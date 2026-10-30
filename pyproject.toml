@@ -1,0 +1,73 @@
+# uv workspace root (virtual: not a package itself).
+[tool.uv]
+required-version = "==0.13.6"
+
+[tool.uv.workspace]
+members = [
+    "services/api",
+    "services/detectors",
+    "services/attributor",
+    "services/replayer",
+    "packages/faults",
+    "sdk/python",
+]
+
+[dependency-groups]
+dev = [
+    "coverage==7.17.0",
+    "pre-commit==4.7.0",
+    "pyright[nodejs]==1.1.414",
+    "pytest==9.2.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.17.3",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [".tools"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F",  # pycodestyle, pyflakes
+    "I",            # isort
+    "N",            # pep8-naming
+    "UP",           # pyupgrade
+    "B",            # bugbear
+    "S",            # bandit
+    "SIM", "C4", "PT", "RUF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+include = ["services", "packages", "sdk"]
+exclude = ["**/.venv", "**/__pycache__", ".tools"]
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config", "-ra"]
+testpaths = ["services", "packages", "sdk"]
+xfail_strict = true
+markers = [
+    "contract: contract tests (telemetry profile, JSON Schemas, golden fixtures)",
+]
+
+[tool.coverage.run]
+branch = true
+source_pkgs = [
+    "traceblame_api",
+    "traceblame_detectors",
+    "traceblame_attributor",
+    "traceblame_replayer",
+    "traceblame_faults",
+    "traceblame_py",
+]
+
+[tool.coverage.report]
+show_missing = true

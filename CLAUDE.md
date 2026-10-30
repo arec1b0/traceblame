@@ -49,4 +49,11 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
   stop and write it as an ADR draft in docs/adr/ instead of improvising.
 
 ## Commands (fill in as they appear)
-- `make bootstrap` / `make lint` / `make test` / `make contract` / `make kind-up` / `make demo`
+Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows in this checkout.
+- `make bootstrap`: install pinned tools into `.tools/` (tools/versions.env + tools/checksums.txt),
+  `uv sync --all-packages --locked`, Go module download, pre-commit hook environments
+- `make lint`: pre-commit over all tracked files (stage new files first)
+- `make test`: pytest with coverage gates (`COV_MIN`), `go test -race` per go.work module
+- `make contract`: contract tests (from #3)
+- `make kind-up` / `make kind-down`: local kind cluster `traceblame`
+- `make demo`: M3
