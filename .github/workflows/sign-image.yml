@@ -1,0 +1,50 @@
+# Keyless image signing (design §1.4: cosign keyless; verified at admission by Kyverno).
+# Reusable stub: release workflows call it with the digest their build produced. Nothing
+# calls it in M0, because no images exist yet; the first caller is the collector build (#5).
+name: sign-image
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Image repository without tag or digest, e.g. ghcr.io/<owner>/traceblame-api
+        required: true
+        type: string
+      digest:
+        description: Image digest from the build job, sha256:<64 hex>
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  sign:
+    name: sign and verify
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write # Fulcio certificate from the GitHub OIDC token
+      packages: write # push the signature next to the image in GHCR
+    env:
+      IMAGE: ${{ inputs.image }}
+      DIGEST: ${{ inputs.digest }}
+    steps:
+      - name: Validate inputs
+        run: |
+          [[ "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "bad digest: ${DIGEST}" >&2; exit 1; }
+          [[ "${IMAGE}" =~ ^ghcr\.io/[a-z0-9._/-]+$ ]] || { echo "bad image: ${IMAGE}" >&2; exit 1; }
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.4
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: cosign login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin <<<"${GH_TOKEN}"
+      - name: Sign by digest
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+      - name: Verify the signature identity
+        # The certificate names this reusable workflow (job_workflow_ref) as the signer.
+        run: |
+          cosign verify \
+            --certificate-identity-regexp "^https://github\.com/${GITHUB_REPOSITORY}/\.github/workflows/sign-image\.yml@refs/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "${IMAGE}@${DIGEST}"

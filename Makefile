@@ -18,7 +18,7 @@ COV_GATED := services/detectors services/attributor
 
 KIND_CLUSTER := traceblame
 
-.PHONY: help bootstrap lint test contract fixtures kind-up kind-down
+.PHONY: help bootstrap lint test contract security fixtures kind-up kind-down
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-10s %s\n", $$1, $$2 }'
@@ -40,6 +40,9 @@ test: ## Unit tests: pytest with coverage gates, go test -race
 contract: ## Contract tests: profile <-> JSON Schema sync, semconv pin, golden fixtures
 	$(UV_RUN) traceblame-contracts gen-schema --check
 	$(UV_RUN) pytest -m contract -rxX
+
+security: ## gitleaks (full history), Syft SBOM, Grype gate; digest-pinned images (needs Docker)
+	@bash scripts/security.sh
 
 fixtures: ## Re-capture golden span fixtures from Ollama (OLLAMA_URL=...; see collector/testdata/fixtures)
 	bash scripts/install-tools.sh otelcol-contrib

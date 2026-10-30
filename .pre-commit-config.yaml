@@ -60,3 +60,9 @@ repos:
         entry: .tools/bin/actionlint
         language: unsupported
         files: ^\.github/workflows/.*\.ya?ml$
+      - id: zizmor
+        name: zizmor
+        # Online audits run when GH_TOKEN is set (CI); offline audits always run.
+        entry: uv run --frozen zizmor --min-severity=low
+        language: unsupported
+        files: ^\.github/workflows/.*\.ya?ml$

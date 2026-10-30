@@ -1,0 +1,12 @@
+# Grype configuration for `make security` (scripts/security.sh).
+#
+# The gate is 0 critical vulnerabilities without a waiver (design §1.4). A waiver is an
+# ignore rule whose reason says why it is acceptable and ends in "expires YYYY-MM-DD";
+# scripts/security.sh fails on a waiver without an expiry or past it. Example:
+#
+# ignore:
+#   - vulnerability: CVE-2026-00000
+#     package:
+#       name: example
+#     reason: not reachable from TraceBlame code paths (see #NN); expires 2026-12-31
+ignore: []

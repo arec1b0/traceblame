@@ -1,0 +1,113 @@
+# CI for M0 (design §1.4): static -> unit -> contract -> security.
+# Every job calls the same make targets as local development, and every tool version comes
+# from tools/versions.env, uv.lock or .pre-commit-config.yaml. Actions are pinned by commit
+# SHA, scanners by image digest.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: static (lint, 0 errors)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Cache pinned tools and environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools
+            ~/.cache/uv
+            ~/.cache/pre-commit
+            ~/.cache/pyright-python
+          key: tools-${{ runner.os }}-${{ hashFiles('tools/versions.env', 'tools/checksums.txt', 'uv.lock', '.pre-commit-config.yaml') }}
+      - run: make bootstrap
+      - name: make lint
+        run: make lint
+        env:
+          # Lets zizmor run its online audits (impostor commits, known-vulnerable actions).
+          GH_TOKEN: ${{ github.token }}
+
+  unit:
+    name: unit (pytest, go test -race, coverage gates)
+    needs: static
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Cache pinned tools and environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools
+            ~/.cache/uv
+            ~/.cache/pre-commit
+            ~/.cache/pyright-python
+          key: tools-${{ runner.os }}-${{ hashFiles('tools/versions.env', 'tools/checksums.txt', 'uv.lock', '.pre-commit-config.yaml') }}
+      - run: make bootstrap
+      - run: make test
+
+  contract:
+    name: contract (profile, JSON Schema, golden fixtures)
+    needs: unit
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the compat check reads the profile at the base revision
+      - name: Cache pinned tools and environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools
+            ~/.cache/uv
+            ~/.cache/pre-commit
+            ~/.cache/pyright-python
+          key: tools-${{ runner.os }}-${{ hashFiles('tools/versions.env', 'tools/checksums.txt', 'uv.lock', '.pre-commit-config.yaml') }}
+      - run: make bootstrap
+      - name: make contract
+        run: make contract
+        env:
+          CONTRACT_BASE_REF: origin/${{ github.base_ref || 'main' }}
+
+  security:
+    name: security (gitleaks, Syft SBOM, Grype gate)
+    needs: contract
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # gitleaks scans the full history
+      - run: make security
+      - name: Upload SBOMs and scan reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-reports
+          path: .security/
+          if-no-files-found: ignore
+          retention-days: 30

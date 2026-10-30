@@ -24,9 +24,10 @@ and `uv.lock`, and the Python version in `.python-version`.
 
 ```bash
 make bootstrap   # pinned tools, uv workspace, Go modules, pre-commit hook environments
-make lint        # pre-commit over all tracked files: ruff, pyright, golangci-lint, hadolint, gitleaks, actionlint
+make lint        # pre-commit: ruff, pyright, golangci-lint, hadolint, gitleaks, actionlint, zizmor
 make test        # pytest with coverage gates, go test -race
 make contract    # profile <-> JSON Schema sync, semconv pin, golden fixtures
+make security    # gitleaks (full history), Syft SBOM, Grype gate; digest-pinned images, needs Docker
 make fixtures    # re-capture golden span fixtures from a local Ollama
 make kind-up     # local kind cluster "traceblame"; make kind-down deletes it
 ```

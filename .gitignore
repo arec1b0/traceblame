@@ -2,6 +2,9 @@
 .tools/
 .venv/
 
+# make security reports (SBOMs, scan results)
+.security/
+
 # Python
 __pycache__/
 *.py[cod]
