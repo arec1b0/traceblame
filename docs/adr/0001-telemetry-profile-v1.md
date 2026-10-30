@@ -1,0 +1,249 @@
+# ADR-0001: Telemetry profile v1 on pinned OTel GenAI semantic conventions
+
+- **Status:** Proposed
+- **Date:** 2026-10-30
+- **Issue:** #1 (M0 Foundations)
+- **Decider:** Daniil Krizhanovskyi
+
+## Context
+
+TraceBlame reads spans from instrumented LLM applications and turns them into a blame
+verdict. Detectors, storage and the attributor need one span shape that does not move
+under them. The design ([docs/design.md](../design.md), "Shared conventions") fixes the
+approach: an `aegis-telemetry` profile v1 on top of pinned OTel GenAI semantic
+conventions, own attributes only under `aegis.*`, with OpenInference as the alternative
+to record. Hard rule 1 in CLAUDE.md requires an explicit version verified from official
+sources.
+
+State of upstream on 2026-10-30:
+
+1. **GenAI left core semconv.** Release v1.42.0 (2026-06-12) deprecated every `gen_ai.*`
+   attribute, metric, event and span in `open-telemetry/semantic-conventions` and moved
+   them to `open-telemetry/semantic-conventions-genai` [S2]. The latest core release is
+   v1.44.0 (2026-08-04) [S3, S4].
+2. **The new repository has no release.** It has no tags and no GitHub releases.
+   `model/manifest.yaml` at commit `72e0d0a097db3ba31ba3f33d0519401a044f6e23` declares
+   `schema_url: https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev` and
+   `stability: development`, with a dependency on core v1.44.0 [S5]. That schema URL
+   returns HTTP 404. `RELEASING.md` describes only a dev channel with `vX.Y.Z-dev`
+   tags [S6], and none has been published.
+3. **v1.41.1 is the last tagged release that defines GenAI.** It was released 2026-05-11
+   (tag commit `ead83b9b0fa36540c1642fce46e874f002ac23f1`) [S1]. Its schema file
+   `https://opentelemetry.io/schemas/1.41.1` resolves [S7]. The registry [S8] defines,
+   at Development stability:
+   - `gen_ai.provider.name`, which replaces the deprecated `gen_ai.system`;
+   - `gen_ai.operation.name`, with well-known values that include `chat`, `embeddings`,
+     `retrieval`, `execute_tool` and `invoke_agent`;
+   - `gen_ai.request.*`, `gen_ai.response.*` and `gen_ai.usage.input_tokens` /
+     `output_tokens`;
+   - `gen_ai.tool.name` and `gen_ai.tool.call.id`, and `gen_ai.agent.name` and
+     `gen_ai.agent.id`;
+   - `gen_ai.conversation.id`, `gen_ai.data_source.id`, `gen_ai.retrieval.documents` and
+     `gen_ai.retrieval.query.text`.
+
+   Attributes added later in the GenAI repository, such as `gen_ai.retrieval.top_k`,
+   are not in v1.41.1.
+4. **Instrumentation SDKs diverge.** None of them emits exactly one semconv version, so a
+   normalizer is needed whatever we pin.
+   - OTel `opentelemetry-instrumentation-openai-v2` 2.4b0 (2026-05-01) follows semconv
+     v1.30.0 by default. With `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`
+     it emits the latest conventions. It does not capture content by default [S9].
+   - OpenInference `openinference-instrumentation-openai` 0.1.68 (2026-10-29) emits only
+     OpenInference conventions: `openinference.span.kind`, and flattened, indexed `llm.*`
+     keys [S10, S11].
+   - OpenLLMetry `opentelemetry-instrumentation-openai` 0.62.4 (2026-09-29) captures
+     prompts and completions by default. `TRACELOOP_TRACE_CONTENT=false` turns that
+     off [S12].
+5. **Repository topology.** The design keeps contracts in the umbrella repository
+   `aegis-platform/contracts`. That repository does not exist yet.
+
+## Decision
+
+### 1. Pin
+
+Profile `aegis-telemetry/1` is defined on **OpenTelemetry semantic conventions v1.41.1**:
+
+| Field | Value |
+|---|---|
+| Repository | `open-telemetry/semantic-conventions` |
+| Tag | `v1.41.1` |
+| Commit | `ead83b9b0fa36540c1642fce46e874f002ac23f1` |
+| Schema URL | `https://opentelemetry.io/schemas/1.41.1` |
+
+Every non-`aegis.*` attribute in the profile must exist in v1.41.1, must not be deprecated
+there, and must use the v1.41.1 type. A contract test checks this against a vendored
+snapshot of the v1.41.1 registry (issue #3).
+
+### 2. Profile identity and versioning
+
+- The profile id is `aegis-telemetry/<major>`. This ADR defines major `1`.
+- The profile YAML carries a semver `revision`. Within one major, only additive changes
+  are allowed: a new optional attribute, a new enum value, or a looser requirement.
+  A compatibility check in CI rejects anything else (see "v(N) / v(N−1) coexistence").
+- Every normalized span carries `aegis.profile.version` = `aegis-telemetry/1`. This
+  matches `profile_version` in the design's ClickHouse `spans` table and blame API.
+
+### 3. Namespace
+
+- Our own attributes live only under `aegis.*`.
+- The `aegis.*` namespace is closed. An `aegis.*` key that the profile does not define is a
+  contract violation.
+- An attribute that is not in v1.41.1 is not part of profile v1, even if a newer GenAI
+  convention defines it. Adopting one needs either a re-pin or a new `aegis.*` attribute,
+  each through an ADR.
+
+### 4. Correlation IDs
+
+| Attribute | Scope | Requirement | Set by |
+|---|---|---|---|
+| `trace_id` | span (OTLP field) | required | SDK |
+| `aegis.tenant.id` | resource | required | shim; the normalizer may fill it from per-pipeline config |
+| `aegis.session.id` | span | recommended | shim; may be mapped from `gen_ai.conversation.id` or OpenInference `session.id` |
+| `aegis.bundle.digest` | span | conditionally required: when a promptops bundle is in use. Format `sha256:<64 hex>` | shim |
+| `aegis.decision.id` | span | conditionally required: on spans that passed an AgentGate decision | AgentGate / shim |
+
+### 5. Content
+
+- Shims ship with content capture off.
+- A normalized span must not carry raw content. The profile JSON Schema rejects
+  `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`,
+  `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, `gen_ai.retrieval.query.text`,
+  and the deprecated `gen_ai.prompt` and `gen_ai.completion`.
+- The normalizer hashes or drops content from SDKs that capture it by default (issue #7).
+- When a tenant opts in, content is stored encrypted out of band with a 7 d TTL, and the
+  span carries only `aegis.content.ref`.
+
+### 6. Where the contracts live
+
+The profile YAML, the generated JSON Schema and the semconv snapshot live in
+`traceblame/schemas/` until `aegis-platform` exists. They then move to
+`aegis-platform/contracts`, and traceblame consumes them as a pinned package. That move
+gets its own ADR.
+
+## Adapter layer
+
+```
+SDK spans ─▶ detect source ─▶ map to canonical model ─▶ emit profile vN ─▶ normalized spans
+```
+
+- **Detect.** The normalizer identifies the SDK and its convention version from:
+  - the instrumentation scope name and version;
+  - the scope or resource `schema_url`;
+  - `telemetry.sdk.*`;
+  - marker attributes: `openinference.span.kind`, `llm.*`, `traceloop.*`.
+- **Map.** There is one mapping table per (SDK, source convention version), kept as data
+  in `collector/processor/normalizer/`. Examples:
+  - OpenInference `llm.model_name` → `gen_ai.request.model`;
+  - `openinference.span.kind=RETRIEVER` → `aegis.span.kind=retrieval`;
+  - v1.30-era `gen_ai.system` → `gen_ai.provider.name`.
+- **Emit.** One emitter per profile major writes the span and sets
+  `aegis.profile.version`.
+- **Derived span class.** The normalizer sets `aegis.span.kind`
+  (`llm|embedding|retrieval|tool|agent|chain`). Detectors key on it, so when upstream
+  renames `gen_ai.operation.name` values, only the mapping tables change.
+- **Drift signal.** Unmapped attributes pass through and are counted in
+  `traceblame_normalizer_unmapped_attrs_total{sdk,attr}`. The `UnmappedAttrsSpike` alert
+  watches it.
+- **Fixtures.** Real exports per SDK and version live in `collector/testdata/fixtures/`
+  (dataset D4). The contract stage runs fixtures → normalizer → profile JSON Schema.
+  The OTel-native fixture is captured in both default and `gen_ai_latest_experimental`
+  mode, so two source versions of one SDK are covered from the start.
+
+## v(N) / v(N−1) coexistence
+
+- The normalizer can emit profile v(N) and v(N−1) at the same time. The choice is per
+  pipeline and lives in collector config, not in code.
+- Consumers (storage, detectors, attributor) read `aegis.profile.version` and accept both
+  versions during a migration window.
+- A new major N+1 rolls out in the same expand → migrate → contract order as ClickHouse
+  migrations:
+  1. **Expand.** Ship consumers that accept N and N+1. The normalizer still emits N.
+     Contract tests validate fixtures against both schemas.
+  2. **Migrate.** Switch the emitter to N+1 pipeline by pipeline, starting with the
+     second gateway pool.
+  3. **Contract.** Drop N−1 once no N−1 span is left within the spans TTL (30 d).
+- **Rollback** reverts the collector ConfigMap to emit N−1. Agents hold spans in their
+  file queue during the switch.
+- Within one major, the CI compatibility check rejects these changes:
+  - an attribute is removed or renamed;
+  - an attribute's type changes;
+  - a requirement is tightened;
+  - an enum value is removed;
+  - the semconv pin changes.
+
+## Alternatives considered
+
+**A. OpenInference conventions as canonical.** Rejected.
+- For: richer retrieval, reranker and document semantics; wide framework coverage;
+  a mature ecosystem around Phoenix.
+- Against:
+  - It is governed by one vendor.
+  - Its indexed keys (`llm.input_messages.0.message.content`) fit columnar storage and
+    JSON Schema poorly.
+  - OTel collectors and backends are converging on `gen_ai.*`.
+  - OpenInference stays a first-class *source*. The adapter layer maps it, and its
+    fixtures run in every contract test.
+
+**B. Pin `semantic-conventions-genai` at a commit SHA.** Rejected for now.
+- For: it is where GenAI development happens, and it has newer attributes.
+- Against:
+  - There is no release.
+  - Its `schema_url` (`gen-ai-dev/1.42.0-dev`) returns 404 and covers many commits, so a
+    span cannot say which definition it follows.
+  - Definitions change under the same version string.
+
+This becomes the re-pin target once a non-dev release ships.
+
+**C. Pin core v1.44.0, the latest core release.** Rejected. `gen_ai.*` is deprecated
+there; that release points to the GenAI repository for it.
+
+**D. Track latest with no pin.** Rejected. It violates hard rule 1, and the contract would
+drift silently.
+
+## Consequences
+
+**Positive**
+- The pin is reproducible: an immutable tag, a published schema file, and a vendored
+  registry snapshot checked in CI.
+- Detectors depend on the profile, not on any SDK. An SDK or upstream change is absorbed
+  in mapping tables and caught by fixtures and the unmapped-attribute metric.
+- Hard rule 2 (no content) is enforced by the contract, not only by convention.
+
+**Negative and risks**
+- v1.41.1 GenAI definitions are deprecated in core ≥ v1.42.0. The attributes we rely on
+  keep the same names in `semantic-conventions-genai` at `72e0d0a`. Upstream stability
+  is still Development, so renames remain possible.
+- Newer attributes, such as `gen_ai.retrieval.top_k`, are unavailable until a re-pin.
+- `aegis.retrieval.doc_ids`, `aegis.retrieval.scores` and `aegis.tool.args_hash` exist
+  because `any`-typed or content-bearing semconv attributes cannot be emitted portably
+  without content. They are defined in the profile (issue #3).
+
+**Re-pin triggers.** Any of these opens a new ADR:
+1. `semantic-conventions-genai` publishes its first non-dev release.
+2. Upstream renames or removes an attribute that the profile uses.
+3. An SDK we support stops emitting v1.41-era names.
+
+A breaking re-pin becomes profile major 2 and follows the coexistence process above.
+
+**Follow-ups**
+- M1: a scheduled drift check that compares profile attributes against
+  `semantic-conventions-genai@HEAD`.
+- An ADR that moves the contracts to `aegis-platform/contracts` once that repository
+  exists.
+
+## Sources
+
+Checked 2026-10-30.
+
+- [S1] semantic-conventions v1.41.1 release — https://github.com/open-telemetry/semantic-conventions/releases/tag/v1.41.1
+- [S2] semantic-conventions v1.42.0 release (GenAI move) — https://github.com/open-telemetry/semantic-conventions/releases/tag/v1.42.0
+- [S3] semantic-conventions v1.44.0 release — https://github.com/open-telemetry/semantic-conventions/releases/tag/v1.44.0
+- [S4] OpenTelemetry semantic conventions docs index — https://opentelemetry.io/docs/specs/semconv/
+- [S5] semantic-conventions-genai `model/manifest.yaml` @ 72e0d0a — https://github.com/open-telemetry/semantic-conventions-genai/blob/72e0d0a097db3ba31ba3f33d0519401a044f6e23/model/manifest.yaml
+- [S6] semantic-conventions-genai `RELEASING.md` @ 72e0d0a — https://github.com/open-telemetry/semantic-conventions-genai/blob/72e0d0a097db3ba31ba3f33d0519401a044f6e23/RELEASING.md
+- [S7] Schema file 1.41.1 — https://opentelemetry.io/schemas/1.41.1
+- [S8] v1.41.1 GenAI attribute registry — https://github.com/open-telemetry/semantic-conventions/blob/v1.41.1/docs/registry/attributes/gen-ai.md
+- [S9] opentelemetry-instrumentation-openai-v2 on PyPI — https://pypi.org/project/opentelemetry-instrumentation-openai-v2/
+- [S10] openinference-instrumentation-openai on PyPI — https://pypi.org/project/openinference-instrumentation-openai/
+- [S11] OpenInference semantic conventions — https://github.com/Arize-ai/openinference/blob/main/spec/semantic_conventions.md
+- [S12] opentelemetry-instrumentation-openai (OpenLLMetry) on PyPI — https://pypi.org/project/opentelemetry-instrumentation-openai/
