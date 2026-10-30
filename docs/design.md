@@ -402,6 +402,8 @@ Collector: otelcol_receiver_accepted_spans, otelcol_exporter_send_failed_spans, 
 - 
 traceblame_normalizer_unmapped_attrs_total{sdk,attr} — ранний сигнал semconv drift.
 - 
+traceblame_normalizer_newer_schema_spans_total{sdk,schema_url} — спаны со schema_url новее известных mapping tables (map + pass-through, ADR-0001).
+- 
 traceblame_pipeline_lag_seconds (span end → blame written), histogram.
 - 
 traceblame_findings_total{detector,component}, traceblame_detector_duration_seconds.
