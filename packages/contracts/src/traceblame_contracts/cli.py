@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from traceblame_contracts.compat import diff_profiles
+from traceblame_contracts.compat import breaking_within_major, diff_profiles
 from traceblame_contracts.jsonschema_gen import generate_json_schema, render_json_schema
 from traceblame_contracts.normalizers import NORMALIZERS
 from traceblame_contracts.otlp import flatten_otlp_json
@@ -53,11 +53,15 @@ def _validate(args: argparse.Namespace) -> int:
 
 
 def _compat(args: argparse.Namespace) -> int:
-    breaks = diff_profiles(load_profile(args.old), load_profile(args.new))
-    for brk in breaks:
-        print(f"{brk.rule}: {brk.subject} {brk.detail}".rstrip())
-    print(f"{len(breaks)} breaking change(s)")
-    return 1 if breaks else 0
+    old, new = load_profile(args.old), load_profile(args.new)
+    diff = diff_profiles(old, new)
+    for change in diff.changes:
+        print(f"[{change.severity}] {change.rule}: {change.subject} {change.detail}".rstrip())
+    print(f"required bump: {diff.bump}")
+    blocked = breaking_within_major(old, new)
+    if blocked:
+        print(f"{len(blocked)} major change(s) need {old.profile}/{old.major + 1}")
+    return 1 if blocked else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

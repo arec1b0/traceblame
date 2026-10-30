@@ -8,7 +8,8 @@
 #   release (snapshot: schemas/semconv/v1.41.1). Semconv attributes keep their names;
 #   renames from SDK conventions belong in the normalizer mapping tables.
 # - Own attributes live only under aegis.*, and the aegis.* namespace is closed.
-# - Within major 1 only additive changes are allowed (`traceblame-contracts compat`).
+# - Within major 1 only minor changes are allowed: `traceblame-contracts compat` classifies
+#   every change as major or minor (rules in ADR-0001, section 2).
 # - Requirement levels are per span kind; `all` applies to every kind, and a kind-specific
 #   entry overrides it. The JSON Schema enforces `required`; `conditionally_required`
 #   carries its condition and is enforced by normalizer tests.

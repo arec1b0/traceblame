@@ -11,7 +11,7 @@ import yaml
 from jsonschema import Draft202012Validator
 
 from traceblame_contracts.cli import schema_path_for
-from traceblame_contracts.compat import diff_profiles
+from traceblame_contracts.compat import breaking_within_major
 from traceblame_contracts.jsonschema_gen import render_json_schema
 from traceblame_contracts.profile import OPERATION_ATTRIBUTE, Profile
 from traceblame_contracts.semconv import Snapshot
@@ -67,7 +67,7 @@ def test_forbidden_attributes_are_semconv_names(profile: Profile, snapshot: Snap
 
 
 def test_no_breaking_change_against_the_base_revision(profile: Profile) -> None:
-    """Within one major, the profile only grows (CONTRACT_BASE_REF, default main)."""
+    """Within one major only minor changes (ADR-0001 section 2); base: CONTRACT_BASE_REF."""
     ref = os.environ.get("CONTRACT_BASE_REF", "main")
     git = shutil.which("git")
     if git is None:
@@ -79,4 +79,4 @@ def test_no_breaking_change_against_the_base_revision(profile: Profile) -> None:
     if shown.returncode != 0:
         pytest.skip(f"no baseline profile at {ref}:{path}")
     base = Profile.model_validate(yaml.safe_load(shown.stdout))
-    assert diff_profiles(base, profile) == []
+    assert breaking_within_major(base, profile) == []

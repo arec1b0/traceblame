@@ -72,4 +72,6 @@ def test_compat(
     newer = tmp_path / "newer.yaml"
     newer.write_text(yaml.safe_dump(minimal_profile, sort_keys=False), "utf-8")
     assert main(["compat", str(profile_path), str(newer)]) == 1
-    assert "forbidden_added" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "[major] forbidden_added" in out
+    assert "required bump: major" in out

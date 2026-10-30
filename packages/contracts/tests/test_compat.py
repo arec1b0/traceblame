@@ -3,16 +3,39 @@ from typing import Any
 
 import pytest
 
-from traceblame_contracts.compat import diff_profiles
+from traceblame_contracts.compat import ProfileDiff, breaking_within_major, diff_profiles
 from traceblame_contracts.profile import Profile
+
+_OPTIONAL: dict[str, Any] = {
+    "name": "gen_ai.response.model",
+    "scope": "span",
+    "type": "string",
+    "source": {"semconv": "gen_ai.response.model"},
+    "requirement": {"llm": "recommended"},
+    "brief": "Response model.",
+}
 
 
 def _attr(profile: dict[str, Any], name: str) -> dict[str, Any]:
     return next(a for a in profile["attributes"] if a["name"] == name)
 
 
-def _rules(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
-    return [b.rule for b in diff_profiles(Profile.model_validate(old), Profile.model_validate(new))]
+def _without(profile: dict[str, Any], name: str) -> None:
+    profile["attributes"] = [a for a in profile["attributes"] if a["name"] != name]
+
+
+def _diff(old: dict[str, Any], new: dict[str, Any]) -> ProfileDiff:
+    return diff_profiles(Profile.model_validate(old), Profile.model_validate(new))
+
+
+def _changes(old: dict[str, Any], new: dict[str, Any]) -> list[tuple[str, str]]:
+    return [(c.severity, c.rule) for c in _diff(old, new).changes]
+
+
+def _repin(profile: dict[str, Any], version: str) -> None:
+    profile["semconv"]["version"] = version
+    profile["semconv"]["commit"] = "f" * 40
+    profile["semconv"]["schema_url"] = f"https://opentelemetry.io/schemas/{version}"
 
 
 @pytest.fixture
@@ -25,106 +48,195 @@ def new(minimal_profile: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(minimal_profile)
 
 
-def test_identical_profiles_have_no_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    assert _rules(old, new) == []
+def test_identical_profiles_have_no_changes(old: dict[str, Any], new: dict[str, Any]) -> None:
+    diff = _diff(old, new)
+    assert diff.changes == ()
+    assert diff.bump == "none"
 
 
-def test_removed_attribute_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    new["attributes"] = [a for a in new["attributes"] if a["name"] != "gen_ai.usage.input_tokens"]
-    assert _rules(old, new) == ["attribute_removed"]
+# Major: needs the next profile major.
 
 
-def test_type_change_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    _attr(new, "gen_ai.usage.input_tokens")["type"] = "double"
-    assert _rules(old, new) == ["type_changed"]
+def test_required_attribute_removed_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _without(new, "gen_ai.request.model")
+    assert _changes(old, new) == [("major", "attribute_removed")]
+    assert _diff(old, new).bump == "major"
 
 
-def test_tightened_requirement_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
+def test_required_attribute_renamed_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    spec = _attr(new, "gen_ai.request.model")
+    spec["name"] = spec["source"]["semconv"] = "gen_ai.request.model_id"
+    assert _changes(old, new) == [
+        ("major", "attribute_removed"),
+        ("major", "required_attribute_added"),
+    ]
+
+
+def test_required_attribute_retyped_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _attr(new, "gen_ai.request.model")["type"] = "int"
+    assert _changes(old, new) == [("major", "type_changed")]
+
+
+def test_enum_value_removed_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    old["span_kinds"]["tool"] = {"description": "Tool call.", "operations": []}
+    _attr(old, "aegis.span.kind")["enum"] = ["llm", "chain", "tool"]
+    assert _changes(old, new) == [
+        ("major", "span_kind_removed"),
+        ("major", "enum_value_removed"),
+    ]
+
+
+def test_optional_attribute_removed_is_major_too(old: dict[str, Any], new: dict[str, Any]) -> None:
+    old["attributes"].append(copy.deepcopy(_OPTIONAL))
+    assert _changes(old, new) == [("major", "attribute_removed")]
+
+
+def test_attribute_moved_between_scopes_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _attr(new, "aegis.tenant.id")["scope"] = "span"
+    assert _changes(old, new) == [("major", "scope_changed")]
+
+
+def test_tightened_requirement_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
     spec = _attr(new, "gen_ai.usage.input_tokens")
     spec["requirement"] = {"llm": "required"}
     del spec["condition"]
-    assert _rules(old, new) == ["requirement_tightened"]
+    assert _changes(old, new) == [("major", "requirement_tightened")]
 
 
-def test_loosened_requirement_is_compatible(old: dict[str, Any], new: dict[str, Any]) -> None:
+def test_new_required_attribute_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    new["attributes"].append(dict(_OPTIONAL, requirement={"llm": "required"}))
+    assert _changes(old, new) == [("major", "required_attribute_added")]
+
+
+def test_removed_operation_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    old["span_kinds"]["llm"]["operations"] = ["chat", "text_completion"]
+    assert _changes(old, new) == [("major", "operation_removed")]
+
+
+def test_constraining_operations_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    new["span_kinds"]["chain"]["operations"] = ["invoke_workflow"]
+    assert _changes(old, new) == [("major", "operations_constrained")]
+
+
+def test_new_pattern_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _attr(new, "gen_ai.request.model")["pattern"] = "^[a-z]+$"
+    assert _changes(old, new) == [("major", "constraint_changed")]
+
+
+def test_new_enum_constraint_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _attr(new, "gen_ai.request.model")["enum"] = ["qwen2.5:7b"]
+    assert _changes(old, new) == [("major", "constraint_changed")]
+
+
+def test_new_forbidden_attribute_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    new["forbidden"].append({"name": "gen_ai.output.messages", "reason": "content"})
+    assert _changes(old, new) == [("major", "forbidden_added")]
+
+
+# Minor: allowed within the major.
+
+
+def test_optional_attribute_added_is_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
+    new["attributes"].append(copy.deepcopy(_OPTIONAL))
+    assert _changes(old, new) == [("minor", "attribute_added")]
+    assert _diff(old, new).bump == "minor"
+
+
+def test_pin_change_with_identical_attributes_is_minor(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    """v1.41.1 -> a hypothetical v1.41.2 that defines the same attributes."""
+    _repin(new, "1.41.2")
+    diff = _diff(old, new)
+    assert _changes(old, new) == [("minor", "semconv_pin_changed")]
+    assert diff.bump == "minor"
+    assert "1.41.1 -> 1.41.2" in diff.changes[0].detail
+
+
+def test_pin_change_with_a_retyped_attribute_is_major(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _repin(new, "1.41.2")
+    _attr(new, "gen_ai.usage.input_tokens")["type"] = "double"
+    assert _changes(old, new) == [("minor", "semconv_pin_changed"), ("major", "type_changed")]
+    assert _diff(old, new).bump == "major"
+
+
+def test_loosened_requirement_is_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
     _attr(new, "gen_ai.request.model")["requirement"] = {"llm": "recommended"}
-    assert _rules(old, new) == []
+    assert _changes(old, new) == [("minor", "requirement_loosened")]
 
 
-def test_new_optional_attribute_is_compatible(old: dict[str, Any], new: dict[str, Any]) -> None:
-    new["attributes"].append(
-        {
-            "name": "gen_ai.response.model",
-            "scope": "span",
-            "type": "string",
-            "source": {"semconv": "gen_ai.response.model"},
-            "requirement": {"llm": "recommended"},
-            "brief": "x",
-        }
-    )
-    assert _rules(old, new) == []
-
-
-def test_new_required_attribute_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    new["attributes"].append(
-        {
-            "name": "gen_ai.response.model",
-            "scope": "span",
-            "type": "string",
-            "source": {"semconv": "gen_ai.response.model"},
-            "requirement": {"llm": "required"},
-            "brief": "x",
-        }
-    )
-    assert _rules(old, new) == ["required_attribute_added"]
-
-
-def test_removed_enum_value_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    old["span_kinds"]["tool"] = {"description": "Tool call.", "operations": []}
-    _attr(old, "aegis.span.kind")["enum"] = ["llm", "chain", "tool"]
-    assert _rules(old, new) == ["span_kind_removed", "enum_value_removed"]
-
-
-def test_added_enum_value_is_compatible(old: dict[str, Any], new: dict[str, Any]) -> None:
+def test_added_enum_value_is_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
     new["span_kinds"]["tool"] = {"description": "Tool call.", "operations": []}
     _attr(new, "aegis.span.kind")["enum"] = ["llm", "chain", "tool"]
-    assert _rules(old, new) == []
+    assert _changes(old, new) == [("minor", "span_kind_added"), ("minor", "enum_value_added")]
 
 
-def test_removed_operation_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    old["span_kinds"]["llm"]["operations"] = ["chat", "text_completion"]
-    assert _rules(old, new) == ["operation_removed"]
+def test_added_operation_is_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
+    new["span_kinds"]["llm"]["operations"] = ["chat", "text_completion"]
+    assert _changes(old, new) == [("minor", "operation_added")]
 
 
-def test_constraining_operations_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    new["span_kinds"]["chain"]["operations"] = ["invoke_workflow"]
-    assert _rules(old, new) == ["operations_constrained"]
+def test_removed_pattern_is_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _attr(old, "gen_ai.request.model")["pattern"] = "^[a-z]+$"
+    assert _changes(old, new) == [("minor", "constraint_removed")]
 
 
-def test_new_pattern_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    _attr(new, "gen_ai.request.model")["pattern"] = "^[a-z]+$"
-    assert _rules(old, new) == ["constraint_changed"]
+def test_removed_enum_constraint_is_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _attr(old, "gen_ai.request.model")["enum"] = ["qwen2.5:7b"]
+    assert _changes(old, new) == [("minor", "constraint_removed")]
 
 
-def test_new_forbidden_attribute_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    new["forbidden"].append({"name": "gen_ai.output.messages", "reason": "content"})
-    assert _rules(old, new) == ["forbidden_added"]
+def test_unconstrained_operations_are_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
+    new["span_kinds"]["llm"]["operations"] = []
+    assert _changes(old, new) == [("minor", "operations_unconstrained")]
 
 
-def test_semconv_pin_change_breaks(old: dict[str, Any], new: dict[str, Any]) -> None:
-    new["semconv"]["version"] = "1.44.0"
-    assert _rules(old, new) == ["semconv_pin_changed"]
+def test_pin_moving_to_the_genai_repository_is_minor(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _repin(new, "1.42.0")
+    new["semconv"]["repository"] = "open-telemetry/semantic-conventions-genai"
+    (change,) = _diff(old, new).changes
+    assert (change.severity, change.rule) == ("minor", "semconv_pin_changed")
+    assert change.detail == (
+        "1.41.1 -> 1.42.0 (open-telemetry/semantic-conventions -> "
+        "open-telemetry/semantic-conventions-genai)"
+    )
 
 
-def test_different_major_is_not_compared(old: dict[str, Any], new: dict[str, Any]) -> None:
+def test_removed_forbidden_attribute_is_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
+    new["forbidden"] = []
+    assert _changes(old, new) == [("minor", "forbidden_removed")]
+
+
+# The CI gate: major changes are rejected only when the major stays the same.
+
+
+def test_major_change_within_the_same_major_is_rejected(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _without(new, "gen_ai.request.model")
+    (change,) = breaking_within_major(Profile.model_validate(old), Profile.model_validate(new))
+    assert change.rule == "attribute_removed"
+
+
+def test_major_change_with_a_major_bump_passes(old: dict[str, Any], new: dict[str, Any]) -> None:
     new["major"] = 2
     _attr(new, "aegis.profile.version")["const"] = "aegis-telemetry/2"
-    new["attributes"] = [a for a in new["attributes"] if a["name"] != "gen_ai.usage.input_tokens"]
-    assert _rules(old, new) == []
+    _without(new, "gen_ai.request.model")
+    assert _diff(old, new).bump == "major"
+    assert breaking_within_major(Profile.model_validate(old), Profile.model_validate(new)) == []
 
 
-def test_break_names_the_subject(old: dict[str, Any], new: dict[str, Any]) -> None:
+def test_minor_change_passes_the_gate(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _repin(new, "1.41.2")
+    assert breaking_within_major(Profile.model_validate(old), Profile.model_validate(new)) == []
+
+
+def test_change_names_its_subject_and_detail(old: dict[str, Any], new: dict[str, Any]) -> None:
     _attr(new, "gen_ai.usage.input_tokens")["type"] = "double"
-    (brk,) = diff_profiles(Profile.model_validate(old), Profile.model_validate(new))
-    assert brk.subject == "gen_ai.usage.input_tokens"
-    assert "int -> double" in brk.detail
+    (change,) = _diff(old, new).changes
+    assert change.subject == "gen_ai.usage.input_tokens"
+    assert change.detail == "int -> double"
