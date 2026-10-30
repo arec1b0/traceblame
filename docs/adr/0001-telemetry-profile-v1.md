@@ -1,6 +1,6 @@
 # ADR-0001: Telemetry profile v1 on pinned OTel GenAI semantic conventions
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-30
 - **Issue:** #1 (M0 Foundations)
 - **Decider:** Daniil Krizhanovskyi

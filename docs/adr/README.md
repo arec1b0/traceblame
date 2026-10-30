@@ -23,4 +23,4 @@ improvising.
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-telemetry-profile-v1.md) | Telemetry profile v1 on pinned OTel GenAI semantic conventions | Proposed |
+| [0001](0001-telemetry-profile-v1.md) | Telemetry profile v1 on pinned OTel GenAI semantic conventions | Accepted |
