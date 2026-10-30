@@ -109,9 +109,23 @@ snapshot of the v1.41.1 registry (issue #3).
 ### 2. Profile identity and versioning
 
 - The profile id is `aegis-telemetry/<major>`. This ADR defines major `1`.
-- The profile YAML carries a semver `revision`. Within one major, only additive changes
-  are allowed: a new optional attribute, a new enum value, or a looser requirement.
-  A compatibility check in CI rejects anything else (see "v(N) / v(N−1) coexistence").
+- The profile YAML carries a semver `revision`.
+- The compat checker (`traceblame_contracts.compat.diff_profiles`, issue #3) computes a
+  semantic diff of two profile revisions and classifies every change. Within one major,
+  CI allows only minor changes. A major change needs the next profile major.
+
+  | Major (needs `aegis-telemetry/<N+1>`) | Minor (allowed within the major; bump `revision`) |
+  |---|---|
+  | an attribute removed or renamed (a rename is a removal plus an addition) | an optional attribute added |
+  | an attribute retyped, or moved between resource and span | an enum value, span kind or allowed operation added |
+  | an enum value removed, including a span kind or an allowed operation | a requirement loosened |
+  | a requirement tightened to `required` or `conditionally_required`, or a new attribute added at that level | a pattern, const or enum constraint removed |
+  | a pattern, const or enum constraint added or changed, or a kind's operations constrained | an attribute removed from the forbidden list |
+  | an attribute added to the forbidden list | the semconv pin changed, with no major change at attribute level |
+
+  Removing, renaming or retyping is major for optional attributes too: consumers may read
+  them, and the `aegis.*` namespace is closed. A pin change is judged by what it does to
+  the profile's attributes, not by the version string.
 - Every normalized span carries `aegis.profile.version` = `aegis-telemetry/1`. This
   matches `profile_version` in the design's ClickHouse `spans` table and blame API.
 
@@ -208,8 +222,8 @@ a span.
    - The `UnmappedAttrsSpike` alert watches that counter. It is the early drift signal and
      feeds the migration trigger below.
    - Spans whose `schema_url` is newer than every known table also increment
-     `traceblame_normalizer_newer_schema_spans_total{sdk,schema_url}`. This metric is
-     proposed here; the label set is bounded by the number of releases.
+     `traceblame_normalizer_newer_schema_spans_total{sdk,schema_url}`, listed in design
+     §1.5. Its label set is bounded by the number of releases.
 5. **Fail open.** A span is never dropped because of its `schema_url`. If a required
    profile attribute is still missing after mapping, the span is emitted anyway. Contract
    tests on fixtures, and the counters in production, expose the gap.
@@ -234,12 +248,8 @@ Why pass-through rather than dropping or remapping by guess:
   3. **Contract.** Drop N−1 once no N−1 span is left within the spans TTL (30 d).
 - **Rollback** reverts the collector ConfigMap to emit N−1. Agents hold spans in their
   file queue during the switch.
-- Within one major, the CI compatibility check rejects these changes:
-  - an attribute is removed or renamed;
-  - an attribute's type changes;
-  - a requirement is tightened;
-  - an enum value is removed;
-  - the semconv pin changes.
+- Within one major, the CI compatibility check rejects every major change in the table in
+  "Profile identity and versioning". Minor changes pass.
 
 ## Migration trigger
 
@@ -252,13 +262,17 @@ When that release ships:
    - Vendor its registry. `tools/semconv/fetch.sh` currently reads only the core
      repository and needs that second source.
    - Diff the profile's attributes against it.
-2. **The re-pin is profile major 2** (`aegis-telemetry/2`). The compat check treats any
-   pin change as breaking, even if every name survives, because `aegis.profile.version`
-   must name exactly one semconv definition.
-3. **The rollout follows the coexistence process above:**
+2. **The compat checker decides the bump.**
+   - If every profile attribute survives with the same name, type and requirements, the
+     re-pin is minor: a new `revision` of `aegis-telemetry/1`.
+   - It becomes major (`aegis-telemetry/2`) only if the attribute-level diff has a major
+     change, for example an attribute upstream removed, renamed or retyped.
+3. **A major re-pin follows the coexistence process above:**
    - the normalizer emits v1 and v2 side by side;
    - consumers accept both;
    - v1 is dropped after one spans TTL (30 d).
+
+   A minor re-pin ships like any other minor revision.
 
 **Secondary triggers.** Each of these also opens a new ADR:
 - upstream renames or removes an attribute that the profile uses;
@@ -315,8 +329,9 @@ drift silently.
   because `any`-typed or content-bearing semconv attributes cannot be emitted portably
   without content. They are defined in the profile (issue #3).
 
-**Re-pinning.** See "Migration trigger": every re-pin is a new profile major and follows
-the coexistence process.
+**Re-pinning.** See "Migration trigger". A re-pin is a new profile major only when its
+attribute-level diff is breaking under the compat checker rules; otherwise it is a minor
+revision.
 
 **Follow-ups**
 - M1: a scheduled drift check that compares profile attributes against
