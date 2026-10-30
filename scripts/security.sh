@@ -57,9 +57,12 @@ run -v "${ROOT}:/repo:ro" -v "${OUT}:/out" -e XDG_CACHE_HOME=/tmp \
   -o spdx-json=/out/sbom.spdx.json -o cyclonedx-json=/out/sbom.cdx.json
 
 echo "==> grype: vulnerabilities in the SBOM (fail on critical)"
-run -v "${OUT}:/out" -v "${ROOT}/.grype.yaml:/config/grype.yaml:ro" -v "${CACHE}:/cache" \
+# Mount the repo directory, not the single .grype.yaml file. On WSL2, Docker Desktop keeps a
+# helper mount per bind source, and a file-level one stops git in WSL from recreating
+# .grype.yaml after a branch switch deletes it.
+run -v "${ROOT}:/repo:ro" -v "${OUT}:/out" -v "${CACHE}:/cache" \
   -e GRYPE_DB_CACHE_DIR=/cache/grype-db -e XDG_CACHE_HOME=/tmp \
-  "${GRYPE_IMAGE}" sbom:/out/sbom.spdx.json --config /config/grype.yaml \
+  "${GRYPE_IMAGE}" sbom:/out/sbom.spdx.json --config /repo/.grype.yaml \
   --fail-on critical -o table=/out/grype.txt -o json=/out/grype.json || {
   status=$?
   cat "${OUT}/grype.txt" >&2 || true
