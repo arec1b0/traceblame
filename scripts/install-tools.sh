@@ -2,6 +2,8 @@
 # Install the pinned developer tools into .tools/ (Linux x86_64 only; on Windows use WSL2).
 # Versions come from tools/versions.env, sha256 checksums from tools/checksums.txt.
 # Re-running is a no-op for tools whose pinned version is already installed.
+# Usage: scripts/install-tools.sh            install the default toolset
+#        scripts/install-tools.sh TOOL...    install only the named tools (e.g. otelcol-contrib)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -100,11 +102,32 @@ install_kubectl() {
   install -m 0755 "${WORK}/${name}" "${BIN}/kubectl"
 }
 
-ensure uv "${UV_VERSION}" install_uv
-ensure go "${GO_VERSION}" install_go
-ensure golangci-lint "${GOLANGCI_LINT_VERSION}" install_golangci_lint
-ensure hadolint "${HADOLINT_VERSION}" install_hadolint
-ensure gitleaks "${GITLEAKS_VERSION}" install_gitleaks
-ensure actionlint "${ACTIONLINT_VERSION}" install_actionlint
-ensure kind "${KIND_VERSION}" install_kind
-ensure kubectl "${KUBECTL_VERSION}" install_kubectl
+install_otelcol_contrib() {
+  local name="otelcol-contrib_$1_linux_amd64.tar.gz"
+  fetch "${name}" "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v$1/${name}"
+  tar -xzf "${WORK}/${name}" -C "${WORK}" otelcol-contrib
+  install -m 0755 "${WORK}/otelcol-contrib" "${BIN}/"
+}
+
+# tool name -> "VERSION FUNC"
+declare -A TOOLSET=(
+  [uv]="${UV_VERSION} install_uv"
+  [go]="${GO_VERSION} install_go"
+  [golangci-lint]="${GOLANGCI_LINT_VERSION} install_golangci_lint"
+  [hadolint]="${HADOLINT_VERSION} install_hadolint"
+  [gitleaks]="${GITLEAKS_VERSION} install_gitleaks"
+  [actionlint]="${ACTIONLINT_VERSION} install_actionlint"
+  [kind]="${KIND_VERSION} install_kind"
+  [kubectl]="${KUBECTL_VERSION} install_kubectl"
+  [otelcol-contrib]="${OTELCOL_CONTRIB_VERSION} install_otelcol_contrib"
+)
+DEFAULT_TOOLS=(uv go golangci-lint hadolint gitleaks actionlint kind kubectl)
+
+for tool in "${@:-${DEFAULT_TOOLS[@]}}"; do
+  if [[ -z "${TOOLSET[${tool}]:-}" ]]; then
+    echo "install-tools: unknown tool ${tool}" >&2
+    exit 1
+  fi
+  read -r version func <<<"${TOOLSET[${tool}]}"
+  ensure "${tool}" "${version}" "${func}"
+done

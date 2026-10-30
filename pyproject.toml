@@ -8,6 +8,7 @@ members = [
     "services/detectors",
     "services/attributor",
     "services/replayer",
+    "packages/contracts",
     "packages/faults",
     "sdk/python",
 ]
@@ -20,6 +21,7 @@ dev = [
     "pytest==9.2.0",
     "pytest-cov==7.1.0",
     "ruff==0.17.3",
+    "types-pyyaml==6.0.12.20261030",
 ]
 
 [tool.ruff]
@@ -38,13 +40,16 @@ select = [
     "SIM", "C4", "PT", "RUF",
 ]
 
+[tool.ruff.lint.isort]
+known-first-party = ["traceblame_*"]
+
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]
 
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
-include = ["services", "packages", "sdk"]
+include = ["services", "packages", "sdk", "tests"]
 exclude = ["**/.venv", "**/__pycache__", ".tools"]
 venvPath = "."
 venv = ".venv"
@@ -52,7 +57,7 @@ venv = ".venv"
 [tool.pytest.ini_options]
 minversion = "9.0"
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config", "-ra"]
-testpaths = ["services", "packages", "sdk"]
+testpaths = ["services", "packages", "sdk", "tests"]
 xfail_strict = true
 markers = [
     "contract: contract tests (telemetry profile, JSON Schemas, golden fixtures)",
@@ -64,6 +69,7 @@ source_pkgs = [
     "traceblame_api",
     "traceblame_detectors",
     "traceblame_attributor",
+    "traceblame_contracts",
     "traceblame_replayer",
     "traceblame_faults",
     "traceblame_py",

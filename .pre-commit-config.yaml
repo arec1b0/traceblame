@@ -2,8 +2,9 @@
 # Local hooks call the pinned tools from .tools/bin (tools/versions.env) and uv.lock,
 # so every version has one source.
 minimum_pre_commit_version: "4.7.0"
-# docs/design.md is a verbatim extract of the design doc; keep it byte-identical to the source.
-exclude: ^docs/design\.md$
+# Keep byte-identical: the verbatim design doc extract, the vendored semconv snapshot
+# (SHA256SUMS) and the captured fixtures (fixture_sha256 in their provenance).
+exclude: ^(docs/design\.md|schemas/semconv/|collector/testdata/fixtures/)
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

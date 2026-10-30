@@ -1,0 +1,578 @@
+{
+  "$id": "urn:aegis:schema:aegis-telemetry:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "aegis.span.kind": {
+                "const": "llm"
+              }
+            },
+            "required": [
+              "aegis.span.kind"
+            ]
+          }
+        },
+        "required": [
+          "attributes"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "gen_ai.operation.name": {
+                "enum": [
+                  "chat",
+                  "text_completion",
+                  "generate_content"
+                ]
+              }
+            },
+            "required": [
+              "gen_ai.operation.name",
+              "gen_ai.provider.name",
+              "gen_ai.request.model"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "aegis.span.kind": {
+                "const": "embedding"
+              }
+            },
+            "required": [
+              "aegis.span.kind"
+            ]
+          }
+        },
+        "required": [
+          "attributes"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "gen_ai.operation.name": {
+                "enum": [
+                  "embeddings"
+                ]
+              }
+            },
+            "required": [
+              "gen_ai.operation.name",
+              "gen_ai.provider.name",
+              "gen_ai.request.model"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "aegis.span.kind": {
+                "const": "retrieval"
+              }
+            },
+            "required": [
+              "aegis.span.kind"
+            ]
+          }
+        },
+        "required": [
+          "attributes"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "gen_ai.operation.name": {
+                "enum": [
+                  "retrieval"
+                ]
+              }
+            },
+            "required": [
+              "gen_ai.operation.name"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "aegis.span.kind": {
+                "const": "tool"
+              }
+            },
+            "required": [
+              "aegis.span.kind"
+            ]
+          }
+        },
+        "required": [
+          "attributes"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "gen_ai.operation.name": {
+                "enum": [
+                  "execute_tool"
+                ]
+              }
+            },
+            "required": [
+              "gen_ai.operation.name",
+              "gen_ai.tool.name"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "aegis.span.kind": {
+                "const": "agent"
+              }
+            },
+            "required": [
+              "aegis.span.kind"
+            ]
+          }
+        },
+        "required": [
+          "attributes"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "gen_ai.operation.name": {
+                "enum": [
+                  "create_agent",
+                  "invoke_agent"
+                ]
+              }
+            },
+            "required": [
+              "gen_ai.operation.name"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "aegis.span.kind": {
+                "const": "chain"
+              }
+            },
+            "required": [
+              "aegis.span.kind"
+            ]
+          }
+        },
+        "required": [
+          "attributes"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "properties": {
+              "gen_ai.operation.name": {
+                "enum": [
+                  "invoke_workflow"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "description": "Generated from the aegis-telemetry/1 profile, revision 1.0.0, on OTel semantic conventions 1.41.1. Do not edit: run `traceblame-contracts gen-schema`.",
+  "properties": {
+    "attributes": {
+      "properties": {
+        "aegis.bundle.digest": {
+          "description": "Digest of the promptops bundle the span ran under.",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "aegis.content.ref": {
+          "description": "Reference to the encrypted out-of-band copy of prompt/completion content (TTL 7 d). Present only when the tenant opted in to content capture.",
+          "pattern": "^s3://.+",
+          "type": "string"
+        },
+        "aegis.decision.id": {
+          "description": "AgentGate decision id.",
+          "type": "string"
+        },
+        "aegis.profile.version": {
+          "const": "aegis-telemetry/1",
+          "description": "Profile id of this normalized span. Set by the normalizer.",
+          "type": "string"
+        },
+        "aegis.retrieval.doc_ids": {
+          "description": "Ids of the retrieved documents, in rank order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "aegis.retrieval.scores": {
+          "description": "Retrieval scores, aligned with aegis.retrieval.doc_ids.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "aegis.session.id": {
+          "description": "User or application session the span belongs to.",
+          "type": "string"
+        },
+        "aegis.span.kind": {
+          "description": "Span class the detectors key on. Set by the normalizer, so that upstream renames of operation names touch only mapping tables.",
+          "enum": [
+            "llm",
+            "embedding",
+            "retrieval",
+            "tool",
+            "agent",
+            "chain"
+          ],
+          "type": "string"
+        },
+        "aegis.tool.args_hash": {
+          "description": "Hash of the tool call arguments. The shim computes it in-process, so the arguments themselves are never exported.",
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
+        },
+        "error.type": {
+          "description": "Class of error the operation ended with.",
+          "type": "string"
+        },
+        "gen_ai.agent.id": {
+          "description": "Unique agent id.",
+          "type": "string"
+        },
+        "gen_ai.agent.name": {
+          "description": "Human-readable agent name.",
+          "type": "string"
+        },
+        "gen_ai.completion": {
+          "description": "Forbidden: deprecated raw completion content",
+          "not": {}
+        },
+        "gen_ai.conversation.id": {
+          "description": "Conversation or thread id, when the application has one.",
+          "type": "string"
+        },
+        "gen_ai.data_source.id": {
+          "description": "Data source used for retrieval or grounding.",
+          "type": "string"
+        },
+        "gen_ai.input.messages": {
+          "description": "Forbidden: raw prompt content",
+          "not": {}
+        },
+        "gen_ai.operation.name": {
+          "description": "Name of the GenAI operation.",
+          "type": "string"
+        },
+        "gen_ai.output.messages": {
+          "description": "Forbidden: raw completion content",
+          "not": {}
+        },
+        "gen_ai.prompt": {
+          "description": "Forbidden: deprecated raw prompt content",
+          "not": {}
+        },
+        "gen_ai.provider.name": {
+          "description": "GenAI provider as identified by the instrumentation.",
+          "type": "string"
+        },
+        "gen_ai.request.max_tokens": {
+          "description": "Maximum number of tokens the model may generate.",
+          "type": "integer"
+        },
+        "gen_ai.request.model": {
+          "description": "Model name in the request.",
+          "type": "string"
+        },
+        "gen_ai.response.finish_reasons": {
+          "description": "Reasons the model stopped generating, one per choice.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gen_ai.response.model": {
+          "description": "Model name in the response.",
+          "type": "string"
+        },
+        "gen_ai.retrieval.documents": {
+          "description": "Forbidden: may carry document content; use aegis.retrieval.doc_ids and aegis.retrieval.scores",
+          "not": {}
+        },
+        "gen_ai.retrieval.query.text": {
+          "description": "Forbidden: raw retrieval query content",
+          "not": {}
+        },
+        "gen_ai.system_instructions": {
+          "description": "Forbidden: raw system prompt content",
+          "not": {}
+        },
+        "gen_ai.tool.call.arguments": {
+          "description": "Forbidden: raw tool arguments; use aegis.tool.args_hash",
+          "not": {}
+        },
+        "gen_ai.tool.call.id": {
+          "description": "Id of the tool call.",
+          "type": "string"
+        },
+        "gen_ai.tool.call.result": {
+          "description": "Forbidden: raw tool result content",
+          "not": {}
+        },
+        "gen_ai.tool.name": {
+          "description": "Name of the tool.",
+          "type": "string"
+        },
+        "gen_ai.usage.input_tokens": {
+          "description": "Number of input tokens.",
+          "type": "integer"
+        },
+        "gen_ai.usage.output_tokens": {
+          "description": "Number of output tokens.",
+          "type": "integer"
+        },
+        "server.address": {
+          "description": "Address of the GenAI server.",
+          "type": "string"
+        }
+      },
+      "propertyNames": {
+        "anyOf": [
+          {
+            "not": {
+              "pattern": "^aegis\\."
+            }
+          },
+          {
+            "enum": [
+              "aegis.bundle.digest",
+              "aegis.content.ref",
+              "aegis.decision.id",
+              "aegis.profile.version",
+              "aegis.retrieval.doc_ids",
+              "aegis.retrieval.scores",
+              "aegis.session.id",
+              "aegis.span.kind",
+              "aegis.tool.args_hash"
+            ]
+          }
+        ]
+      },
+      "required": [
+        "aegis.profile.version",
+        "aegis.span.kind"
+      ],
+      "type": "object"
+    },
+    "end_time_unix_nano": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "kind": {
+      "enum": [
+        "SPAN_KIND_UNSPECIFIED",
+        "SPAN_KIND_INTERNAL",
+        "SPAN_KIND_SERVER",
+        "SPAN_KIND_CLIENT",
+        "SPAN_KIND_PRODUCER",
+        "SPAN_KIND_CONSUMER"
+      ]
+    },
+    "name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "parent_span_id": {
+      "pattern": "^([0-9a-f]{16})?$",
+      "type": "string"
+    },
+    "resource": {
+      "properties": {
+        "aegis.tenant.id": {
+          "description": "Tenant that owns the telemetry. Set by the shim; the normalizer may fill it from per-pipeline config.",
+          "type": "string"
+        },
+        "gen_ai.completion": {
+          "description": "Forbidden: deprecated raw completion content",
+          "not": {}
+        },
+        "gen_ai.input.messages": {
+          "description": "Forbidden: raw prompt content",
+          "not": {}
+        },
+        "gen_ai.output.messages": {
+          "description": "Forbidden: raw completion content",
+          "not": {}
+        },
+        "gen_ai.prompt": {
+          "description": "Forbidden: deprecated raw prompt content",
+          "not": {}
+        },
+        "gen_ai.retrieval.documents": {
+          "description": "Forbidden: may carry document content; use aegis.retrieval.doc_ids and aegis.retrieval.scores",
+          "not": {}
+        },
+        "gen_ai.retrieval.query.text": {
+          "description": "Forbidden: raw retrieval query content",
+          "not": {}
+        },
+        "gen_ai.system_instructions": {
+          "description": "Forbidden: raw system prompt content",
+          "not": {}
+        },
+        "gen_ai.tool.call.arguments": {
+          "description": "Forbidden: raw tool arguments; use aegis.tool.args_hash",
+          "not": {}
+        },
+        "gen_ai.tool.call.result": {
+          "description": "Forbidden: raw tool result content",
+          "not": {}
+        },
+        "service.name": {
+          "description": "Logical name of the instrumented service.",
+          "type": "string"
+        },
+        "service.version": {
+          "description": "Version of the instrumented service.",
+          "type": "string"
+        }
+      },
+      "propertyNames": {
+        "anyOf": [
+          {
+            "not": {
+              "pattern": "^aegis\\."
+            }
+          },
+          {
+            "enum": [
+              "aegis.tenant.id"
+            ]
+          }
+        ]
+      },
+      "required": [
+        "aegis.tenant.id",
+        "service.name"
+      ],
+      "type": "object"
+    },
+    "resource_schema_url": {
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "schema_url": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "span_id": {
+      "pattern": "^[0-9a-f]{16}$",
+      "type": "string"
+    },
+    "start_time_unix_nano": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "status": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "STATUS_CODE_UNSET",
+            "STATUS_CODE_OK",
+            "STATUS_CODE_ERROR"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "type": "object"
+    },
+    "trace_id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trace_id",
+    "span_id",
+    "name",
+    "kind",
+    "start_time_unix_nano",
+    "end_time_unix_nano",
+    "status",
+    "resource",
+    "scope",
+    "attributes"
+  ],
+  "title": "aegis-telemetry/1 normalized span",
+  "type": "object",
+  "x-aegis-profile": {
+    "id": "aegis-telemetry/1",
+    "revision": "1.0.0",
+    "semconv_schema_url": "https://opentelemetry.io/schemas/1.41.1",
+    "semconv_version": "1.41.1"
+  }
+}

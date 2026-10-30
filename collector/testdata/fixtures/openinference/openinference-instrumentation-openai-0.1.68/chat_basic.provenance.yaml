@@ -1,0 +1,33 @@
+sdk: openinference
+scenario: chat_basic
+captured_at: '2026-10-30T18:48:07Z'
+capture_script: tools/fixtures/capture_openinference.py
+capture_script_sha256: aa845425c2b105f52293dcc03c9df50d0d18b08b016cedf2bab89fcb94d58e14
+python: 3.12.15
+uv: 0.13.6
+packages:
+  openinference-instrumentation-openai: 0.1.68
+  openinference-instrumentation: 0.1.74
+  openinference-semantic-conventions: 0.1.43
+  openai: 3.41.0
+  opentelemetry-sdk: 1.45.2
+  opentelemetry-exporter-otlp-proto-http: 1.45.2
+env:
+  OPENINFERENCE_HIDE_INPUTS: 'true'
+  OPENINFERENCE_HIDE_OUTPUTS: 'true'
+  OPENINFERENCE_HIDE_INPUT_MESSAGES: 'true'
+  OPENINFERENCE_HIDE_OUTPUT_MESSAGES: 'true'
+  OPENINFERENCE_HIDE_INPUT_TEXT: 'true'
+  OPENINFERENCE_HIDE_OUTPUT_TEXT: 'true'
+model:
+  name: qwen2.5:7b
+  digest: 845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e
+  server: ollama
+  server_version: 0.40.5
+endpoint: http://172.22.96.1:11434/v1
+collector: otelcol-contrib 0.164.0 (sha256 f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4)
+fixture_sha256: 543c02607ecdcd4eb3b08c5a7570a7da86ba6cb12e837212271133f9a7228db5
+notes:
+- chat.completions.create, temperature=0, seed=7, max_tokens=16
+- gen_ai.provider.name / server.address describe the OpenAI client talking to Ollama's OpenAI-compatible
+  API, not the OpenAI service.

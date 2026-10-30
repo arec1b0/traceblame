@@ -1,0 +1,27 @@
+sdk: openllmetry
+scenario: chat_basic
+captured_at: '2026-10-30T18:48:12Z'
+capture_script: tools/fixtures/capture_openllmetry.py
+capture_script_sha256: e0c38cbb61012bef0a6105f0cce4b4b7321576de71a4d45925861350335ea644
+python: 3.12.15
+uv: 0.13.6
+packages:
+  opentelemetry-instrumentation-openai: 0.62.4
+  opentelemetry-semantic-conventions-ai: 0.5.1
+  openai: 3.41.0
+  opentelemetry-sdk: 1.45.2
+  opentelemetry-exporter-otlp-proto-http: 1.45.2
+env:
+  TRACELOOP_TRACE_CONTENT: 'false'
+model:
+  name: qwen2.5:7b
+  digest: 845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e
+  server: ollama
+  server_version: 0.40.5
+endpoint: http://172.22.96.1:11434/v1
+collector: otelcol-contrib 0.164.0 (sha256 f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4)
+fixture_sha256: 953a58b779515073255b04993cc3dc2c115a1c9517a6439b0241e2532bae711c
+notes:
+- chat.completions.create, temperature=0, seed=7, max_tokens=16
+- gen_ai.provider.name / server.address describe the OpenAI client talking to Ollama's OpenAI-compatible
+  API, not the OpenAI service.
