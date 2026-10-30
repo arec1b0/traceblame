@@ -18,7 +18,7 @@ COV_GATED := services/detectors services/attributor
 
 KIND_CLUSTER := traceblame
 
-.PHONY: help bootstrap lint test contract kind-up kind-down
+.PHONY: help bootstrap lint test contract fixtures kind-up kind-down
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-10s %s\n", $$1, $$2 }'
@@ -37,8 +37,13 @@ test: ## Unit tests: pytest with coverage gates, go test -race
 	done
 	bash scripts/go-each-module.sh go test -race ./...
 
-contract: ## Contract tests (telemetry profile, JSON Schemas, golden fixtures)
-	@echo "contract: no contracts yet; the profile and the contract harness land in #3"
+contract: ## Contract tests: profile <-> JSON Schema sync, semconv pin, golden fixtures
+	$(UV_RUN) traceblame-contracts gen-schema --check
+	$(UV_RUN) pytest -m contract -rxX
+
+fixtures: ## Re-capture golden span fixtures from Ollama (OLLAMA_URL=...; see collector/testdata/fixtures)
+	bash scripts/install-tools.sh otelcol-contrib
+	uv run --locked --script tools/fixtures/capture.py $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
 
 kind-up: ## Create the local kind cluster (needs Docker in WSL)
 	@bash scripts/kind-up.sh

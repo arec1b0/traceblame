@@ -1,0 +1,158 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.45.2"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "72f5f158-6d1b-4c38-bd5f-51fe98b196ae"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "traceblame-fixture-capture"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "opentelemetry.instrumentation.openai.v1",
+            "version": "0.62.4"
+          },
+          "spans": [
+            {
+              "traceId": "054334b61a68d6d1c9c48571d0e4a4d5",
+              "spanId": "f0fda7bc587c34e2",
+              "flags": 256,
+              "name": "openai.chat",
+              "kind": 3,
+              "startTimeUnixNano": "1793386091747602754",
+              "endTimeUnixNano": "1793386092027545521",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.max_tokens",
+                  "value": {
+                    "intValue": "16"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.temperature",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.is_streaming",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "gen_ai.openai.api_base",
+                  "value": {
+                    "stringValue": "http://172.22.96.1:11434/v1/"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-238"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.openai.response.system_fingerprint",
+                  "value": {
+                    "stringValue": "fp_ollama"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "40"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "38"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "37"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

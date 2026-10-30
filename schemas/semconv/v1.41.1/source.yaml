@@ -1,0 +1,7 @@
+# Vendored by tools/semconv/fetch.sh. Do not edit; re-run the script instead.
+repository: open-telemetry/semantic-conventions
+version: 1.41.1
+tag: v1.41.1
+commit: ead83b9b0fa36540c1642fce46e874f002ac23f1
+schema_url: https://opentelemetry.io/schemas/1.41.1
+license: Apache-2.0 (see LICENSE)

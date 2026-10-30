@@ -26,7 +26,8 @@ and `uv.lock`, and the Python version in `.python-version`.
 make bootstrap   # pinned tools, uv workspace, Go modules, pre-commit hook environments
 make lint        # pre-commit over all tracked files: ruff, pyright, golangci-lint, hadolint, gitleaks, actionlint
 make test        # pytest with coverage gates, go test -race
-make contract    # contract tests (from #3)
+make contract    # profile <-> JSON Schema sync, semconv pin, golden fixtures
+make fixtures    # re-capture golden span fixtures from a local Ollama
 make kind-up     # local kind cluster "traceblame"; make kind-down deletes it
 ```
 
@@ -46,5 +47,9 @@ sdk/python                                     Python shim (traceblame-py)
 collector/                                     Go: OTel Collector distribution and normalizer
 deploy/kind/                                   local kind cluster config
 docs/adr/                                      architecture decision records
-tools/, scripts/                               pinned tool versions and setup scripts
+schemas/profile/                               telemetry profile v1 (YAML) and its generated JSON Schema
+schemas/semconv/                               vendored OTel semconv registry snapshot (pinned)
+packages/contracts                             contract harness (traceblame-contracts CLI)
+collector/testdata/fixtures/                   golden span fixtures (real exports + provenance)
+tools/, scripts/                               pinned tool versions, setup and capture scripts
 ```

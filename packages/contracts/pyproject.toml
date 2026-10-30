@@ -1,0 +1,17 @@
+[project]
+name = "traceblame-contracts"
+version = "0.0.0"
+description = "TraceBlame contract harness: telemetry profile, JSON Schema generation, fixture checks."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "jsonschema>=4.26",
+    "pydantic>=2.12",
+    "pyyaml>=6.0.2",
+]
+
+[project.scripts]
+traceblame-contracts = "traceblame_contracts.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"

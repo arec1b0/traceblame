@@ -54,6 +54,9 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   `uv sync --all-packages --locked`, Go module download, pre-commit hook environments
 - `make lint`: pre-commit over all tracked files (stage new files first)
 - `make test`: pytest with coverage gates (`COV_MIN`), `go test -race` per go.work module
-- `make contract`: contract tests (from #3)
+- `make contract`: `traceblame-contracts gen-schema --check` + `pytest -m contract`
+  (profile <-> JSON Schema, semconv snapshot, golden fixtures)
+- `make fixtures`: re-capture golden fixtures from Ollama (`OLLAMA_URL=...`)
+- `uv run traceblame-contracts gen-schema`: regenerate the JSON Schema after editing the profile
 - `make kind-up` / `make kind-down`: local kind cluster `traceblame`
 - `make demo`: M3
