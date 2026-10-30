@@ -36,13 +36,15 @@ check_waivers() {
 
 check_waivers
 mkdir -p "${OUT}" "${CACHE}"
-run() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp "$@"; }
+# Run as the invoking user so reports stay user-owned. The Syft and Grype images ship /tmp
+# as root 0755, and a plain tmpfs inherits that mode, so set mode=1777 explicitly.
+run() { docker run --rm --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,mode=1777 -e HOME=/tmp "$@"; }
 
 echo "==> gitleaks: full git history"
 # safe.directory via environment only: the mounted repo has a different owner in the container.
 run -v "${ROOT}:/repo:ro" \
   -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo \
-  "${GITLEAKS_IMAGE}" git --no-banner --redact --log-opts="--all" \
+  "${GITLEAKS_IMAGE}" git --no-banner --no-color --redact --log-opts="--all" \
   --report-format json --report-path /dev/stdout /repo >"${OUT}/gitleaks.json" || {
   echo "security: gitleaks found secrets (see .security/gitleaks.json)" >&2
   exit 1
