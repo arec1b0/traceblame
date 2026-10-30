@@ -17,10 +17,17 @@ sources.
 
 State of upstream on 2026-10-30:
 
-1. **GenAI left core semconv.** Release v1.42.0 (2026-06-12) deprecated every `gen_ai.*`
-   attribute, metric, event and span in `open-telemetry/semantic-conventions` and moved
-   them to `open-telemetry/semantic-conventions-genai` [S2]. The latest core release is
-   v1.44.0 (2026-08-04) [S3, S4].
+1. **GenAI left core semconv.** Release v1.42.0 (2026-06-12, tag commit
+   `ae3a98640194ed405c4c797281502e4d3bd258b3`) deprecated every `gen_ai.*` attribute,
+   metric, event and span in `open-telemetry/semantic-conventions` and moved them to
+   `open-telemetry/semantic-conventions-genai` [S2]. Three official sources confirm it:
+   - the release notes;
+   - `CHANGELOG.md` at the tag, which lists the move under "Breaking changes" [S13];
+   - the model at the tag: `model/gen-ai/registry.yaml` is gone, and all 60 `gen_ai.*`
+     attribute definitions now sit in `model/gen-ai/deprecated/registry-deprecated.yaml`,
+     each marked as moved to the GenAI repository [S14].
+
+   The latest core release is v1.44.0 (2026-08-04) [S3, S4].
 2. **The new repository has no release.** It has no tags and no GitHub releases.
    `model/manifest.yaml` at commit `72e0d0a097db3ba31ba3f33d0519401a044f6e23` declares
    `schema_url: https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev` and
@@ -73,6 +80,31 @@ Profile `aegis-telemetry/1` is defined on **OpenTelemetry semantic conventions v
 Every non-`aegis.*` attribute in the profile must exist in v1.41.1, must not be deprecated
 there, and must use the v1.41.1 type. A contract test checks this against a vendored
 snapshot of the v1.41.1 registry (issue #3).
+
+**Why v1.41.1**
+- **It is the newest release where `gen_ai.*` is defined and not deprecated.** From
+  v1.42.0 on, core carries only deprecated stubs that point to the GenAI repository
+  [S13, S14]. Pinning v1.42.0 or later would pin deprecated definitions.
+- **It is a real, immutable release:**
+  - a tag that resolves to one commit;
+  - a published schema file that resolves [S7];
+  - a registry we vendor and checksum.
+
+  The GenAI repository offers only a moving dev line. Its `schema_url` returns 404, and
+  it has published no release [S5, S6, S15].
+- **It covers everything profile v1 needs:**
+  - `gen_ai.provider.name`;
+  - operation names for all six span kinds (`chat`, `embeddings`, `retrieval`,
+    `execute_tool`, `invoke_agent`, `invoke_workflow`);
+  - the tool, agent, retrieval and usage attributes.
+
+  The contract test confirms that all 18 semconv attributes in the profile exist there,
+  undeprecated, with matching types.
+- **It keeps the way forward cheap.** Every `gen_ai.*` name the profile uses exists
+  unchanged in `semantic-conventions-genai` at `72e0d0a`, so a later re-pin is mostly a
+  version change, not a remapping.
+- **v1.41.1 rather than v1.41.0:** the patch only excludes two Kubernetes metrics from
+  code generation [S1]. The GenAI definitions are identical, so we take the latest patch.
 
 ### 2. Profile identity and versioning
 
@@ -149,6 +181,44 @@ SDK spans ─▶ detect source ─▶ map to canonical model ─▶ emit profile
   The OTel-native fixture is captured in both default and `gen_ai_latest_experimental`
   mode, so two source versions of one SDK are covered from the start.
 
+## Normalizer behaviour on a newer `schema_url`
+
+A span can declare, on its scope or resource, a `schema_url` newer than anything the
+mapping tables know. Examples: `https://opentelemetry.io/schemas/1.44.0`,
+`.../gen-ai-dev/1.42.0-dev`, or a future GenAI release. The rule is: map what is known,
+pass the rest through, and count it. The normalizer never guesses a rename and never drops
+a span.
+
+1. **Pick a mapping table.** Use the SDK's table for the newest source version at or below
+   the span's `schema_url`. If the `schema_url` is newer than every known table, use the
+   newest table. A span without a `schema_url` is placed by scope name and marker
+   attributes, as above. The captured fixtures carry `1.30.0` and `1.37.0`, or no
+   `schema_url` at all.
+2. **Map.** Attributes the chosen table knows become profile attributes, including known
+   renames such as `gen_ai.system` → `gen_ai.provider.name`. An attribute that already has
+   a profile name is kept as it is and type-checked. So when a newer convention keeps a
+   name, it keeps working with no table change.
+3. **Pass through.** Every other attribute passes through unchanged, under its own name.
+   OpenLLMetry's non-semconv `gen_ai.is_streaming` and `gen_ai.usage.total_tokens` are
+   examples. There are two exceptions, whatever the `schema_url`:
+   - forbidden content attributes are dropped or hashed (issue #7);
+   - unknown `aegis.*` keys are dropped, because the namespace is closed.
+4. **Count.** Every passed-through attribute that is neither a profile attribute nor in
+   the chosen table increments `traceblame_normalizer_unmapped_attrs_total{sdk,attr}`.
+   - The `UnmappedAttrsSpike` alert watches that counter. It is the early drift signal and
+     feeds the migration trigger below.
+   - Spans whose `schema_url` is newer than every known table also increment
+     `traceblame_normalizer_newer_schema_spans_total{sdk,schema_url}`. This metric is
+     proposed here; the label set is bounded by the number of releases.
+5. **Fail open.** A span is never dropped because of its `schema_url`. If a required
+   profile attribute is still missing after mapping, the span is emitted anyway. Contract
+   tests on fixtures, and the counters in production, expose the gap.
+
+Why pass-through rather than dropping or remapping by guess:
+- Dropping unknown attributes would lose evidence that detectors may need later.
+- A guessed remap could put a wrong value into a profile attribute and corrupt blame.
+- Pass-through plus a counter keeps the data and makes the drift visible.
+
 ## v(N) / v(N−1) coexistence
 
 - The normalizer can emit profile v(N) and v(N−1) at the same time. The choice is per
@@ -170,6 +240,33 @@ SDK spans ─▶ detect source ─▶ map to canonical model ─▶ emit profile
   - a requirement is tightened;
   - an enum value is removed;
   - the semconv pin changes.
+
+## Migration trigger
+
+**The primary trigger is the first non-dev release of
+`open-telemetry/semantic-conventions-genai`:** a `vX.Y.Z` tag without `-dev`, whose
+`schema_url` resolves. On 2026-10-30 the repository has no tags and no releases [S15].
+When that release ships:
+
+1. **A new ADR re-pins the profile to that release.**
+   - Vendor its registry. `tools/semconv/fetch.sh` currently reads only the core
+     repository and needs that second source.
+   - Diff the profile's attributes against it.
+2. **The re-pin is profile major 2** (`aegis-telemetry/2`). The compat check treats any
+   pin change as breaking, even if every name survives, because `aegis.profile.version`
+   must name exactly one semconv definition.
+3. **The rollout follows the coexistence process above:**
+   - the normalizer emits v1 and v2 side by side;
+   - consumers accept both;
+   - v1 is dropped after one spans TTL (30 d).
+
+**Secondary triggers.** Each of these also opens a new ADR:
+- upstream renames or removes an attribute that the profile uses;
+- an SDK we support stops emitting v1.41-era names;
+- `UnmappedAttrsSpike` shows lasting drift for one SDK.
+
+Until a trigger fires, profile v1 stays on v1.41.1. The M1 drift check against
+`semantic-conventions-genai@HEAD` reports upstream name changes early.
 
 ## Alternatives considered
 
@@ -218,12 +315,8 @@ drift silently.
   because `any`-typed or content-bearing semconv attributes cannot be emitted portably
   without content. They are defined in the profile (issue #3).
 
-**Re-pin triggers.** Any of these opens a new ADR:
-1. `semantic-conventions-genai` publishes its first non-dev release.
-2. Upstream renames or removes an attribute that the profile uses.
-3. An SDK we support stops emitting v1.41-era names.
-
-A breaking re-pin becomes profile major 2 and follows the coexistence process above.
+**Re-pinning.** See "Migration trigger": every re-pin is a new profile major and follows
+the coexistence process.
 
 **Follow-ups**
 - M1: a scheduled drift check that compares profile attributes against
@@ -247,3 +340,6 @@ Checked 2026-10-30.
 - [S10] openinference-instrumentation-openai on PyPI — https://pypi.org/project/openinference-instrumentation-openai/
 - [S11] OpenInference semantic conventions — https://github.com/Arize-ai/openinference/blob/main/spec/semantic_conventions.md
 - [S12] opentelemetry-instrumentation-openai (OpenLLMetry) on PyPI — https://pypi.org/project/opentelemetry-instrumentation-openai/
+- [S13] semantic-conventions `CHANGELOG.md` at v1.42.0 — https://github.com/open-telemetry/semantic-conventions/blob/v1.42.0/CHANGELOG.md
+- [S14] v1.42.0 deprecated GenAI registry — https://github.com/open-telemetry/semantic-conventions/blob/v1.42.0/model/gen-ai/deprecated/registry-deprecated.yaml
+- [S15] semantic-conventions-genai releases — https://github.com/open-telemetry/semantic-conventions-genai/releases
