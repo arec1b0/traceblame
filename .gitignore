@@ -1,0 +1,26 @@
+# Local toolchain and environments (make bootstrap)
+.tools/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Go
+*.test
+*.out
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

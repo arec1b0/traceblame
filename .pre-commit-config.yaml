@@ -1,0 +1,61 @@
+# Run with `make lint` (pre-commit run --all-files). No git hook is installed by default.
+# Local hooks call the pinned tools from .tools/bin (tools/versions.env) and uv.lock,
+# so every version has one source.
+minimum_pre_commit_version: "4.7.0"
+# docs/design.md is a verbatim extract of the design doc; keep it byte-identical to the source.
+exclude: ^docs/design\.md$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check --force-exclude
+        language: unsupported
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen ruff format --check --force-exclude
+        language: unsupported
+        types_or: [python, pyi]
+      - id: pyright
+        name: pyright
+        entry: uv run --frozen pyright
+        language: unsupported
+        types_or: [python, pyi]
+        pass_filenames: false
+      - id: golangci-lint
+        name: golangci-lint
+        entry: scripts/go-each-module.sh golangci-lint run ./...
+        language: unsupported
+        files: (\.go|go\.mod|go\.work)$
+        pass_filenames: false
+      - id: hadolint
+        name: hadolint
+        entry: .tools/bin/hadolint
+        language: unsupported
+        types: [dockerfile]
+      - id: gitleaks
+        name: gitleaks
+        entry: .tools/bin/gitleaks dir --no-banner --redact .
+        language: unsupported
+        pass_filenames: false
+        always_run: true
+      - id: actionlint
+        name: actionlint
+        entry: .tools/bin/actionlint
+        language: unsupported
+        files: ^\.github/workflows/.*\.ya?ml$

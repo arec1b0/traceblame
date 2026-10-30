@@ -1,0 +1,13 @@
+# Default gitleaks rules plus path exclusions for local, untracked tool directories.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Local tool and cache directories (not tracked)"
+paths = [
+  '''(^|/)\.venv/''',
+  '''(^|/)\.tools/''',
+  '''(^|/)\.git/''',
+  '''(^|/)\.(ruff|pytest)_cache/''',
+  '''(^|/)__pycache__/''',
+]
