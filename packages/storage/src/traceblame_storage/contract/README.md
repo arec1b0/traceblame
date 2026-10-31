@@ -9,3 +9,5 @@ Add the statement here when a service starts to read or write a column.
   list, one normalized span)
 - `*_read.sql` / `*_write.sql`: what the detectors, the attributor and the fault injector
   will read and write (design §1.1)
+- `trace_roots_read.sql`: the trace-assembler's watermark scan, root spans by end time
+  (ADR-0003 draft, ADR-0004 section 4)
