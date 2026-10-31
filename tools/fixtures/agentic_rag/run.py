@@ -73,22 +73,26 @@ async def _run(args: argparse.Namespace) -> int:
 
     if not aegis.setup_tracing():
         raise SystemExit("run: tracing is off (TRACEBLAME_ENABLED=1 and traceblame-py needed)")
-    agents: dict[str, Any] = {}
+    # One agent per process: the app registers its Prometheus metrics globally, so a second
+    # RAGAgent raises. Each contract gets its own store, which the retriever is pointed at.
+    agent: Any = None
+    stores: dict[str, Any] = {}
     try:
         for item in _sampled(args):
-            if item.title not in agents:
-                store = ChromaStore(collection_name=cuad.doc_id(item.title, 0))
-                store.add_documents(_chunks(item))
-                agents[item.title] = RAGAgent(vector_store=store, enable_tracing=False)
+            if item.title not in stores:
+                stores[item.title] = ChromaStore(collection_name=cuad.doc_id(item.title, 0))
+                stores[item.title].add_documents(_chunks(item))
+            if agent is None:
+                agent = RAGAgent(vector_store=stores[item.title], enable_tracing=False)
+            agent.vector_store = stores[item.title]
+            agent.tool_selector.get_tool("retriever").vector_store = stores[item.title]
             record: dict[str, Any] = {
                 "qid": item.qid,
                 "session": _session(item.qid),
                 "answerable": item.answerable,
             }
             try:
-                response = await agents[item.title].run(
-                    item.question, context={"session_id": record["session"]}
-                )
+                response = await agent.run(item.question, context={"session_id": record["session"]})
                 record |= {
                     "outcome": "answered" if response.answer else "empty_answer",
                     "steps": [s.action for s in response.steps],
