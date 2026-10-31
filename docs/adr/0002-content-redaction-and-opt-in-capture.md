@@ -129,6 +129,20 @@ The agent tier keeps spans in a `file_storage` queue on the node's disk, before 
 so content must be removed before that queue. The content stage must be able to run on the
 agent tier, and the processor runs on either tier. The tier layout belongs to issue #10.
 
+### 5. Amends ADR-0001 §2
+
+ADR-0001 is Accepted and stays as written. This section adds one row to its table of
+major changes (issue #28), and the compat checker implements it:
+
+| Major (needs `aegis-telemetry/<N+1>`) | Minor |
+|---|---|
+| a `source.algorithm` added, removed or reworded (whitespace and line wrapping are ignored) | none |
+
+An algorithm is judged by its normalized text, so any wording change is major: shims and
+the normalizer must agree on it byte for byte, and stored values follow the old one. A
+future `algorithm_version` field could let a pure rewording be minor; adding it is itself a
+profile change, so it is a separate decision.
+
 ## Consequences
 
 **Positive**

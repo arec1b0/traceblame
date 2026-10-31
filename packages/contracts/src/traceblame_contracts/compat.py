@@ -4,9 +4,9 @@ Every change is classified:
 - major: breaks producers or consumers of the old revision, so it needs the next profile
   major. An attribute removed, renamed or retyped (optional or not), an enum value removed,
   a requirement tightened to required/conditionally_required, a constraint added, a newly
-  forbidden attribute, a `source.algorithm` added, removed or changed. Producers and the
-  normalizer must agree on an algorithm byte for byte, and hashes already stored follow the
-  old one; only whitespace and line wrapping in its text are ignored.
+  forbidden attribute, a `source.algorithm` added, removed or changed (ADR-0002, section 5).
+  Producers and the normalizer must agree on an algorithm byte for byte, and hashes already
+  stored follow the old one; only whitespace and line wrapping in its text are ignored.
 - minor: backward compatible, so it is allowed within a major. An optional attribute or
   enum value added, a requirement loosened, a constraint removed, and a semconv pin change.
 
