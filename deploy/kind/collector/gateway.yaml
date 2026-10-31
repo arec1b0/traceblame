@@ -1,8 +1,8 @@
 # otel-gateway (Deployment, design §1.1 component 4). Accepts only agents (mTLS client
 # certificates of the agents' CA, plus a NetworkPolicy), keeps the agent-stamped tenant,
 # tail-samples whole traces and writes them to ClickHouse through the stock exporter
-# (ADR-0004). No NATS export: natsexporter v0.164.1 cannot publish to JetStream (ADR-0003
-# draft: the trace-assembler reads a ClickHouse watermark instead).
+# (ADR-0004). No NATS export: natsexporter v0.164.1 cannot publish to JetStream (ADR-0003,
+# Proposed: the trace-assembler polls ClickHouse by arrival time instead; #35).
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
@@ -28,8 +28,8 @@ processors:
   # Design §1.1: all errors, latency > p95, 10% of the rest. The latency thresholds come
   # from deploy/kind/collector/latency-thresholds.env (per service, documented there). The
   # low-eval-score policy is left out: no profile attribute carries an eval score, and judge
-  # scores arrive after ingest. Eval and injected-fault traces are not yet kept at 100%: the
-  # profile has no attribute that marks them.
+  # scores arrive after ingest (#37). Eval and injected-fault traces are not yet kept at
+  # 100%: the profile has no attribute that marks them (#36).
   tail_sampling:
     decision_wait: 30s
     num_traces: 200000

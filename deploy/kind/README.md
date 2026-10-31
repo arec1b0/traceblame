@@ -28,8 +28,8 @@ make kind-down
   htpasswd user. The gateway accepts only agents, by mTLS client certificate plus a
   NetworkPolicy, and keeps that value.
 - **No NATS.** `natsexporter` v0.164.1 cannot publish to JetStream. The gateway exports to
-  ClickHouse only; the trace-assembler is to read a ClickHouse watermark instead
-  (`trace_roots`, ADR-0003 draft, pending).
+  ClickHouse only; the trace-assembler is to poll `trace_roots` by arrival time instead
+  (ADR-0003, Proposed; #35).
 - **memory_limiter.** The cluster configs use `limit_percentage`, which works with the
   container memory limits. Local smoke tests on WSL2 merge
   `collector/test/smoke/testdata/memory-limiter-mib.yaml` over them, because the collector
@@ -47,9 +47,9 @@ make kind-down
 - **Split traces while the gateway set changes** (design §1.1 deployment notes). After a ring
   change, a trace's later spans can go to another gateway, and each half is sampled
   independently. The bench measures how often this happens and for how long:
-  `evals/reports/gateway-scaling-*.md`.
+  `evals/reports/gateway-scaling-*.md`. Mitigation: #38.
 - **Eval and injected-fault traces are not yet kept at 100%.** The profile has no attribute
-  that marks them.
+  that marks them (#36, before #14).
 - **The low-eval-score policy (§1.1) is not configured.** No profile attribute carries an
-  eval score at ingest.
+  eval score at ingest (#37).
 - **App → agent is plain gRPC/HTTP inside the node** (ADR-0005, negative consequences).
