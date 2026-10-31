@@ -59,6 +59,9 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
 - `make contract`: builds `collector/cmd/normalize`, `traceblame-contracts gen-schema --check`
   (JSON Schema + the normalizer's profile copy), gap report in `.contract/`, `pytest -m contract`
   (profile <-> JSON Schema, semconv snapshot, golden fixtures through the Go normalizer)
+- `make integration`: ClickHouse (pinned 26.8 LTS) in a test container: migrations, N-1 test,
+  table-level no-content proof through the built collector (needs Docker; builds the collector)
+- `uv run traceblame-storage check|migrate|status`: forward-only ClickHouse migrations (ADR-0004)
 - `make security`: gitleaks (full history), Syft SBOM, Grype gate (0 critical without a
   waiver in .grype.yaml); scanner images pinned by digest, needs Docker
 - `make fixtures`: re-capture golden fixtures from Ollama (`OLLAMA_URL=...`)

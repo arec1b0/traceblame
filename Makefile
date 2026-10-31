@@ -26,7 +26,7 @@ OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
 # The normalizer as a CLI (collector/cmd/normalize): the contract stage runs fixtures through it.
 export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
-.PHONY: help bootstrap lint test contract security fixtures kind-up kind-down \
+.PHONY: help bootstrap lint test contract integration security fixtures kind-up kind-down \
 	collector collector-smoke collector-image
 
 help: ## List targets
@@ -39,7 +39,7 @@ lint: ## Run every linter over all tracked files (pre-commit)
 	$(UV_RUN) pre-commit run --all-files --show-diff-on-failure
 
 test: ## Unit tests: pytest with coverage gates, go test -race
-	$(UV_RUN) pytest -m "not contract" --cov --cov-report=term
+	$(UV_RUN) pytest -m "not contract and not integration" --cov --cov-report=term
 	@for pkg in $(COV_GATED); do \
 	  echo "coverage gate: $$pkg >= $(COV_MIN)%"; \
 	  $(UV_RUN) coverage report --include="$$pkg/src/*" --fail-under=$(COV_MIN); \
@@ -54,6 +54,9 @@ contract: ## Contract tests: profile/schema sync, semconv pin, fixtures through 
 	$(UV_RUN) traceblame-contracts gen-schema --check
 	$(UV_RUN) traceblame-contracts gap-report
 	$(UV_RUN) pytest -m contract -rxX
+
+integration: collector ## Integration: ClickHouse in a test container, migrations, the built collector (needs Docker)
+	OTELCOL_BIN="$(OTELCOL_BIN)" $(UV_RUN) pytest -m integration -rs
 
 security: ## gitleaks (full history), Syft SBOM, Grype gate; digest-pinned images (needs Docker)
 	@bash scripts/security.sh

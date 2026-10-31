@@ -1,0 +1,15 @@
+[project]
+name = "traceblame-storage"
+version = "0.0.0"
+description = "TraceBlame storage: forward-only ClickHouse migrations and the storage contract."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "clickhouse-connect>=1.11",
+]
+
+[project.scripts]
+traceblame-storage = "traceblame_storage.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"

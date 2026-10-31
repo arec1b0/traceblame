@@ -1,0 +1,2 @@
+SELECT trace_id, span_id, parent_span_id, service, operation, span_kind, start_ts, duration_ms, status_code, provider, model, finish_reasons, input_tokens, output_tokens, tool_name, args_hash, retrieval_scores, retrieved_doc_ids, bundle_digest, tenant_id, session_id, content_ref, attrs, profile_version, decision_id, error_type, http_status_code, source_sdk, normalizer_version, resource_attrs
+FROM spans WHERE trace_id = '0af7651916cd43dd8448eb211c80319c' ORDER BY start_ts

@@ -1,4 +1,4 @@
-# CI for M0 (design §1.4): static -> unit -> contract -> security.
+# CI (design §1.4): static -> unit -> contract -> integration and security.
 # Every job calls the same make targets as local development, and every tool version comes
 # from tools/versions.env, uv.lock or .pre-commit-config.yaml. Actions are pinned by commit
 # SHA, scanners by image digest.
@@ -98,6 +98,32 @@ jobs:
           path: .contract/
           if-no-files-found: ignore
           retention-days: 30
+
+  integration:
+    name: integration (ClickHouse, migrations, collector to ClickHouse)
+    needs: contract
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the N-1 test reads the migrations at the base revision
+      - name: Cache pinned tools and environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools
+            ~/.cache/uv
+            ~/.cache/pre-commit
+            ~/.cache/pyright-python
+          key: tools-${{ runner.os }}-${{ hashFiles('tools/versions.env', 'tools/checksums.txt', 'uv.lock', '.pre-commit-config.yaml') }}
+      - run: make bootstrap
+      - name: make integration
+        run: make integration
+        env:
+          CONTRACT_BASE_REF: origin/${{ github.base_ref || 'main' }}
 
   security:
     name: security (gitleaks, Syft SBOM, Grype gate)
