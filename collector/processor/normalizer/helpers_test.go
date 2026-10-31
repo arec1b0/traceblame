@@ -2,6 +2,7 @@ package normalizer
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -86,6 +87,28 @@ func (h *harness) counts(name, label1, label2 string) map[string]int64 {
 		v1, _ := dp.Attributes.Value(attribute.Key(label1))
 		v2, _ := dp.Attributes.Value(attribute.Key(label2))
 		out[v1.AsString()+"|"+v2.AsString()] += dp.Value
+	}
+	return out
+}
+
+// countsBy is counts for any number of labels: "v1|v2|..." -> value.
+func (h *harness) countsBy(name string, labels ...string) map[string]int64 {
+	h.t.Helper()
+	out := map[string]int64{}
+	m, err := h.tel.GetMetric(name)
+	if err != nil {
+		return out // never recorded
+	}
+	sum, ok := m.Data.(metricdata.Sum[int64])
+	require.True(h.t, ok, "%s is not an int64 sum", name)
+	require.True(h.t, sum.IsMonotonic, "%s is not a counter", name)
+	for _, dp := range sum.DataPoints {
+		values := make([]string, len(labels))
+		for i, l := range labels {
+			v, _ := dp.Attributes.Value(attribute.Key(l))
+			values[i] = v.AsString()
+		}
+		out[strings.Join(values, "|")] += dp.Value
 	}
 	return out
 }

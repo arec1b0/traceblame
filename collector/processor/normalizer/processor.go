@@ -30,6 +30,8 @@ type normalizerProcessor struct {
 	tables  *mapping.Registry
 	emit    emitter
 	tel     *telemetry
+	// evalTenants is the set of cfg.EvalTenants.
+	evalTenants map[string]bool
 }
 
 func newProcessor(cfg *Config, set component.TelemetrySettings) (*normalizerProcessor, error) {
@@ -45,29 +47,45 @@ func newProcessor(cfg *Config, set component.TelemetrySettings) (*normalizerProc
 	if err != nil {
 		return nil, err
 	}
-	return &normalizerProcessor{cfg: cfg, profile: p, tables: tables, emit: emitters[cfg.Profile], tel: tel}, nil
+	evalTenants := map[string]bool{}
+	for _, tenant := range cfg.EvalTenants {
+		evalTenants[tenant] = true
+	}
+	return &normalizerProcessor{
+		cfg: cfg, profile: p, tables: tables, emit: emitters[cfg.Profile], tel: tel, evalTenants: evalTenants,
+	}, nil
 }
 
 func (p *normalizerProcessor) processTraces(ctx context.Context, td ptrace.Traces) (ptrace.Traces, error) {
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		rs := td.ResourceSpans().At(i)
-		p.normalizeResource(ctx, rs.Resource().Attributes())
+		tenant := p.normalizeResource(ctx, rs.Resource().Attributes())
 		for j := 0; j < rs.ScopeSpans().Len(); j++ {
 			ss := rs.ScopeSpans().At(j)
 			scope := mapping.Scope{Name: ss.Scope().Name(), SchemaURL: ss.SchemaUrl(), ResourceSchemaURL: rs.SchemaUrl()}
 			for k := 0; k < ss.Spans().Len(); k++ {
-				p.normalizeSpan(ctx, scope, ss.Spans().At(k))
+				p.normalizeSpan(ctx, scope, ss.Spans().At(k), tenant)
 			}
 		}
 	}
 	return td, nil
 }
 
-func (p *normalizerProcessor) normalizeResource(ctx context.Context, attrs pcommon.Map) {
+// normalizeResource normalizes the resource and returns its tenant, which decides on the
+// eval markers of its spans.
+func (p *normalizerProcessor) normalizeResource(ctx context.Context, attrs pcommon.Map) string {
 	p.setTenant(ctx, attrs)
+	tenant := resourceTenant(attrs)
 	attrs.RemoveIf(func(name string, v pcommon.Value) bool {
-		return p.tables.IsContent(name) || !p.keepAttribute(ctx, "resource", mapping.UnknownSDK, "", name, v)
+		if p.tables.IsContent(name) {
+			return true
+		}
+		if isMarker("resource", name) {
+			return !p.keepMarker(ctx, tenant, "", name, v)
+		}
+		return !p.keepAttribute(ctx, "resource", mapping.UnknownSDK, "", name, v)
 	})
+	return tenant
 }
 
 // setTenant applies the tenant source (ADR-0005). In auth mode the authenticated client
@@ -91,7 +109,7 @@ func (p *normalizerProcessor) setTenant(ctx context.Context, attrs pcommon.Map) 
 	}
 }
 
-func (p *normalizerProcessor) normalizeSpan(ctx context.Context, scope mapping.Scope, span ptrace.Span) {
+func (p *normalizerProcessor) normalizeSpan(ctx context.Context, scope mapping.Scope, span ptrace.Span, tenant string) {
 	attrs := span.Attributes()
 	traceID := span.TraceID().String()
 	sel := p.tables.Select(scope, attrs)
@@ -113,6 +131,10 @@ func (p *normalizerProcessor) normalizeSpan(ctx context.Context, scope mapping.S
 	kind = p.resolveKind(ctx, kind, attrs, sdk, traceID)
 
 	attrs.RemoveIf(func(name string, v pcommon.Value) bool {
+		// Markers do not depend on the SDK: they are checked on every span, table or not.
+		if isMarker("span", name) {
+			return !p.keepMarker(ctx, tenant, traceID, name, v)
+		}
 		if !p.keepAttribute(ctx, "span", sdk, traceID, name, v) {
 			return true
 		}
