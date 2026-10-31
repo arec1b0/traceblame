@@ -25,11 +25,15 @@ processors:
   # Second pass, idempotent (#10 comment): the agent already normalized and set the tenant.
   normalizer:
     tenant_source: config
-  # Design §1.1: all errors, latency > p95, 10% of the rest. The latency thresholds come
-  # from deploy/kind/collector/latency-thresholds.env (per service, documented there). The
-  # low-eval-score policy is left out: no profile attribute carries an eval score, and judge
-  # scores arrive after ingest (#37). Eval and injected-fault traces are not yet kept at
-  # 100%: the profile has no attribute that marks them (#36).
+    # The agent's allowlist, from the same ConfigMap (eval-tenants): the second pass keeps
+    # the markers the agent accepted and drops any other.
+    eval_tenants: ${env:TRACEBLAME_EVAL_TENANTS}
+  # Design §1.1: all errors, eval and injected-fault traces, latency > p95, 10% of the rest.
+  # The latency thresholds come from deploy/kind/collector/latency-thresholds.env (per
+  # service, documented there). Eval and fault traces carry aegis.eval.run.id (resource) or
+  # aegis.fault.injection.id (span), which both normalizer passes keep only for tenants in
+  # eval_tenants (#36). The low-eval-score policy is left out: no profile attribute carries
+  # an eval score, and judge scores arrive after ingest (#37).
   tail_sampling:
     decision_wait: 30s
     num_traces: 200000
@@ -39,6 +43,13 @@ processors:
         type: status_code
         status_code:
           status_codes: [ERROR]
+      # string_attribute matches the key on the resource or on any span of the trace.
+      - name: eval-runs
+        type: string_attribute
+        string_attribute: {key: aegis.eval.run.id, values: [".+"], enabled_regex_matching: true}
+      - name: fault-injections
+        type: string_attribute
+        string_attribute: {key: aegis.fault.injection.id, values: [".+"], enabled_regex_matching: true}
       - name: slow-bench-openinference
         type: and
         and:

@@ -26,10 +26,11 @@ type telemetry struct {
 	logger *zap.Logger
 	limit  int
 
-	unmapped     *capped
-	newerSchema  *capped
-	invalid      *capped
-	droppedLarge *capped
+	unmapped       *capped
+	newerSchema    *capped
+	invalid        *capped
+	droppedLarge   *capped
+	markerRejected *capped
 }
 
 func newTelemetry(set component.TelemetrySettings, limit int) (*telemetry, error) {
@@ -58,51 +59,80 @@ func newTelemetry(set component.TelemetrySettings, limit int) (*telemetry, error
 		"attr", "large unmapped value dropped"); err != nil {
 		return nil, err
 	}
+	// A security signal (#36): a marker would force 100% sampling. Labelled by tenant, not
+	// by sdk; the run or injection id itself is never a label or a log field.
+	if t.markerRejected, err = t.counterWith(meter, "traceblame_normalizer_eval_marker_rejected_total", "{attribute}",
+		"Eval and fault-injection markers dropped: the tenant is not in eval_tenants "+
+			"(tenant_not_allowed) or the value fails the profile (pattern).",
+		[]string{"tenant", "attr", "reason"}, 0, "eval marker rejected"); err != nil {
+		return nil, err
+	}
 	return t, nil
 }
 
+// counter makes a counter labelled {sdk, <label>} whose <label> is capped.
 func (t *telemetry) counter(meter metric.Meter, name, unit, desc, label, logMsg string) (*capped, error) {
+	return t.counterWith(meter, name, unit, desc, []string{"sdk", label}, 1, logMsg)
+}
+
+func (t *telemetry) counterWith(meter metric.Meter, name, unit, desc string, labels []string, capAt int, logMsg string) (*capped, error) {
 	c, err := meter.Int64Counter(name, metric.WithUnit(unit), metric.WithDescription(desc))
 	if err != nil {
 		return nil, err
 	}
-	return &capped{counter: c, label: label, limit: t.limit, logger: t.logger, logMsg: logMsg, seen: map[[2]string]bool{}}, nil
+	return &capped{counter: c, labels: labels, capAt: capAt, limit: t.limit, logger: t.logger, logMsg: logMsg, seen: map[string]bool{}}, nil
 }
 
-// capped is a counter labelled {sdk, <label>} that records at most limit label sets. The
-// first sighting of each set is logged once: keys and ids only, never attribute values.
+// capped is a counter that records at most limit label sets; further sets are counted with
+// labels[capAt] replaced by overflowLabel. The first sighting of each set is logged once:
+// keys and ids only, never attribute values.
 type capped struct {
 	counter metric.Int64Counter
-	label   string
+	labels  []string
+	capAt   int
 	limit   int
 	logger  *zap.Logger
 	logMsg  string
 
 	mu       sync.Mutex
-	seen     map[[2]string]bool
+	seen     map[string]bool
 	overflow bool
 }
 
+// add counts one {sdk, <label>} sighting.
 func (c *capped) add(ctx context.Context, sdk, value, traceID string) {
-	key := [2]string{sdk, value}
+	c.addLabels(ctx, traceID, sdk, value)
+}
+
+// addLabels counts one sighting with a value for each label, in order.
+func (c *capped) addLabels(ctx context.Context, traceID string, values ...string) {
+	values = append([]string(nil), values...)
+	key := strings.Join(values, "\x00")
 	c.mu.Lock()
 	switch {
 	case c.seen[key]:
 	case len(c.seen) < c.limit:
 		c.seen[key] = true
-		c.logger.Info(c.logMsg, zap.String("trace_id", traceID), zap.String("sdk", sdk),
-			zap.String(c.label, value), zap.String("normalizer_version", Version))
+		fields := []zap.Field{zap.String("trace_id", traceID)}
+		for i, l := range c.labels {
+			fields = append(fields, zap.String(l, values[i]))
+		}
+		c.logger.Info(c.logMsg, append(fields, zap.String("normalizer_version", Version))...)
 	default:
-		key[1] = overflowLabel
+		values[c.capAt] = overflowLabel
 		if !c.overflow {
 			c.overflow = true
 			c.logger.Warn("label cap reached; further values are counted as "+overflowLabel,
-				zap.String("trace_id", traceID), zap.String("metric_label", c.label),
+				zap.String("trace_id", traceID), zap.String("metric_label", c.labels[c.capAt]),
 				zap.Int("max_label_values", c.limit), zap.String("normalizer_version", Version))
 		}
 	}
 	c.mu.Unlock()
-	c.counter.Add(ctx, 1, metric.WithAttributes(attribute.String("sdk", key[0]), attribute.String(c.label, key[1])))
+	attrs := make([]attribute.KeyValue, len(c.labels))
+	for i, l := range c.labels {
+		attrs[i] = attribute.String(l, values[i])
+	}
+	c.counter.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
 // attrLabel collapses array indexes, so llm.tools.0.tool.name and llm.tools.1.tool.name

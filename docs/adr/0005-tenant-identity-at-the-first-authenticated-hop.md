@@ -36,6 +36,20 @@ two-tier topology:
   - A NetworkPolicy admits only agent pods to the OTLP port.
   - The gateway's normalizer runs with `tenant_source: config` and no `tenant_id`, so it
     keeps the agent-stamped tenant.
+- **Eval and fault-injection markers are a tenant-trust decision (#36).**
+  - The gateway keeps every trace that carries `aegis.eval.run.id` or
+    `aegis.fault.injection.id` at 100%. Any client that could set them could force full
+    sampling and pollute the D1 ground truth.
+  - The normalizer keeps a marker only for a tenant in `eval_tenants`, decided on the tenant
+    this ADR establishes: the authenticated one on the agent, the agent-stamped one on the
+    gateway. Any other marker, or one that fails the profile pattern, is dropped and counted
+    in `traceblame_normalizer_eval_marker_rejected_total{tenant, attr, reason}`. It is a
+    security signal, so it is not lumped into `invalid_attrs_total`, and an id is never a
+    label.
+  - Both tiers check, with one list from one source (in kind, the `eval-tenants` ConfigMap
+    read by both pods). The gateway's pass keeps what the agent accepted, and it rejects
+    what a different list would, so a drift shows up as gateway-side rejections.
+  - The list is empty by default: no tenant may mark traces until an operator says so.
 - **Single-tenant mode** is `tenant_source: config` with `tenant_id`: the shim value is
   trusted and the config only fills a missing one, as before #10.
 - **Credentials live in the cluster only.** `make kind-up` generates every credential (CA,
@@ -59,5 +73,10 @@ gateway-side override cannot be built on the given topology.
   password crosses the node network in clear. That hop needs TLS before any non-demo use.
 - **The local CA is short-lived.** It is valid for 30 days, and its rotation is manual
   (re-run `make kind-up` after deleting the Secrets).
+- **An allowlisted tenant can mark every trace.** `eval_tenants` decides who may force
+  100% sampling, not how much. A per-tenant budget on marked traces is a follow-up.
+- **The allowlist changes on restart.** Like the htpasswd, `eval_tenants` is read at start.
+  `make kind-deploy` restarts both tiers together. Until both have restarted, the gateway
+  drops markers that only the agent's new list allows, and counts them.
 - **A compromised agent can claim any tenant.** Agents are trusted. Per-tenant agent pools
   are a follow-up.

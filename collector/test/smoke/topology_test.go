@@ -58,6 +58,7 @@ func TestTheKindConfigsValidate(t *testing.T) {
 	overlay := filepath.Join("testdata", "memory-limiter-mib.yaml")
 	collectorDir := repoPath("deploy", "kind", "collector")
 	env := append(os.Environ(), readEnv(t, filepath.Join(collectorDir, "latency-thresholds.env"))...)
+	env = append(env, readEnv(t, filepath.Join(collectorDir, "eval-tenants.env"))...)
 	env = append(env, "CLICKHOUSE_USER=u", "CLICKHOUSE_PASSWORD=p", "POD_NAME=otel-gateway-0")
 	for name, files := range map[string][]string{
 		"agent":         {"agent.yaml"},

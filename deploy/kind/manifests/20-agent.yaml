@@ -63,6 +63,10 @@ spec:
           image: traceblame-otelcol:local
           imagePullPolicy: Never
           args: ["--config=/etc/otelcol/config/agent.yaml"]
+          # eval_tenants, shared with the gateway (#36).
+          envFrom:
+            - configMapRef:
+                name: eval-tenants
           ports:
             - {name: otlp-grpc, containerPort: 4317}
             - {name: otlp-http, containerPort: 4318}

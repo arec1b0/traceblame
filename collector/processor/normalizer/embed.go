@@ -12,7 +12,7 @@ import (
 
 // Version of the normalizer and its embedded mapping tables, stamped on every span as
 // aegis.normalizer.version. Bump it with every change to the mapping or redaction rules.
-const Version = "0.3.0"
+const Version = "0.4.0"
 
 // The mapping tables (mappings/README.md) and the profile copies, kept byte-identical to
 // schemas/profile by `traceblame-contracts gen-schema`.

@@ -16,6 +16,7 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, 256, cfg.MaxUnmappedValueBytes)
 	assert.False(t, cfg.ContentCapture)
 	assert.Empty(t, cfg.TenantID)
+	assert.Empty(t, cfg.EvalTenants, "no tenant may mark traces for 100% sampling by default")
 }
 
 func TestConfigFromYAML(t *testing.T) {
@@ -27,6 +28,7 @@ func TestConfigFromYAML(t *testing.T) {
 	assert.Equal(t, &Config{
 		Profile: "aegis-telemetry/1", TenantSource: TenantSourceConfig, TenantID: "acme",
 		TenantAuthAttribute: "username", MaxLabelValues: 50, MaxUnmappedValueBytes: 512,
+		EvalTenants: []string{"acme", "eval-runner"},
 	}, cfg)
 }
 
@@ -40,6 +42,7 @@ func TestConfigValidate(t *testing.T) {
 		{"label cap below one", func(c *Config) { c.MaxLabelValues = 0 }, "max_label_values"},
 		{"value limit below one", func(c *Config) { c.MaxUnmappedValueBytes = 0 }, "max_unmapped_value_bytes"},
 		{"content capture", func(c *Config) { c.ContentCapture = true }, "ADR-0002"},
+		{"empty eval tenant", func(c *Config) { c.EvalTenants = []string{"acme", ""} }, "eval_tenants"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := createDefaultConfig().(*Config)

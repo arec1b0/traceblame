@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Any
 
@@ -174,3 +175,32 @@ def test_algorithm_version_needs_an_algorithm(minimal_profile: dict[str, Any]) -
     _attr(minimal_profile, "aegis.span.kind")["source"]["algorithm_version"] = 1
     with pytest.raises(ValidationError, match="algorithm"):
         Profile.model_validate(minimal_profile)
+
+
+_ROOT_PROFILE = (
+    Path(__file__).resolve().parents[3] / "schemas" / "profile" / "aegis-telemetry.v1.yaml"
+)
+
+
+@pytest.mark.parametrize("name", ["aegis.eval.run.id", "aegis.fault.injection.id"])
+@pytest.mark.parametrize(
+    ("value", "ok"),
+    [
+        ("01J9Z3K8WQ5Y4N2V7XHB6T0DCE", True),
+        ("3f2b8c1e-6d4a-4f7e-9b2a-0c5d8e1f3a7b", True),
+        ("run-2026-10-31.cuad:split=test", False),
+        ("run-2026-10-31.cuad", True),
+        ("a" * 128, True),
+        ("a" * 129, False),
+        ("", False),
+        ("run 1", False),
+        ("прогон", False),
+        ("run\n", False),
+    ],
+)
+def test_marker_ids_are_bounded_in_size_and_charset(name: str, value: str, ok: bool) -> None:
+    """#36: markers force 100% sampling, so their values are short, plain ids."""
+    spec = load_profile(_ROOT_PROFILE).attribute(name)
+    assert spec is not None
+    assert spec.pattern is not None
+    assert (re.fullmatch(spec.pattern.removeprefix("^").removesuffix("$"), value) is not None) == ok

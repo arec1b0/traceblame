@@ -73,6 +73,9 @@ Semantics:
   source; the source yields the group, or nothing. It reads a fact out of a message that is
   dropped afterwards (e.g. the HTTP status, #29), so keep it anchored and narrow.
 - **Profile names are always known.** Listing them in `known` or `content` is an error.
+  The eval and fault markers (`aegis.eval.run.id`, `aegis.fault.injection.id`, #36) are
+  native profile names that shims and `faults/` set; no table maps them, every table passes
+  them through, and the normalizer's marker check runs whatever table matched.
 - **Content.**
   - `content` lists apply to every span, whatever the table that matched; the profile's
     forbidden list is always content too.

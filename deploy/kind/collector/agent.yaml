@@ -34,6 +34,9 @@ processors:
   normalizer:
     tenant_source: auth
     tenant_auth_attribute: username
+    # Tenants that may mark eval and fault-injection traces (#36, ADR-0005). One source for
+    # both tiers: eval-tenants.env -> ConfigMap eval-tenants -> this variable, a YAML list.
+    eval_tenants: ${env:TRACEBLAME_EVAL_TENANTS}
 
 exporters:
   loadbalancing:

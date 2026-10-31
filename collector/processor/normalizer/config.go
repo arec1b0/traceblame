@@ -38,6 +38,11 @@ type Config struct {
 	// MaxUnmappedValueBytes: on GenAI spans, an attribute that neither the profile nor the
 	// table knows is dropped when its string value is longer (fail closed, ADR-0002).
 	MaxUnmappedValueBytes int `mapstructure:"max_unmapped_value_bytes"`
+	// EvalTenants may set the eval and fault-injection markers (aegis.eval.run.id,
+	// aegis.fault.injection.id, #36). The gateway keeps marked traces at 100%, so a marker of
+	// any other tenant is dropped and counted (ADR-0005). Both tiers read the same list.
+	// Empty: no tenant may.
+	EvalTenants []string `mapstructure:"eval_tenants"`
 	// ContentCapture is the tenant opt-in to the encrypted out-of-band content copy
 	// (aegis.content.ref, ADR-0002). It must stay false until the content store exists.
 	ContentCapture bool `mapstructure:"content_capture"`
@@ -75,6 +80,11 @@ func (c *Config) Validate() error {
 	}
 	if c.MaxUnmappedValueBytes < 1 {
 		return errors.New("max_unmapped_value_bytes must be at least 1")
+	}
+	for _, tenant := range c.EvalTenants {
+		if tenant == "" {
+			return errors.New("eval_tenants must not contain an empty tenant")
+		}
 	}
 	if c.ContentCapture {
 		return errors.New("content_capture needs the encrypted content store of ADR-0002 (Proposed), " +

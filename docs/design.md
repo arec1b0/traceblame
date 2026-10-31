@@ -83,7 +83,7 @@ DaemonSet; loadbalancing exporter роутит по trace_id, file_storage sendi
 4
 Collector gateway tier
 OTel Collector
-tail_sampling: 100% ошибок, latency > p95, low eval score, 10% остального; export в ClickHouse + NATS
+tail_sampling: 100% ошибок, 100% eval- и fault-трейсов (aegis.eval.run.id, aegis.fault.injection.id; только tenants из eval_tenants, #36), latency > p95, low eval score, 10% остального; export в ClickHouse + NATS
 5
 trace-assembler
 Go
@@ -114,7 +114,7 @@ App span → shim → OTLP → agent collector (no blocking: при отказе
 - 
 Agent tier → loadbalancing по trace_id → gateway tier: все спаны трейса на одном инстансе, иначе tail sampling ломается.
 - 
-Gateway: normalizer → tail_sampling → ClickHouse spans + NATS spans.sampled.
+Gateway: normalizer → tail_sampling → ClickHouse spans + NATS spans.sampled. Eval- и fault-маркеры оба прохода normalizer (agent и gateway) оставляют только для tenants из одного общего eval_tenants; остальные отбрасываются и считаются (ADR-0005).
 - 
 trace-assembler закрывает трейс → trace.completed.
 - 
@@ -408,6 +408,8 @@ traceblame_normalizer_newer_schema_spans_total{sdk,schema_url} — спаны с
 traceblame_normalizer_invalid_attrs_total{sdk,attr} — атрибуты профиля, которые normalizer не смог починить: неверный тип или нарушение pattern/enum/const (drop), неизвестные aegis.* (drop), gen_ai.operation.name вне профиля (остаётся, span → chain).
 - 
 traceblame_normalizer_dropped_large_values_total{sdk,attr} — неизвестные атрибуты GenAI-спанов со строковым значением длиннее max_unmapped_value_bytes (старт 256), отброшены: fail closed на неизвестный content (ADR-0002).
+- 
+traceblame_normalizer_eval_marker_rejected_total{tenant,attr,reason} — eval/fault-маркеры, отброшенные normalizer: tenant не в eval_tenants (tenant_not_allowed) или значение не проходит pattern профиля (pattern). Сигнал безопасности: маркер даёт 100% sampling; id в labels не попадают.
 - 
 traceblame_pipeline_lag_seconds (span end → blame written), histogram.
 - 

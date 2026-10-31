@@ -36,14 +36,22 @@ SDK span ─▶ detect SDK ─▶ mapping table ─▶ redact content ─▶ che
    `gen_ai.operation.name` through the profile's span kinds, else `chain`. An operation
    outside the profile is kept: the span becomes `chain` and the attribute is counted as
    invalid. The normalizer never guesses a rename.
-5. **Check.** Every profile attribute is coerced to its profile type when that loses
+5. **Eval markers** (#36, [ADR-0005](../../../docs/adr/0005-tenant-identity-at-the-first-authenticated-hop.md)).
+   `aegis.eval.run.id` (resource) and `aegis.fault.injection.id` (span) make the gateway
+   keep the whole trace. They are kept only when the resource's tenant (after the tenant
+   source) is in `eval_tenants` and the value passes the profile pattern
+   (`^[A-Za-z0-9._:-]{1,128}$`). Otherwise they are dropped and counted in
+   `traceblame_normalizer_eval_marker_rejected_total`, with reason `tenant_not_allowed` or
+   `pattern`. The check runs on every span, whatever table matched. The agent and the
+   gateway run it with the same list, so the gateway's pass keeps what the agent accepted.
+6. **Check.** Every profile attribute is coerced to its profile type when that loses
    nothing, e.g. `"16"` → `16`, or a scalar → a one-element array. Otherwise it is dropped
    and counted. `aegis.*` keys outside the profile, or in the wrong scope, are dropped and
    counted: the namespace is closed. Everything else passes through. Attributes that
    neither the profile nor the table knows are counted as unmapped. The exception is on
    GenAI spans: those longer than `max_unmapped_value_bytes` are dropped and counted
    instead, failing closed on content no rule names yet.
-6. **Stamp.** Sets `aegis.profile.version`, `aegis.span.kind`, `aegis.source.sdk` and
+7. **Stamp.** Sets `aegis.profile.version`, `aegis.span.kind`, `aegis.source.sdk` and
    `aegis.normalizer.version`, and fills a missing resource `aegis.tenant.id` from
    `tenant_id`.
 
@@ -60,6 +68,7 @@ processors:
     max_label_values: 1000       # distinct label sets per counter; then attr="_other"
     max_unmapped_value_bytes: 256   # GenAI spans: longer unknown strings are dropped
     content_capture: false       # opt-in content store (ADR-0002); true is rejected for now
+    eval_tenants: []             # tenants that may set the eval/fault markers (#36); empty: none
 ```
 
 ## Self-telemetry
@@ -70,14 +79,16 @@ processors:
 | `traceblame_normalizer_newer_schema_spans_total` | `sdk`, `schema_url` | `schema_url` newer than every table of the SDK |
 | `traceblame_normalizer_invalid_attrs_total` | `sdk`, `attr` | profile attributes it could not repair (see Check) |
 | `traceblame_normalizer_dropped_large_values_total` | `sdk`, `attr` | unknown attributes dropped from GenAI spans for their size (see Check) |
+| `traceblame_normalizer_eval_marker_rejected_total` | `tenant`, `attr`, `reason` | eval and fault markers dropped: `tenant_not_allowed` or `pattern` (see Eval markers). A security signal: a marker forces 100% sampling. The run or injection id is never a label. `tenant="_none"`: no tenant |
 
 The names follow design §1.5 exactly; the end-to-end smoke tests scrape them from the built
 collector.
 - Array indexes in `attr` are collapsed (`llm.tools.*.tool.json_schema`).
 - Resource-level drops use `sdk="unknown"`.
+- The label cap replaces `attr` with `_other`; for the marker counter, `tenant`.
 
 The first sighting of each label set is logged once at `info`, as JSON with `trace_id`,
-`sdk`, the label and `normalizer_version`. Logs carry attribute keys only, never values.
+the counter's labels and `normalizer_version`. Logs carry attribute keys only, never values.
 
 ## Versioning
 

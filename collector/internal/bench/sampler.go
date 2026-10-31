@@ -33,37 +33,52 @@ type TailSampler struct {
 // NewTailSampler reads processors.tail_sampling of a gateway config, with ${env:X} taken
 // from env.
 func NewTailSampler(gatewayConfig string, env map[string]string) (*TailSampler, error) {
-	raw, err := os.ReadFile(filepath.Clean(gatewayConfig))
+	conf, err := processorConfig(gatewayConfig, "tail_sampling", env)
 	if err != nil {
 		return nil, err
-	}
-	var missing []string
-	expanded := envRef.ReplaceAllStringFunc(string(raw), func(ref string) string {
-		name := envRef.FindStringSubmatch(ref)[1]
-		v, ok := env[name]
-		if !ok {
-			missing = append(missing, name)
-		}
-		return v
-	})
-	var doc struct {
-		Processors map[string]map[string]any `yaml:"processors"`
-	}
-	if err := yaml.Unmarshal([]byte(expanded), &doc); err != nil {
-		return nil, err
-	}
-	conf, ok := doc.Processors["tail_sampling"]
-	if !ok {
-		return nil, fmt.Errorf("bench: %s has no tail_sampling processor", gatewayConfig)
-	}
-	for _, name := range missing {
-		if name != "CLICKHOUSE_USER" && name != "CLICKHOUSE_PASSWORD" {
-			return nil, fmt.Errorf("bench: no value for ${env:%s}", name)
-		}
 	}
 	conf["decision_wait"] = replayWait.String()
 	conf["num_traces"] = 2_000_000
 	return &TailSampler{conf: conf}, nil
+}
+
+// processorConfig reads processors.<name> of a collector config, with every ${env:X} in it
+// taken from env; references elsewhere in the file (credentials) are not needed.
+func processorConfig(config, name string, env map[string]string) (map[string]any, error) {
+	raw, err := os.ReadFile(filepath.Clean(config))
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Processors map[string]yaml.Node `yaml:"processors"`
+	}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	node, ok := doc.Processors[name]
+	if !ok {
+		return nil, fmt.Errorf("bench: %s has no %s processor", config, name)
+	}
+	section, err := yaml.Marshal(&node)
+	if err != nil {
+		return nil, err
+	}
+	var missing error
+	expanded := envRef.ReplaceAllStringFunc(string(section), func(ref string) string {
+		v, ok := env[envRef.FindStringSubmatch(ref)[1]]
+		if !ok && missing == nil {
+			missing = fmt.Errorf("bench: no value for %s in %s", ref, config)
+		}
+		return v
+	})
+	if missing != nil {
+		return nil, missing
+	}
+	conf := map[string]any{}
+	if err := yaml.Unmarshal([]byte(expanded), &conf); err != nil {
+		return nil, err
+	}
+	return conf, nil
 }
 
 // Decide feeds every part (one trace id each) to a fresh processor and returns the trace
