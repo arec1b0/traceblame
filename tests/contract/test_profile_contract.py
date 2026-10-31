@@ -1,5 +1,6 @@
 """The profile, its generated JSON Schema and the pinned semconv snapshot agree (ADR-0001)."""
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -15,9 +16,17 @@ from traceblame_contracts.compat import breaking_within_major
 from traceblame_contracts.jsonschema_gen import render_json_schema
 from traceblame_contracts.profile import OPERATION_ATTRIBUTE, Profile
 from traceblame_contracts.semconv import Snapshot
+from traceblame_contracts.vectors import (
+    VectorFile,
+    load_registry,
+    load_registry_from_git,
+    registry_problems,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = ROOT / "schemas" / "profile" / "aegis-telemetry.v1.yaml"
+VECTORS_DIR = ROOT / "schemas" / "profile" / "vectors" / "v1"
+ARGS_HASH = "aegis.tool.args_hash"
 
 pytestmark = pytest.mark.contract
 
@@ -72,7 +81,11 @@ def test_forbidden_attributes_are_semconv_names(profile: Profile, snapshot: Snap
 
 
 def test_no_breaking_change_against_the_base_revision(profile: Profile) -> None:
-    """Within one major only minor changes (ADR-0001 section 2); base: CONTRACT_BASE_REF."""
+    """Within one major only minor changes (ADR-0001 section 2); base: CONTRACT_BASE_REF.
+
+    Golden vectors are read at the same two revisions: a reword is minor only against
+    vectors that already existed at the base (ADR-0002 section 5).
+    """
     ref = os.environ.get("CONTRACT_BASE_REF", "main")
     git = shutil.which("git")
     if git is None:
@@ -84,4 +97,46 @@ def test_no_breaking_change_against_the_base_revision(profile: Profile) -> None:
     if shown.returncode != 0:
         pytest.skip(f"no baseline profile at {ref}:{path}")
     base = Profile.model_validate(yaml.safe_load(shown.stdout))
-    assert breaking_within_major(base, profile) == []
+    base_vectors = load_registry_from_git(ref, VECTORS_DIR.relative_to(ROOT).as_posix(), cwd=ROOT)
+    assert (
+        breaking_within_major(
+            base, profile, old_vectors=base_vectors, new_vectors=load_registry(VECTORS_DIR)
+        )
+        == []
+    )
+
+
+def test_every_registered_vector_belongs_to_the_profile(profile: Profile) -> None:
+    assert registry_problems(profile, load_registry(VECTORS_DIR)) == []
+
+
+def test_args_hash_has_registered_vectors() -> None:
+    registry = load_registry(VECTORS_DIR)
+    assert ARGS_HASH in registry, "aegis.tool.args_hash needs golden vectors (ADR-0002 section 5)"
+
+
+def _reference_args_hash(file: VectorFile, vector_id: str) -> str:
+    """SHA-256 over the canonical form (raw UTF-8 input when canonical is null), 16 hex chars."""
+    vector = next(v for v in file.vectors if v.id == vector_id)
+    material = vector.input if vector.canonical is None else vector.canonical
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+
+
+def test_args_hash_vectors_agree_with_an_independent_reference() -> None:
+    """The registry is self-consistent without the Go normalizer: expected = sha256(canonical)."""
+    file = load_registry(VECTORS_DIR)[ARGS_HASH]
+    wrong = [v.id for v in file.vectors if _reference_args_hash(file, v.id) != v.expected]
+    assert wrong == []
+
+
+def test_args_hash_vectors_cover_the_required_cases() -> None:
+    file = load_registry(VECTORS_DIR)[ARGS_HASH]
+    ids = {v.id for v in file.vectors}
+    raw = [v for v in file.vectors if v.canonical is None]
+    assert len(file.vectors) >= 20
+    assert {"rfc8785-3-2-3-sample", "rfc8785-3-2-3-utf16-property-order"} <= ids
+    assert any("key-order" in i for i in ids)
+    assert any("number" in i for i in ids)
+    assert any("unicode" in i for i in ids)
+    assert raw, "the raw-UTF-8 fallback needs vectors"
+    assert any(not v.input.isascii() for v in raw), "a non-ASCII raw-fallback case"

@@ -14,6 +14,7 @@ from traceblame_contracts.normalizers import NORMALIZERS, GoNormalizer, Identity
 from traceblame_contracts.otlp import flatten_otlp_json
 from traceblame_contracts.profile import load_profile
 from traceblame_contracts.validate import validate_span
+from traceblame_contracts.vectors import Registry, load_registry
 
 DEFAULT_PROFILE = Path("schemas/profile/aegis-telemetry.v1.yaml")
 # Directories that keep a byte-identical copy of the default profile. The normalizer embeds
@@ -76,11 +77,13 @@ def _validate(args: argparse.Namespace) -> int:
 
 def _compat(args: argparse.Namespace) -> int:
     old, new = load_profile(args.old), load_profile(args.new)
-    diff = diff_profiles(old, new)
+    old_vectors: Registry = load_registry(args.old_vectors) if args.old_vectors else {}
+    new_vectors: Registry = load_registry(args.new_vectors) if args.new_vectors else {}
+    diff = diff_profiles(old, new, old_vectors=old_vectors, new_vectors=new_vectors)
     for change in diff.changes:
         print(f"[{change.severity}] {change.rule}: {change.subject} {change.detail}".rstrip())
     print(f"required bump: {diff.bump}")
-    blocked = breaking_within_major(old, new)
+    blocked = breaking_within_major(old, new, old_vectors=old_vectors, new_vectors=new_vectors)
     if blocked:
         print(f"{len(blocked)} major change(s) need {old.profile}/{old.major + 1}")
     return 1 if blocked else 0
@@ -134,6 +137,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     cmp_ = sub.add_parser("compat", help="list breaking changes between two profile files")
     cmp_.add_argument("old", type=Path)
     cmp_.add_argument("new", type=Path)
+    cmp_.add_argument(
+        "--old-vectors",
+        type=Path,
+        help="directory of golden vector files at the old revision (default: none)",
+    )
+    cmp_.add_argument(
+        "--new-vectors",
+        type=Path,
+        help="directory of golden vector files at the new revision (default: none)",
+    )
     cmp_.set_defaults(func=_compat)
 
     gap = sub.add_parser(

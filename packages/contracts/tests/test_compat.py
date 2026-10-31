@@ -1,10 +1,13 @@
 import copy
+from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from traceblame_contracts.compat import ProfileDiff, breaking_within_major, diff_profiles
 from traceblame_contracts.profile import Profile
+from traceblame_contracts.vectors import Registry, VectorFile
 
 _OPTIONAL: dict[str, Any] = {
     "name": "gen_ai.response.model",
@@ -352,3 +355,295 @@ def test_change_names_its_subject_and_detail(old: dict[str, Any], new: dict[str,
     (change,) = _diff(old, new).changes
     assert change.subject == "gen_ai.usage.input_tokens"
     assert change.detail == "int -> double"
+
+
+# algorithm_version (ADR-0002, section 5, issue #32).
+
+_CARRIER = "aegis.span.kind"
+_TEXT = "sha256 over the key-sorted arguments"
+_REWORDED = "the SHA-256 of the arguments, keys sorted"
+
+
+def _versioned(profile: dict[str, Any], text: str | None, version: int | None) -> None:
+    _algorithm(profile, text)
+    source = _attr(profile, _CARRIER)["source"]
+    if version is None:
+        source.pop("algorithm_version", None)
+    else:
+        source["algorithm_version"] = version
+
+
+def _vector(vector_id: str, expected: str = "0123456789abcdef") -> dict[str, Any]:
+    return {"id": vector_id, "input": f"in-{vector_id}", "canonical": None, "expected": expected}
+
+
+def _registry(*vectors: dict[str, Any], version: int = 1) -> Registry:
+    doc = {"attribute": _CARRIER, "algorithm_version": version, "vectors": list(vectors)}
+    return {_CARRIER: VectorFile.model_validate(doc)}
+
+
+def _classified(
+    old: dict[str, Any],
+    new: dict[str, Any],
+    old_vectors: Registry | None = None,
+    new_vectors: Registry | None = None,
+) -> list[tuple[str, str]]:
+    diff = diff_profiles(
+        Profile.model_validate(old),
+        Profile.model_validate(new),
+        old_vectors=old_vectors,
+        new_vectors=new_vectors,
+    )
+    return [(c.severity, c.rule) for c in diff.changes]
+
+
+def test_adopting_version_1_with_the_text_unchanged_is_minor(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, None)
+    _versioned(new, _TEXT, 1)
+    assert _classified(old, new) == [("minor", "algorithm_version_adopted")]
+    assert not breaking_within_major(Profile.model_validate(old), Profile.model_validate(new))
+
+
+def test_adopting_version_1_ignores_whitespace_in_the_text(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, None)
+    _versioned(new, "sha256 over\n  the key-sorted   arguments", 1)
+    assert _classified(old, new) == [("minor", "algorithm_version_adopted")]
+
+
+def test_adopting_version_1_together_with_a_text_change_is_major(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, None)
+    _versioned(new, _REWORDED, 1)
+    assert _classified(old, new) == [("major", "algorithm_version_adopted_with_text_change")]
+
+
+def test_adopting_it_with_a_text_change_is_major_even_with_registered_vectors(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, None)
+    _versioned(new, _REWORDED, 1)
+    vectors = _registry(_vector("a"))
+    assert _classified(old, new, vectors, vectors) == [
+        ("major", "algorithm_version_adopted_with_text_change")
+    ]
+
+
+@pytest.mark.parametrize("version", [2, 5])
+def test_introducing_a_version_above_1_is_major(
+    old: dict[str, Any], new: dict[str, Any], version: int
+) -> None:
+    _versioned(old, _TEXT, None)
+    _versioned(new, _TEXT, version)
+    assert _classified(old, new) == [("major", "algorithm_version_introduced_above_1")]
+
+
+def test_removing_the_version_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _TEXT, None)
+    assert _classified(old, new) == [("major", "algorithm_version_removed")]
+
+
+def test_lowering_the_version_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _versioned(old, _TEXT, 2)
+    _versioned(new, _TEXT, 1)
+    assert _classified(old, new) == [("major", "algorithm_version_lowered")]
+
+
+def test_raising_the_version_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _TEXT, 2)
+    assert _classified(old, new) == [("major", "algorithm_version_raised")]
+
+
+def test_raising_the_version_with_a_text_change_is_one_major_change(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _REWORDED, 2)
+    assert _classified(old, new) == [("major", "algorithm_version_raised")]
+
+
+def test_algorithm_added_or_removed_stays_major_whatever_the_version(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(new, _TEXT, 1)
+    assert _classified(old, new) == [("major", "algorithm_added")]
+    assert _classified(new, old) == [("major", "algorithm_removed")]
+
+
+def test_a_reword_with_unchanged_base_vectors_is_minor(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _REWORDED, 1)
+    base = _registry(_vector("a"), _vector("b"))
+    assert _classified(old, new, base, base) == [("minor", "algorithm_reworded")]
+    assert not breaking_within_major(
+        Profile.model_validate(old),
+        Profile.model_validate(new),
+        old_vectors=base,
+        new_vectors=base,
+    )
+
+
+def test_a_reword_may_add_vectors(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _REWORDED, 1)
+    head = _registry(_vector("a"), _vector("b"), _vector("c"))
+    assert _classified(old, new, _registry(_vector("a"), _vector("b")), head) == [
+        ("minor", "algorithm_reworded")
+    ]
+
+
+def test_a_reword_without_any_registered_vectors_is_major(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _REWORDED, 1)
+    assert _classified(old, new) == [("major", "algorithm_changed")]
+    assert _classified(old, new, {}, {}) == [("major", "algorithm_changed")]
+
+
+def test_a_reword_with_vectors_only_at_head_is_major(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    """Vectors added in the rewording PR prove nothing about the old computation."""
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _REWORDED, 1)
+    (change,) = diff_profiles(
+        Profile.model_validate(old),
+        Profile.model_validate(new),
+        old_vectors={},
+        new_vectors=_registry(_vector("a")),
+    ).changes
+    assert (change.severity, change.rule) == ("major", "algorithm_changed")
+    assert "base" in change.detail
+
+
+def test_a_reword_with_a_changed_vector_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _REWORDED, 1)
+    base = _registry(_vector("a"), _vector("b"))
+    head = _registry(_vector("a"), _vector("b", expected="fedcba9876543210"))
+    assert _classified(old, new, base, head) == [
+        ("major", "algorithm_changed"),
+        ("major", "vector_changed"),
+    ]
+
+
+def test_a_reword_with_a_removed_vector_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _REWORDED, 1)
+    base = _registry(_vector("a"), _vector("b"))
+    assert _classified(old, new, base, _registry(_vector("a"))) == [
+        ("major", "algorithm_changed"),
+        ("major", "vector_removed"),
+    ]
+
+
+def test_a_reword_of_an_unversioned_algorithm_stays_major_even_with_vectors(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, None)
+    _versioned(new, _REWORDED, None)
+    base = _registry(_vector("a"))
+    assert _classified(old, new, base, base) == [("major", "algorithm_changed")]
+
+
+def test_a_changed_vector_is_major_even_with_the_text_unchanged(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _TEXT, 1)
+    head = _registry(_vector("a", expected="fedcba9876543210"))
+    assert _classified(old, new, _registry(_vector("a")), head) == [("major", "vector_changed")]
+    assert breaking_within_major(
+        Profile.model_validate(old),
+        Profile.model_validate(new),
+        old_vectors=_registry(_vector("a")),
+        new_vectors=head,
+    )
+
+
+@pytest.mark.parametrize("field", ["input", "canonical", "expected"])
+def test_every_vector_field_is_covered_by_the_changed_rule(
+    old: dict[str, Any], new: dict[str, Any], field: str
+) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _TEXT, 1)
+    changed = _vector("a") | {field: "changed"}
+    assert _classified(old, new, _registry(_vector("a")), _registry(changed)) == [
+        ("major", "vector_changed")
+    ]
+
+
+def test_a_removed_vector_is_major_even_with_the_text_unchanged(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _TEXT, 1)
+    base = _registry(_vector("a"), _vector("b"))
+    assert _classified(old, new, base, _registry(_vector("a"))) == [("major", "vector_removed")]
+
+
+def test_a_vanished_registry_file_removes_every_vector(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _TEXT, 1)
+    assert _classified(old, new, _registry(_vector("a"), _vector("b")), {}) == [
+        ("major", "vector_removed"),
+        ("major", "vector_removed"),
+    ]
+
+
+def test_adding_vectors_is_not_a_change(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _versioned(old, _TEXT, 1)
+    _versioned(new, _TEXT, 1)
+    diff = diff_profiles(
+        Profile.model_validate(old),
+        Profile.model_validate(new),
+        old_vectors=_registry(_vector("a")),
+        new_vectors=_registry(_vector("a"), _vector("b")),
+    )
+    assert diff.changes == ()
+    assert diff.bump == "none"
+
+
+def test_vectors_of_a_removed_attribute_do_not_add_changes(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    """The removal is the change (major, as in #28); its vectors need not stay."""
+    old["attributes"].append(
+        {
+            "name": "aegis.tool.args_hash",
+            "scope": "span",
+            "type": "string",
+            "source": {"aegis": "extension", "algorithm": _TEXT, "algorithm_version": 1},
+            "requirement": {"llm": "recommended"},
+            "brief": "Hash.",
+        }
+    )
+    doc = {
+        "attribute": "aegis.tool.args_hash",
+        "algorithm_version": 1,
+        "vectors": [_vector("a")],
+    }
+    vectors = {"aegis.tool.args_hash": VectorFile.model_validate(doc)}
+    assert _classified(old, new, vectors, {}) == [("major", "attribute_removed")]
+
+
+def test_adopting_version_1_on_the_committed_args_hash_is_minor() -> None:
+    """The real profile against itself with the field removed: profile 1.3.0 -> 1.4.0."""
+    path = Path(__file__).resolve().parents[3] / "schemas" / "profile" / "aegis-telemetry.v1.yaml"
+    head = yaml.safe_load(path.read_text(encoding="utf-8"))
+    base = copy.deepcopy(head)
+    source = _attr(base, "aegis.tool.args_hash")["source"]
+    assert source.pop("algorithm_version") == 1
+    assert _classified(base, head) == [("minor", "algorithm_version_adopted")]
+    assert _diff(base, head).bump == "minor"

@@ -219,7 +219,7 @@
       }
     }
   ],
-  "description": "Generated from the aegis-telemetry/1 profile, revision 1.3.0, on OTel semantic conventions 1.41.1. Do not edit: run `traceblame-contracts gen-schema`.",
+  "description": "Generated from the aegis-telemetry/1 profile, revision 1.4.0, on OTel semantic conventions 1.41.1. Do not edit: run `traceblame-contracts gen-schema`.",
   "properties": {
     "attributes": {
       "properties": {
@@ -592,7 +592,7 @@
   "type": "object",
   "x-aegis-profile": {
     "id": "aegis-telemetry/1",
-    "revision": "1.3.0",
+    "revision": "1.4.0",
     "semconv_schema_url": "https://opentelemetry.io/schemas/1.41.1",
     "semconv_version": "1.41.1"
   }

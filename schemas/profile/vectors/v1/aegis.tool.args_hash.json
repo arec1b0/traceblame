@@ -1,0 +1,237 @@
+{
+  "attribute": "aegis.tool.args_hash",
+  "algorithm_version": 1,
+  "vectors": [
+    {
+      "id": "rfc8785-3-2-3-sample",
+      "input": "{\n       \"numbers\": [333333333.33333329, 1E30, 4.50,\n                   2e-3, 0.000000000000000000000000001],\n       \"string\": \"\\u20ac$\\u000F\\u000aA'\\u0042\\u0022\\u005c\\\\\\\"\\/\",\n       \"literals\": [null, true, false]\n     }",
+      "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"\u20ac$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
+      "expected": "2d5e01a318d0f087",
+      "note": "RFC 8785 section 3.2.2 sample object and its canonical form (3.2.3)."
+    },
+    {
+      "id": "rfc8785-3-2-3-utf16-property-order",
+      "input": "{\n       \"\\u20ac\": \"Euro Sign\",\n       \"\\r\": \"Carriage Return\",\n       \"\\ufb33\": \"Hebrew Letter Dalet With Dagesh\",\n       \"1\": \"One\",\n       \"\\ud83d\\ude00\": \"Emoji: Grinning Face\",\n       \"\\u0080\": \"Control\",\n       \"\\u00f6\": \"Latin Small Letter O With Diaeresis\"\n     }",
+      "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\u0080\":\"Control\",\"\u00f6\":\"Latin Small Letter O With Diaeresis\",\"\u20ac\":\"Euro Sign\",\"\ud83d\ude00\":\"Emoji: Grinning Face\",\"\ufb33\":\"Hebrew Letter Dalet With Dagesh\"}",
+      "expected": "5e321556d22018a9",
+      "note": "RFC 8785 section 3.2.3: properties sort by UTF-16 code units, so U+1F600 (D83D DE00) precedes U+FB33."
+    },
+    {
+      "id": "key-order-flat",
+      "input": "{\"units\": \"metric\", \"city\": \"Paris\"}",
+      "canonical": "{\"city\":\"Paris\",\"units\":\"metric\"}",
+      "expected": "016ad0ce38cd3c9a",
+      "note": "The tool call from the normalizer's own test: keys sort, whitespace goes."
+    },
+    {
+      "id": "key-order-already-canonical",
+      "input": "{\"a\":1,\"b\":2}",
+      "canonical": "{\"a\":1,\"b\":2}",
+      "expected": "43258cff783fe703",
+      "note": "Canonical input is unchanged."
+    },
+    {
+      "id": "key-order-nested",
+      "input": "{\"b\": [3, {\"z\": 1, \"a\": 2}], \"a\": {\"d\": [], \"c\": {}}}",
+      "canonical": "{\"a\":{\"c\":{},\"d\":[]},\"b\":[3,{\"a\":2,\"z\":1}]}",
+      "expected": "88b956832dd276b1",
+      "note": "Objects sort at every depth; arrays keep their order."
+    },
+    {
+      "id": "key-order-array-order-kept",
+      "input": "[3, 1, 2, [\"b\", \"a\"]]",
+      "canonical": "[3,1,2,[\"b\",\"a\"]]",
+      "expected": "02e209760efb252d",
+      "note": "Array elements are never sorted."
+    },
+    {
+      "id": "key-order-whitespace-around",
+      "input": "  \n{\"b\" : 1 ,\t\"a\":2}\r\n ",
+      "canonical": "{\"a\":2,\"b\":1}",
+      "expected": "d3626ac30a87e6f7",
+      "note": "Insignificant whitespace, including leading and trailing, does not reach the hash."
+    },
+    {
+      "id": "number-appendix-b",
+      "input": "[0, -0, 5e-324, -5e-324, 1.7976931348623157e308, 9007199254740992, 1e23, 0.000001, 1e-7, 333333333.33333329, 1E30, 4.50, 2e-3, 1e21, 1e-27]",
+      "canonical": "[0,0,5e-324,-5e-324,1.7976931348623157e+308,9007199254740992,1e+23,0.000001,1e-7,333333333.3333333,1e+30,4.5,0.002,1e+21,1e-27]",
+      "expected": "7dcefd97e2e8482f",
+      "note": "RFC 8785 appendix B samples written as JSON numbers: -0, denormals, the 1e+21 and 1e-7 switches, 1e+23."
+    },
+    {
+      "id": "number-integers-and-fractions",
+      "input": "[1, 10, 100.0, 1.0, 12345678901234567890, 0.1, 0.30000000000000004, -1.5E+2, 0e0, 1.0e0, 123456789012345680000]",
+      "canonical": "[1,10,100,1,12345678901234567000,0.1,0.30000000000000004,-150,0,1,123456789012345680000]",
+      "expected": "a98ce65fe6c0c7da",
+      "note": "Integers and fractions as IEEE 754 doubles: 100.0 is 100, 12345678901234567890 loses precision, exponent forms fold."
+    },
+    {
+      "id": "string-escapes",
+      "input": "[\"\\u0000\\u0001\\b\\t\\n\\f\\r\\u001f\\u007f\\\"\\\\\\/\"]",
+      "canonical": "[\"\\u0000\\u0001\\b\\t\\n\\f\\r\\u001f\u007f\\\"\\\\/\"]",
+      "expected": "3a0ff22fc382b5b4",
+      "note": "Only controls below U+0020, the quote and the backslash are escaped; DEL and '/' are literal."
+    },
+    {
+      "id": "unicode-escape-equals-literal-a",
+      "input": "{\"name\": \"caf\\u00e9\", \"city\": \"Z\\u00fcrich\"}",
+      "canonical": "{\"city\":\"Z\u00fcrich\",\"name\":\"caf\u00e9\"}",
+      "expected": "59f37625e80323c8",
+      "note": "\\u escapes serialize as the literal character."
+    },
+    {
+      "id": "unicode-escape-equals-literal-b",
+      "input": "{\"name\": \"caf\u00e9\", \"city\": \"Z\u00fcrich\"}",
+      "canonical": "{\"city\":\"Z\u00fcrich\",\"name\":\"caf\u00e9\"}",
+      "expected": "59f37625e80323c8",
+      "note": "The literal spelling of unicode-escape-equals-literal-a: the same hash."
+    },
+    {
+      "id": "unicode-nfc",
+      "input": "[\"\u00e9\"]",
+      "canonical": "[\"\u00e9\"]",
+      "expected": "0b657be394b1d432",
+      "note": "U+00E9. No Unicode normalization is applied."
+    },
+    {
+      "id": "unicode-nfd",
+      "input": "[\"e\u0301\"]",
+      "canonical": "[\"e\u0301\"]",
+      "expected": "32860394d411eb38",
+      "note": "U+0065 U+0301: the same text as unicode-nfc, a different hash."
+    },
+    {
+      "id": "unicode-astral-pair-and-key",
+      "input": "{\"\\ud83d\\ude00\": \"\\ud83d\\ude00\", \"mood\": \"\ud83d\ude00\"}",
+      "canonical": "{\"mood\":\"\ud83d\ude00\",\"\ud83d\ude00\":\"\ud83d\ude00\"}",
+      "expected": "532d1ee8dd8969a9",
+      "note": "A surrogate-pair escape is one astral character; it sorts after 'm'."
+    },
+    {
+      "id": "toplevel-null",
+      "input": "null",
+      "canonical": "null",
+      "expected": "74234e98afe7498f",
+      "note": "A bare literal."
+    },
+    {
+      "id": "toplevel-string",
+      "input": "\"x\"",
+      "canonical": "\"x\"",
+      "expected": "ba2df4903a2c14e8",
+      "note": "A bare string."
+    },
+    {
+      "id": "toplevel-number",
+      "input": "1E2",
+      "canonical": "100",
+      "expected": "ad57366865126e55",
+      "note": "A bare number."
+    },
+    {
+      "id": "toplevel-empty-array",
+      "input": "[ ]",
+      "canonical": "[]",
+      "expected": "4f53cda18c2baa0c",
+      "note": "An empty array."
+    },
+    {
+      "id": "toplevel-empty-object",
+      "input": "{ }",
+      "canonical": "{}",
+      "expected": "44136fa355b3678a",
+      "note": "An empty object."
+    },
+    {
+      "id": "raw-not-json",
+      "input": "city=Paris",
+      "canonical": null,
+      "expected": "a26bd426181db379",
+      "note": "Not JSON at all."
+    },
+    {
+      "id": "raw-empty",
+      "input": "",
+      "canonical": null,
+      "expected": "e3b0c44298fc1c14",
+      "note": "No arguments: SHA-256 of the empty string."
+    },
+    {
+      "id": "raw-whitespace-only",
+      "input": "   ",
+      "canonical": null,
+      "expected": "0aad7da77d2ed59c",
+      "note": "Whitespace only is not JSON."
+    },
+    {
+      "id": "raw-truncated-json",
+      "input": "{\"city\":",
+      "canonical": null,
+      "expected": "e72c05d23e812539",
+      "note": "Truncated JSON."
+    },
+    {
+      "id": "raw-single-quotes",
+      "input": "{'city': 'Paris'}",
+      "canonical": null,
+      "expected": "79f3685311ea75e5",
+      "note": "Python repr is not JSON."
+    },
+    {
+      "id": "raw-nan",
+      "input": "[NaN]",
+      "canonical": null,
+      "expected": "638577393ecb248f",
+      "note": "NaN is not JSON."
+    },
+    {
+      "id": "raw-duplicate-property",
+      "input": "{\"a\": 1, \"a\": 2}",
+      "canonical": null,
+      "expected": "93437bd0c5f136d0",
+      "note": "I-JSON forbids duplicate names; whitespace is hashed as written."
+    },
+    {
+      "id": "raw-lone-high-surrogate",
+      "input": "{\"a\": \"\\ud83d\"}",
+      "canonical": null,
+      "expected": "b64f32864e02e577",
+      "note": "A lone surrogate escape is not I-JSON."
+    },
+    {
+      "id": "raw-lone-low-surrogate",
+      "input": "[\"\\ude00x\"]",
+      "canonical": null,
+      "expected": "69ef263ba589fdc8",
+      "note": "A lone low surrogate escape is not I-JSON."
+    },
+    {
+      "id": "raw-trailing-data",
+      "input": "{} {}",
+      "canonical": null,
+      "expected": "2cec2bbf1a64ea52",
+      "note": "Data after the JSON value."
+    },
+    {
+      "id": "raw-number-out-of-range",
+      "input": "[1e400]",
+      "canonical": null,
+      "expected": "c5707d15ca6a3c35",
+      "note": "A number that does not fit an IEEE 754 double."
+    },
+    {
+      "id": "raw-non-ascii-text",
+      "input": "ville=Z\u00fcrich",
+      "canonical": null,
+      "expected": "275e9b3817c7e20e",
+      "note": "Raw UTF-8 bytes, not ASCII."
+    },
+    {
+      "id": "raw-non-ascii-duplicate-property",
+      "input": "{\"city\": \"Z\u00fcrich\", \"city\": \"Z\u00fcrich\"}",
+      "canonical": null,
+      "expected": "95e28b010d07d5fa",
+      "note": "Non-ASCII and not I-JSON: the raw UTF-8 bytes, with their spacing."
+    }
+  ]
+}
