@@ -11,7 +11,7 @@ import pytest
 
 from traceblame_storage import contract
 from traceblame_storage.migrations import Migration, at_revision, packaged
-from traceblame_storage.runner import ChecksumMismatchError, migrate
+from traceblame_storage.runner import ChecksumMismatchError, DropGuardError, migrate
 from traceblame_storage.testing import ClickHouseServer
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,8 +30,6 @@ ENGINES = {
     "spans": "MergeTree",
     "otel_traces_ingest": "Null",
     "spans_from_otel": "MaterializedView",
-    "trace_roots": "MergeTree",
-    "trace_roots_from_otel": "MaterializedView",
     "trace_arrivals": "MergeTree",
     "trace_arrivals_from_otel": "MaterializedView",
     "findings": "ReplacingMergeTree",
@@ -44,7 +42,7 @@ ENGINES = {
 def test_migrate_creates_every_table_once(clickhouse: ClickHouseServer, database: str) -> None:
     client = clickhouse.client(database)
     try:
-        assert [m.version for m in migrate(client, packaged())] == list(range(1, 11))
+        assert [m.version for m in migrate(client, packaged())] == list(range(1, 13))
         assert migrate(client, packaged()) == [], "a second run applies nothing"
         rows = client.query_rows(
             f"SELECT name, engine FROM system.tables WHERE database = '{database}'"  # noqa: S608
@@ -230,3 +228,56 @@ def test_n_minus_1(clickhouse: ClickHouseServer, database: str, direction: str) 
         _run(clickhouse, database, base, contract.packaged())
     else:
         _run(clickhouse, database, packaged(), contract.at_revision(ref, cwd=ROOT))
+
+
+def test_the_drop_guard_fails_clearly_and_a_rerun_applies_only_the_refused_drop(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """#41: ClickHouse refuses DROP TABLE above max_table_size_to_drop (error 359). The runner
+    names the migration, table, size and limit and points to the runbook; 0012 is not
+    recorded (0011 stays applied); lifting the limit and re-running applies only 0012."""
+    client = clickhouse.client(database)
+    try:
+        migrations = packaged()
+        migrate(client, [m for m in migrations if m.version <= 10])
+        client.command(_statement("spans_write.sql"))  # trace_roots now holds a part
+        client.command("SET max_table_size_to_drop = 1")  # the query-level setting wins
+
+        with pytest.raises(DropGuardError) as err:
+            migrate(client, migrations)
+        msg = str(err.value)
+        assert "0012_contract_drop_trace_roots.sql" in msg
+        assert f"{database}.trace_roots" in msg
+        assert "limit 1 B" in msg
+        assert "unavailable" not in msg
+        assert "size " in msg
+        assert "docs/runbooks/clickhouse-drop-guard.md" in msg
+        assert "Code: 359" not in msg, "not the raw server error"
+        recorded = [r[0] for r in client.query_rows("SELECT version FROM schema_migrations")]
+        assert sorted(recorded) == list(range(1, 12)), "0011 applied, 0012 not recorded"
+        tables = {
+            r[0]
+            for r in client.query_rows(
+                "SELECT name FROM system.tables WHERE database = currentDatabase()"
+            )
+        }
+        assert "trace_roots" in tables
+        assert "trace_roots_from_otel" not in tables
+
+        client.command("SET max_table_size_to_drop = 0")
+        assert [m.version for m in migrate(client, migrations)] == [12]
+        tables = {
+            r[0]
+            for r in client.query_rows(
+                "SELECT name FROM system.tables WHERE database = currentDatabase()"
+            )
+        }
+        assert "trace_roots" not in tables
+    finally:
+        client.close()
+
+
+def test_the_runbook_is_linked_from_the_migration() -> None:
+    sql = next(m.sql for m in packaged() if m.version == 12)
+    assert "docs/runbooks/clickhouse-drop-guard.md" in sql
+    assert (ROOT / "docs" / "runbooks" / "clickhouse-drop-guard.md").is_file()
