@@ -113,7 +113,7 @@ exporters:
   file:
     path: {path}
     format: json
-  otlphttp/agent:
+  otlp_http/agent:
     endpoint: http://127.0.0.1:{agent_port}
     auth:
       authenticator: basicauth/agent
@@ -129,7 +129,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [file, otlphttp/agent]
+      exporters: [file, otlp_http/agent]
 """
 
 
@@ -681,6 +681,7 @@ def main() -> int:
             str(archive),
             "--qids",
             *qids,
+            "--files",
             *files,
         )
         report["content_check"] = check[-1]

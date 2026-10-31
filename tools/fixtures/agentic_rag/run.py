@@ -245,11 +245,13 @@ def _check_content(args: argparse.Namespace) -> int:
         raise SystemExit("check-content: unknown qids")
     exported: set[str] = set()
     for path in args.files:
-        for line in Path(path).read_text(encoding="utf-8").splitlines() or [""]:
-            if not line.strip():
-                continue
-            for s in _strings(json.loads(line)):
-                exported.update(s[i : i + WINDOW] for i in range(max(len(s) - WINDOW, 0) + 1))
+        text = Path(path).read_text(encoding="utf-8")
+        try:
+            docs = [json.loads(text)]
+        except ValueError:  # JSON lines, as the collector writes them
+            docs = [json.loads(line) for line in text.splitlines() if line.strip()]
+        for s in _strings(docs):
+            exported.update(s[i : i + WINDOW] for i in range(max(len(s) - WINDOW, 0) + 1))
     found: list[str] = []
     for item in items:
         texts = [item.question] + [c.content for c in _chunks(item)]
@@ -274,7 +276,7 @@ def main() -> int:
     check = sub.add_parser("check-content")
     check.add_argument("--archive", required=True)
     check.add_argument("--qids", nargs="+", required=True)
-    check.add_argument("files", nargs="+", help="JSON or JSON-lines files")
+    check.add_argument("--files", nargs="+", required=True, help="JSON or JSON-lines files")
     args = parser.parse_args()
     _quiet_logs()
     if args.command == "run":
