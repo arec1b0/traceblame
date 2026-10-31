@@ -43,8 +43,9 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 - Do not create git commits with Co-Authored-By or any AI attribution trailers.
   Commits are GPG-signed with my key: never pass --no-gpg-sign, never change git config.
 - Do not push, tag or release without explicit request.
-- Dev env: Windows 11 host; Go/ocb/kind/make run in WSL2 (Ubuntu) or Docker. Scripts must work there.
+- Dev env: repo lives in WSL ext4 (~/src/traceblame), never /mnt/c; Windows 11 host; Go/ocb/kind/make run in WSL2 (Ubuntu) or Docker. Scripts must work there.
   Python: `uv` only, dev deps in `[dependency-groups] dev`, never `tool.uv.dev-dependencies`.
+- Never start long-running host services (Ollama, Docker, DBs) yourself; use the running instance (e.g. `OLLAMA_URL`) or ask me.
 - If a design decision is missing or contradicts reality (library API, semconv change),
   stop and write it as an ADR draft in docs/adr/ instead of improvising.
 
