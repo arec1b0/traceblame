@@ -37,7 +37,8 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 
 ## Workflow
 - One GitHub issue = one branch = one PR. Conventional Commits.
-- Before any push: gh pr view <branch> --json state; never push to a branch whose PR is merged or closed — branch from origin/main instead.
+- pre-push hook enforces the PR-state rule; never bypass with --no-verify.
+- One ref per git push (the pre-push hook checks only the first ref).
 - Before code for an issue: short plan (files, interfaces, tests), wait for my OK on anything
   that changes a contract (profile, JSON Schema, OpenAPI, ClickHouse schema).
 - Tests first for normalizer mappings, detectors, attributor. Coverage >= 80% there.
@@ -53,7 +54,8 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 ## Commands (fill in as they appear)
 Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows in this checkout.
 - `make bootstrap`: install pinned tools into `.tools/` (tools/versions.env + tools/checksums.txt),
-  `uv sync --all-packages --locked`, Go module download, pre-commit hook environments
+  `uv sync --all-packages --locked`, Go module download, pre-commit hook environments, and the
+  pre-push hook (`pre-commit install --hook-type pre-push`: scripts/prepush-check.sh)
 - `make lint`: pre-commit over all tracked files (stage new files first)
 - `make test`: pytest with coverage gates (`COV_MIN`), `go test -race` per go.work module
 - `make contract`: builds `collector/cmd/normalize`, `traceblame-contracts gen-schema --check`

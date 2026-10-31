@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Set up a development checkout: pinned tools, Python and Go dependencies, pre-commit hook
-# environments. It does not install a git hook: commits are made from Windows git (GPG key),
-# and `make lint` runs pre-commit explicitly.
+# environments, and the pre-push git hook (the PR-state rule, scripts/prepush-check.sh).
+# No commit hook: `make lint` runs pre-commit explicitly.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,3 +16,4 @@ bash scripts/install-tools.sh
 uv sync --all-packages --locked
 bash scripts/go-each-module.sh go mod download
 uv run --frozen pre-commit install-hooks
+uv run --frozen pre-commit install --hook-type pre-push
