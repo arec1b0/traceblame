@@ -67,6 +67,10 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
 - `make security`: gitleaks (full history), Syft SBOM, Grype gate (0 critical without a
   waiver in .grype.yaml); scanner images pinned by digest, needs Docker
 - `make fixtures`: re-capture golden fixtures from Ollama (`OLLAMA_URL=...`)
+- `make fixtures-agentic-rag`: real agentic-rag runs on CUAD through the kind agent and gateway
+  (`APP_DIR=../agentic-rag`, `OLLAMA_URL=...`; needs `make kind-up kind-deploy`): canary
+  preflight, tenant/marker checks against ClickHouse, report in `evals/reports/sdk-py-kind-*`,
+  fixtures `agentic_rag_cuad_*` with provenance
 - `uv run traceblame-contracts gen-schema`: regenerate the JSON Schema and the normalizer's
   embedded profile copy after editing the profile
 - `make collector`: ocb build of the collector distribution into `collector/_build/otelcol`

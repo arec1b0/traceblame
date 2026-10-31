@@ -53,6 +53,25 @@ spans name `openai` as the provider and a local address as the server.
 - **Outcomes.** The capture also fails when a request does not produce its expected outcome,
   e.g. a tool call or an HTTP 400.
 
+## Real application runs (#12)
+
+`openinference/openinference-instrumentation-openai-0.1.68/agentic_rag_cuad_{answerable,unanswerable}`
+are exports of a real application, not single requests: the agentic-rag app
+([arec1b0/agentic-rag](https://github.com/arec1b0/agentic-rag)) instrumented with the Python
+shim (`traceblame-py`), answering real CUAD questions over their contracts with `qwen2.5:7b`.
+Each holds one trace per question: the agent span, the reasoning and judge LLM calls, tool
+calls and retrievals. Content stays in the process (ADR-0006): the spans carry ids, scores,
+argument hashes, `aegis.output.parse_ok` and `aegis.output.cited_doc_ids`, never text.
+
+`make fixtures-agentic-rag` ([tools/fixtures/capture_agentic_rag.py](../../../tools/fixtures/capture_agentic_rag.py))
+captures them through the pinned collector, which writes the file and forwards the same
+requests to the kind agent; it writes fixtures only when the canary preflight, the kind checks
+and the content check all pass. Their provenance adds the app and shim commits, the dataset
+pin and the sampled question ids, the embedding model revision, and the run's report in
+`evals/reports/`. The word list of `make contract` (the capture prompts' words) proves little
+for CUAD text, so the capture itself checked every question and every chunk of the queried
+contracts against the export and the stored rows (`content_check: passed`).
+
 ## Re-capturing
 
 From WSL2 or Linux, with Ollama running and `qwen2.5:7b` pulled:
