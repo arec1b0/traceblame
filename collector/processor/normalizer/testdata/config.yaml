@@ -1,0 +1,3 @@
+profile: aegis-telemetry/1
+tenant_id: acme
+max_label_values: 50
