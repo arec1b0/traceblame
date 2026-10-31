@@ -9,4 +9,12 @@
 #     package:
 #       name: example
 #     reason: not reachable from TraceBlame code paths (see #NN); expires 2026-12-31
-ignore: []
+ignore:
+  # x/crypto/openpgp is deprecated by design and will never get a fix. The distribution does
+  # not build it: `go list -deps` of collector/_build/otelcol has no x/crypto/openpgp, and
+  # govulncheck v1.9.0 (source mode) finds no reachable vulnerability. The module comes
+  # in for other packages (configtls via go-tpm-keyfiles).
+  - vulnerability: GO-2026-5932
+    package:
+      name: golang.org/x/crypto
+    reason: openpgp is not in the collector build (go list -deps, govulncheck); re-check on every collector bump; expires 2027-01-31
