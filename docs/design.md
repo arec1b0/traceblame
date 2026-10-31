@@ -409,7 +409,7 @@ traceblame_normalizer_invalid_attrs_total{sdk,attr} — атрибуты про�
 - 
 traceblame_normalizer_dropped_large_values_total{sdk,attr} — неизвестные атрибуты GenAI-спанов со строковым значением длиннее max_unmapped_value_bytes (старт 256), отброшены: fail closed на неизвестный content (ADR-0002).
 - 
-traceblame_normalizer_eval_marker_rejected_total{tenant,attr,reason} — eval/fault-маркеры, отброшенные normalizer: tenant не в eval_tenants (tenant_not_allowed) или значение не проходит pattern профиля (pattern). Сигнал безопасности: маркер даёт 100% sampling; id в labels не попадают.
+traceblame_normalizer_eval_marker_rejected_total{tenant,attr,reason} — eval/fault-маркеры, отброшенные normalizer: tenant не в eval_tenants (tenant_not_allowed), маркер не в своём scope (scope) или значение не проходит pattern профиля (pattern); каждый маркер считается один раз и не попадает в invalid_attrs. Сигнал безопасности: маркер даёт 100% sampling; id в labels не попадают.
 - 
 traceblame_pipeline_lag_seconds (span end → blame written), histogram.
 - 

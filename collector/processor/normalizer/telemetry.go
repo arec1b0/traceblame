@@ -63,7 +63,8 @@ func newTelemetry(set component.TelemetrySettings, limit int) (*telemetry, error
 	// by sdk; the run or injection id itself is never a label or a log field.
 	if t.markerRejected, err = t.counterWith(meter, "traceblame_normalizer_eval_marker_rejected_total", "{attribute}",
 		"Eval and fault-injection markers dropped: the tenant is not in eval_tenants "+
-			"(tenant_not_allowed) or the value fails the profile (pattern).",
+			"(tenant_not_allowed), the marker is in the wrong scope (scope), or the value "+
+			"fails the profile (pattern).",
 		[]string{"tenant", "attr", "reason"}, 0, "eval marker rejected"); err != nil {
 		return nil, err
 	}

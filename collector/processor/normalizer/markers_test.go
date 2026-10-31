@@ -208,19 +208,41 @@ func TestTheTenantIsCheckedBeforeTheValue(t *testing.T) {
 	}
 }
 
-func TestEvalMarkersInTheWrongScopeStayInvalidAttributes(t *testing.T) {
+// wrongScope puts each marker in the other scope: the run id on a span, the injection id
+// on the resource.
+func wrongScope(t *testing.T) ptrace.Traces {
+	t.Helper()
 	td := fixtureByID(t, chatFixture).Load(t)
 	firstSpan(td).Attributes().PutStr(evalRunAttr, runID)
 	td.ResourceSpans().At(0).Resource().Attributes().PutStr(faultInjectionAttr, injectionID)
+	return td
+}
+
+// A marker in the wrong scope is still an attempt to mark the trace: it counts with the
+// other marker rejections, once, and not as an invalid attribute.
+func TestEvalMarkersInTheWrongScopeAreRejectedForTheirScope(t *testing.T) {
 	h := newHarness(t, allowlisted)
-	runs, injections := markersOf(h.run(td))
+	out := h.run(wrongScope(t))
+	runs, injections := markersOf(out)
 	assert.Empty(t, runs)
 	assert.Empty(t, injections)
+	assert.NotContains(t, firstSpan(out).Attributes().AsRaw(), evalRunAttr)
+	assert.NotContains(t, out.ResourceSpans().At(0).Resource().Attributes().AsRaw(), faultInjectionAttr)
 	assert.Equal(t, map[string]int64{
-		"otel-genai|aegis.eval.run.id":     1,
-		"unknown|aegis.fault.injection.id": 1,
-	}, h.counts(invalidMetric, "sdk", "attr"))
-	assert.Empty(t, h.countsBy(rejectedMetric, "tenant", "attr", "reason"))
+		testTenant + "|aegis.eval.run.id|scope":        1,
+		testTenant + "|aegis.fault.injection.id|scope": 1,
+	}, h.countsBy(rejectedMetric, "tenant", "attr", "reason"))
+	assert.Empty(t, h.counts(invalidMetric, "sdk", "attr"), "counted once, as a marker")
+}
+
+func TestATenantNotAllowlistedIsRejectedBeforeTheScope(t *testing.T) {
+	h := newHarness(t, nil)
+	h.run(wrongScope(t))
+	assert.Equal(t, map[string]int64{
+		testTenant + "|aegis.eval.run.id|tenant_not_allowed":        1,
+		testTenant + "|aegis.fault.injection.id|tenant_not_allowed": 1,
+	}, h.countsBy(rejectedMetric, "tenant", "attr", "reason"))
+	assert.Empty(t, h.counts(invalidMetric, "sdk", "attr"))
 }
 
 func TestEvalMarkersFollowTheResolvedTenant(t *testing.T) {
