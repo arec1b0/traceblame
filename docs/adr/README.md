@@ -25,4 +25,5 @@ improvising.
 |---|---|---|
 | [0001](0001-telemetry-profile-v1.md) | Telemetry profile v1 on pinned OTel GenAI semantic conventions | Accepted |
 | [0002](0002-content-redaction-and-opt-in-capture.md) | Content redaction in the normalizer, and opt-in content capture | Proposed |
+| [0003](0003-trace-assembler-input-clickhouse-watermark.md) | Trace-assembler input: a ClickHouse watermark instead of spans.sampled | Proposed |
 | [0004](0004-clickhouse-schema-management.md) | ClickHouse schema management and the span ingest path | Proposed |
