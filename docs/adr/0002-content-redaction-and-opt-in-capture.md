@@ -74,8 +74,10 @@ Three more facts shape the decision:
     and shipped as a minor revision because the checker did not yet see algorithm changes.
     Under the rule from issue #28 it is major. It stays 1.2.0 within `aegis-telemetry/1`:
     nothing computed `aegis.tool.args_hash` under the 1.1.0 text (the normalizer implements
-    1.2.0, and the shims, #12 and #13, have not started), so no hash disagrees. The next
-    algorithm change needs the next major.
+    1.2.0, and the shims, #12 and #13, have not started), so no hash disagrees.
+  - Since profile 1.4.0 the attribute carries `algorithm_version: 1` and has golden vectors
+    (section 5). A change to the computation needs the next major; a rewording that the
+    vectors show leaves every hash identical is minor.
   - A hash the shim set wins. Shims and the normalizer must agree byte for byte; the
     normalizer's JCS is tested against the RFC's own vectors.
 - **No content digests** such as `aegis.content.input_hash`.
@@ -90,7 +92,8 @@ Three more facts shape the decision:
   - Keyed hashing is a future decision, e.g. HMAC-SHA-256 with a per-tenant key from the
     content store's key service. It changes the profile algorithm and needs keys in every
     shim. It is a major change: the compat checker classifies an algorithm added, removed
-    or reworded as major (issue #28).
+    or reworded as major (issue #28); `algorithm_version` does not change that, since a
+    keyed hash changes the computation.
 
 ### 3. Opt-in content capture (design only, not implemented)
 
@@ -131,17 +134,46 @@ agent tier, and the processor runs on either tier. The tier layout belongs to is
 
 ### 5. Amends ADR-0001 §2
 
-ADR-0001 is Accepted and stays as written. This section adds one row to its table of
-major changes (issue #28), and the compat checker implements it:
+This section adds rows to ADR-0001's table of changes (issues #28 and #32), and the compat
+checker implements them. An algorithm is judged by its normalized text (whitespace and line
+wrapping are ignored): shims and the normalizer must agree on it byte for byte, and stored
+values follow the old one. So by default any wording change is major.
 
-| Major (needs `aegis-telemetry/<N+1>`) | Minor |
-|---|---|
-| a `source.algorithm` added, removed or reworded (whitespace and line wrapping are ignored) | none |
+`source.algorithm_version` is an optional integer on an attribute's `source` (profile 1.4.0;
+it needs an `algorithm`). It names the computation the text describes. With it, a rewording
+that leaves the output byte-identical can be minor, but only with evidence.
 
-An algorithm is judged by its normalized text, so any wording change is major: shims and
-the normalizer must agree on it byte for byte, and stored values follow the old one. A
-future `algorithm_version` field could let a pure rewording be minor; adding it is itself a
-profile change, so it is a separate decision.
+| Change to an attribute present in both revisions | Severity | Rule |
+|---|---|---|
+| `source.algorithm` added or removed | major | `algorithm_added`, `algorithm_removed` |
+| text changed, no `algorithm_version` | major | `algorithm_changed` |
+| `algorithm_version: 1` introduced, text unchanged | minor | `algorithm_version_adopted` |
+| `algorithm_version: 1` introduced together with a text change | major | `algorithm_version_adopted_with_text_change` |
+| `algorithm_version` introduced with a value above 1 | major | `algorithm_version_introduced_above_1` |
+| `algorithm_version` removed, lowered or raised (text changed or not) | major | `algorithm_version_removed`, `_lowered`, `_raised` |
+| text changed, version unchanged, backed by golden vectors | minor | `algorithm_reworded` |
+| text changed, version unchanged, not backed by golden vectors | major | `algorithm_changed` |
+| a golden vector changed or removed against the base | major | `vector_changed`, `vector_removed` |
+
+A raised version, or a changed vector under an unchanged version, means the computation
+changed: values already stored no longer match what a producer computes. Adoption must not change the
+text: the version is introduced to describe the existing computation.
+
+**Backed by golden vectors** means all of:
+- the attribute has a non-empty vector file at the **base** revision. Vectors that exist only
+  at head prove nothing about the old computation, so a change cannot ship its own evidence;
+- every base vector is present and unchanged at head. Vectors may be added, never changed or
+  removed, and adding them emits no change and needs no revision bump;
+- every implementation passes all vectors, enforced by its contract test in CI.
+
+The checker verifies the first two by reading the registry at both revisions; it does not
+run the vectors. The registry is `schemas/profile/vectors/v<major>/<attribute>.json`
+([README](../../schemas/profile/vectors/README.md)). The normalizer's runner is
+`collector/processor/normalizer/content_vectors_test.go`; the Python and TypeScript shims
+(#12, #13) add theirs in their own PRs.
+
+Profile 1.4.0 sets `algorithm_version: 1` on `aegis.tool.args_hash` with the algorithm text
+unchanged (`algorithm_version_adopted`, minor) and registers its first vectors.
 
 ## Consequences
 
@@ -172,7 +204,9 @@ profile change, so it is a separate decision.
     clean logs;
   - canaries in content attributes, events, links, the status and the resource;
   - real error fixtures keep only `exception.type`;
-  - `aegis.tool.args_hash`, the size guard, and a fuzz target.
+  - `aegis.tool.args_hash`, the size guard, and a fuzz target;
+  - `content_vectors_test.go`: every golden vector of `aegis.tool.args_hash`, directly and
+    through the processor.
 - `internal/jcs`: RFC 8785 Appendix B number samples, the section 3.2.2 sample, and the
   section 3.2.3 sorting sample.
 - `tests/contract`: content fixtures carry content and content-off ones do not; after the

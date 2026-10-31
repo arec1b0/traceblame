@@ -1,3 +1,4 @@
+import copy
 import json
 import sys
 from collections.abc import Callable
@@ -127,3 +128,38 @@ def test_gap_report_writes_markdown_and_json(
     assert doc["profile"] == "aegis-telemetry/1"
     assert len(doc["fixtures"]) == 1
     assert "gap-report.md" in capsys.readouterr().out
+
+
+def test_compat_reads_golden_vectors_from_both_revisions(
+    tmp_path: Path,
+    minimal_profile: dict[str, Any],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    carrier = next(a for a in minimal_profile["attributes"] if a["name"] == "aegis.span.kind")
+    carrier["source"] |= {"algorithm": "sha256 of the arguments", "algorithm_version": 1}
+    reworded = copy.deepcopy(minimal_profile)
+    next(a for a in reworded["attributes"] if a["name"] == "aegis.span.kind")["source"][
+        "algorithm"
+    ] = "the SHA-256 of the arguments"
+    old, new = tmp_path / "old.yaml", tmp_path / "new.yaml"
+    old.write_text(yaml.safe_dump(minimal_profile, sort_keys=False), "utf-8")
+    new.write_text(yaml.safe_dump(reworded, sort_keys=False), "utf-8")
+    vectors = tmp_path / "vectors"
+    vectors.mkdir()
+    (vectors / "aegis.span.kind.json").write_text(
+        json.dumps(
+            {
+                "attribute": "aegis.span.kind",
+                "algorithm_version": 1,
+                "vectors": [{"id": "a", "input": "x", "canonical": None, "expected": "0" * 16}],
+            }
+        ),
+        "utf-8",
+    )
+
+    assert main(["compat", str(old), str(new)]) == 1
+    assert "[major] algorithm_changed" in capsys.readouterr().out
+
+    argv = ["compat", str(old), str(new), "--old-vectors", str(vectors), "--new-vectors"]
+    assert main([*argv, str(vectors)]) == 0
+    assert "[minor] algorithm_reworded" in capsys.readouterr().out

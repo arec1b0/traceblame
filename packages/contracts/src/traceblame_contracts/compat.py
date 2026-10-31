@@ -7,6 +7,13 @@ Every change is classified:
   forbidden attribute, a `source.algorithm` added, removed or changed (ADR-0002, section 5).
   Producers and the normalizer must agree on an algorithm byte for byte, and hashes already
   stored follow the old one; only whitespace and line wrapping in its text are ignored.
+  `source.algorithm_version` makes two exceptions minor, and nothing else about it is:
+  adopting version 1 with the text unchanged, and rewording the text of a versioned
+  algorithm against golden vectors that already existed at the base revision and are
+  unchanged at head (ADR-0002, section 5). Introducing a version above 1, removing, lowering
+  or raising it, and adopting it together with a text change are major. A vector changed or
+  removed against the base is major too. Passing the vectors is enforced by each
+  implementation's contract test, not here.
 - minor: backward compatible, so it is allowed within a major. An optional attribute or
   enum value added, a requirement loosened, a constraint removed, and a semconv pin change.
 
@@ -18,6 +25,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from traceblame_contracts.profile import AegisSource, AttributeSpec, Profile, RequirementLevel
+from traceblame_contracts.vectors import Registry, VectorFile
 
 Severity = Literal["major", "minor"]
 Bump = Literal["major", "minor", "none"]
@@ -56,20 +64,41 @@ class ProfileDiff:
         return "minor" if self.changes else "none"
 
 
-def diff_profiles(old: Profile, new: Profile) -> ProfileDiff:
+def diff_profiles(
+    old: Profile,
+    new: Profile,
+    *,
+    old_vectors: Registry | None = None,
+    new_vectors: Registry | None = None,
+) -> ProfileDiff:
+    """Classify every change from `old` to `new`.
+
+    The vector registries are the golden vectors at each revision; omitted means none, so a
+    reworded algorithm is then major.
+    """
+    vectors = (old_vectors or {}, new_vectors or {})
     return ProfileDiff(
         (
             *_pin_changes(old, new),
             *_span_kind_changes(old, new),
-            *_attribute_changes(old, new),
+            *_attribute_changes(old, new, *vectors),
+            *_vector_changes(new, *vectors),
             *_forbidden_changes(old, new),
         )
     )
 
 
-def breaking_within_major(old: Profile, new: Profile) -> list[Change]:
+def breaking_within_major(
+    old: Profile,
+    new: Profile,
+    *,
+    old_vectors: Registry | None = None,
+    new_vectors: Registry | None = None,
+) -> list[Change]:
     """Major changes that `new` makes without moving to the next major (the CI gate)."""
-    return diff_profiles(old, new).breaking if new.major == old.major else []
+    if new.major != old.major:
+        return []
+    return diff_profiles(old, new, old_vectors=old_vectors, new_vectors=new_vectors).breaking
 
 
 def _pin_changes(old: Profile, new: Profile) -> list[Change]:
@@ -108,7 +137,9 @@ def _span_kind_changes(old: Profile, new: Profile) -> list[Change]:
     return changes
 
 
-def _attribute_changes(old: Profile, new: Profile) -> list[Change]:
+def _attribute_changes(
+    old: Profile, new: Profile, old_vectors: Registry, new_vectors: Registry
+) -> list[Change]:
     kinds = list(dict.fromkeys([*old.span_kinds, *new.span_kinds]))
     changes: list[Change] = []
     for a in old.attributes:
@@ -122,7 +153,7 @@ def _attribute_changes(old: Profile, new: Profile) -> list[Change]:
             changes.append(Change("major", "scope_changed", a.name, f"{a.scope} -> {b.scope}"))
         changes += _requirement_changes(a, b, kinds)
         changes += _constraint_changes(a, b)
-        changes += _algorithm_changes(a, b)
+        changes += _algorithm_changes(a, b, old_vectors.get(a.name), new_vectors.get(a.name))
     for b in new.attributes:
         if old.attribute(b.name) is None:
             if any(b.level_for(kind) in _ENFORCED for kind in kinds):
@@ -174,15 +205,77 @@ def _algorithm(spec: AttributeSpec) -> str | None:
     return None if text is None else " ".join(text.split())
 
 
-def _algorithm_changes(a: AttributeSpec, b: AttributeSpec) -> list[Change]:
+def _version(spec: AttributeSpec) -> int | None:
+    return spec.source.algorithm_version if isinstance(spec.source, AegisSource) else None
+
+
+def _algorithm_changes(
+    a: AttributeSpec, b: AttributeSpec, base: VectorFile | None, head: VectorFile | None
+) -> list[Change]:
     before, after = _algorithm(a), _algorithm(b)
-    if before == after:
-        return []
-    if before is None:
-        return [Change("major", "algorithm_added", a.name, after or "")]
-    if after is None:
+    if before is None or after is None:
+        if before == after:
+            return []
+        if before is None:
+            return [Change("major", "algorithm_added", a.name, after or "")]
         return [Change("major", "algorithm_removed", a.name, before)]
-    return [Change("major", "algorithm_changed", a.name, f"{before} -> {after}")]
+    text_changed = before != after
+    old_version, new_version = _version(a), _version(b)
+    if old_version != new_version:
+        return [_version_change(a.name, old_version, new_version, text_changed)]
+    if not text_changed:
+        return []
+    detail = f"{before} -> {after}"
+    if old_version is None:
+        return [Change("major", "algorithm_changed", a.name, detail)]
+    if problem := _reword_problem(base, head):
+        return [Change("major", "algorithm_changed", a.name, f"{detail} ({problem})")]
+    return [Change("minor", "algorithm_reworded", a.name, detail)]
+
+
+def _version_change(name: str, old: int | None, new: int | None, text_changed: bool) -> Change:
+    detail = f"{'none' if old is None else old} -> {'none' if new is None else new}"
+    if new is None:
+        return Change("major", "algorithm_version_removed", name, detail)
+    if old is None:
+        if new > 1:
+            return Change("major", "algorithm_version_introduced_above_1", name, detail)
+        if text_changed:
+            return Change("major", "algorithm_version_adopted_with_text_change", name, detail)
+        return Change("minor", "algorithm_version_adopted", name, detail)
+    rule = "algorithm_version_lowered" if new < old else "algorithm_version_raised"
+    return Change("major", rule, name, detail)
+
+
+def _reword_problem(base: VectorFile | None, head: VectorFile | None) -> str | None:
+    """Why a reworded algorithm is not backed by evidence that its output did not change."""
+    if base is None:
+        return "no golden vectors registered at the base revision"
+    if _vector_differences(base, head):
+        return "golden vectors changed or removed against the base revision"
+    return None
+
+
+def _vector_differences(base: VectorFile, head: VectorFile | None) -> list[Change]:
+    """Base vectors that are missing or different at head; added vectors are not listed."""
+    at_head = {v.id: v for v in head.vectors} if head is not None else {}
+    changes: list[Change] = []
+    for vector in base.vectors:
+        now = at_head.get(vector.id)
+        if now is None:
+            changes.append(Change("major", "vector_removed", base.attribute, vector.id))
+        elif now != vector:
+            changes.append(Change("major", "vector_changed", base.attribute, vector.id))
+    return changes
+
+
+def _vector_changes(new: Profile, old_vectors: Registry, new_vectors: Registry) -> list[Change]:
+    """Vectors may be added, never changed or removed (an attribute that is gone is #28's)."""
+    changes: list[Change] = []
+    for name, base in old_vectors.items():
+        if new.attribute(name) is not None:
+            changes += _vector_differences(base, new_vectors.get(name))
+    return changes
 
 
 def _forbidden_changes(old: Profile, new: Profile) -> list[Change]:

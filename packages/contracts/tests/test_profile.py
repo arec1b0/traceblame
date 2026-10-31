@@ -148,3 +148,29 @@ def test_unknown_keys_are_rejected(minimal_profile: dict[str, Any]) -> None:
     _attr(minimal_profile, "gen_ai.request.model")["requried"] = True
     with pytest.raises(ValidationError):
         Profile.model_validate(minimal_profile)
+
+
+def test_algorithm_version_is_an_optional_positive_integer(
+    minimal_profile: dict[str, Any],
+) -> None:
+    source = _attr(minimal_profile, "aegis.span.kind")["source"]
+    source |= {"algorithm": "sha256 of the arguments", "algorithm_version": 1}
+    spec = Profile.model_validate(minimal_profile).attribute("aegis.span.kind")
+    assert spec is not None
+    assert getattr(spec.source, "algorithm_version", None) == 1
+
+
+@pytest.mark.parametrize("version", [0, -1, "1", 1.5])
+def test_algorithm_version_rejects_anything_but_a_positive_integer(
+    minimal_profile: dict[str, Any], version: object
+) -> None:
+    source = _attr(minimal_profile, "aegis.span.kind")["source"]
+    source |= {"algorithm": "sha256 of the arguments", "algorithm_version": version}
+    with pytest.raises(ValidationError):
+        Profile.model_validate(minimal_profile)
+
+
+def test_algorithm_version_needs_an_algorithm(minimal_profile: dict[str, Any]) -> None:
+    _attr(minimal_profile, "aegis.span.kind")["source"]["algorithm_version"] = 1
+    with pytest.raises(ValidationError, match="algorithm"):
+        Profile.model_validate(minimal_profile)

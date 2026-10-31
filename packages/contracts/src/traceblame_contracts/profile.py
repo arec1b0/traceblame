@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -46,6 +46,15 @@ class AegisSource(_Model):
     aegis: Literal["extension"]
     derived_from: tuple[str, ...] = ()
     algorithm: str | None = None
+    # Names the computation `algorithm` describes, so a pure rewording can be told from a
+    # change (ADR-0002, section 5). Optional and not read by any consumer.
+    algorithm_version: Annotated[int, Field(strict=True, ge=1)] | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        if self.algorithm_version is not None and self.algorithm is None:
+            raise ValueError("algorithm_version needs an algorithm")
+        return self
 
 
 class AttributeSpec(_Model):

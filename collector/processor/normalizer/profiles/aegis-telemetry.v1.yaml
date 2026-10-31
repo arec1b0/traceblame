@@ -10,6 +10,9 @@
 # - Own attributes live only under aegis.*, and the aegis.* namespace is closed.
 # - Within major 1 only minor changes are allowed: `traceblame-contracts compat` classifies
 #   every change as major or minor (rules in ADR-0001, section 2).
+# - An algorithm (`source.algorithm`) may carry an integer `algorithm_version`. With it, a pure
+#   rewording of the text is a minor change, but only against golden vectors that already
+#   existed and are unchanged (schemas/profile/vectors/README.md, ADR-0002 section 5).
 # - Requirement levels are per span kind; `all` applies to every kind, and a kind-specific
 #   entry overrides it. The JSON Schema enforces `required`; `conditionally_required`
 #   carries its condition and is enforced by normalizer tests.
@@ -17,7 +20,7 @@
 #   events (issue #7).
 profile: aegis-telemetry
 major: 1
-revision: 1.3.0
+revision: 1.4.0
 
 semconv:
   repository: open-telemetry/semantic-conventions
@@ -212,6 +215,7 @@ attributes:
       algorithm: >-
         first 16 lowercase hex chars of SHA-256 over the RFC 8785 (JCS) serialization of the
         arguments; over their raw UTF-8 bytes when they are not I-JSON
+      algorithm_version: 1
     requirement: {tool: conditionally_required}
     condition: when the arguments are observed in-process (the loop detector needs it)
     brief: >-
