@@ -22,6 +22,9 @@ dist/
 *.test
 *.out
 
+# Collector distribution build output (make collector, make collector-image)
+collector/_build/
+
 # Personal Claude Code instructions (CLAUDE.md is shared and tracked)
 CLAUDE.local.md
 

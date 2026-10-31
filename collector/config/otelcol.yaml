@@ -1,0 +1,46 @@
+# Default configuration of the collector image: OTLP in, normalizer, debug exporter out.
+# Deployments mount their own configuration (agent and gateway tiers: issue #10).
+#
+# Self-telemetry stays out of the analysed pipeline (CLAUDE.md hard rule 7): metrics are
+# pulled from :8888, logs are JSON on stderr. The debug exporter runs at `basic` verbosity,
+# which logs span counts only, never attributes.
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  normalizer:
+
+exporters:
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, normalizer]
+      exporters: [debug]

@@ -61,5 +61,10 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   waiver in .grype.yaml); scanner images pinned by digest, needs Docker
 - `make fixtures`: re-capture golden fixtures from Ollama (`OLLAMA_URL=...`)
 - `uv run traceblame-contracts gen-schema`: regenerate the JSON Schema after editing the profile
+- `make collector`: ocb build of the collector distribution into `collector/_build/otelcol`
+  (`GOWORK=off`; versions from tools/versions.env)
+- `make collector-smoke`: end-to-end tests of the built collector (`OTELCOL_BIN=...` to override)
+- `make collector-image`: collector image build + image smoke + end-to-end tests on the image's
+  binary + Syft SBOM + Grype gate (needs Docker)
 - `make kind-up` / `make kind-down`: local kind cluster `traceblame`
 - `make demo`: M3
