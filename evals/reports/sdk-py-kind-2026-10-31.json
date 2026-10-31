@@ -1,0 +1,61 @@
+{
+  "captured_at": "2026-10-31T17:35:47Z",
+  "traceblame_commit": "3a8545b20db64ee005bf657f2ac65435c9341350",
+  "app": {
+    "repository": "https://github.com/arec1b0/agentic-rag",
+    "commit": "0e3780d1f4fa84a19b242a93c341ced1a31d148f"
+  },
+  "problems": [],
+  "canary": {
+    "steps": [
+      "retriever",
+      "calculator",
+      "final_answer"
+    ],
+    "spans": 8,
+    "problems": []
+  },
+  "content_check": {
+    "checked_qids": 24,
+    "leaking_qids": []
+  },
+  "run_a": {
+    "eval_run_id": "rag-cuad-20261031-s7-3a8545b-a",
+    "tenant": "tenant-a",
+    "queries": 4,
+    "outcomes": {
+      "answered": 4
+    },
+    "spans_sent": 39,
+    "spans_stored": 39,
+    "traces_stored": 4,
+    "marked_resource_blocks": 19,
+    "agent_rejected_delta": 19.0,
+    "gateway_rejected_delta": 0.0
+  },
+  "run_b": {
+    "eval_run_id": "rag-cuad-20261031-s7-3a8545b-b",
+    "tenant": "tenant-eval",
+    "scenarios": {
+      "answerable": {
+        "queries": 12,
+        "outcomes": {
+          "answered": 11,
+          "empty_answer": 1
+        },
+        "spans": 102,
+        "traces": 12
+      },
+      "unanswerable": {
+        "queries": 12,
+        "outcomes": {
+          "answered": 12
+        },
+        "spans": 99,
+        "traces": 12
+      }
+    },
+    "spans_sent": 201,
+    "spans_stored": 201
+  }
+}

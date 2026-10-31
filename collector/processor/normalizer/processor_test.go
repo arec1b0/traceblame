@@ -23,6 +23,12 @@ type want struct {
 	kind   string
 	attrs  map[string]any
 	absent []string
+	// A real application run holds many spans: kinds has one expectation per span kind
+	// (its kind, attrs and absent; sdk comes from the fixture), and spans their number.
+	kinds map[string]want
+	spans int
+	// The tenant a shim set; config mode keeps it (ADR-0005). Default: the harness's.
+	tenant string
 }
 
 func llm(model string, extra map[string]any) map[string]any {
@@ -80,7 +86,39 @@ func merge(ms ...map[string]any) map[string]any {
 }
 
 // One expectation per golden fixture; a fixture without one fails the test.
+// The agentic-rag runs (#12): traceblame-py's agent, retriever and tool spans around the
+// app's OpenAI calls. Every LLM call asked for a JSON object, and every tool call was the
+// retriever.
+var agenticRAG = map[string]want{
+	"llm": {
+		attrs: map[string]any{
+			"gen_ai.operation.name": "chat", "gen_ai.provider.name": "openai",
+			"gen_ai.request.model": "qwen2.5:7b", "gen_ai.response.model": "qwen2.5:7b",
+			"aegis.output.parse_ok": true,
+		},
+		absent: []string{"llm.system", "llm.model_name", "llm.invocation_parameters", "output.value", "llm.output_messages.0.message.content"},
+	},
+	"retrieval": {
+		attrs:  map[string]any{"gen_ai.operation.name": "retrieval", "gen_ai.data_source.id": "chroma"},
+		absent: []string{"retrieval.documents.0.document.content"},
+	},
+	"tool": {
+		attrs:  map[string]any{"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": "retriever"},
+		absent: []string{"tool.name"},
+	},
+	"agent": {
+		attrs:  map[string]any{"gen_ai.operation.name": "invoke_agent", "gen_ai.agent.name": "RAGAgent"},
+		absent: []string{"agent.name"},
+	},
+}
+
 var fixtureWants = map[string]want{
+	"openinference/openinference-instrumentation-openai-0.1.68/agentic_rag_cuad_answerable": {
+		sdk: "openinference", kinds: agenticRAG, spans: 102, tenant: "tenant-eval",
+	},
+	"openinference/openinference-instrumentation-openai-0.1.68/agentic_rag_cuad_unanswerable": {
+		sdk: "openinference", kinds: agenticRAG, spans: 99, tenant: "tenant-eval",
+	},
 	"openinference/openinference-instrumentation-openai-0.1.68/chat_basic": {
 		sdk: "openinference", kind: "llm", attrs: llm("qwen2.5:7b", chatBasic),
 		absent: []string{"llm.system", "llm.model_name", "llm.token_count.prompt", "llm.token_count.completion", "llm.finish_reason", "error.type"},
@@ -202,17 +240,29 @@ func TestNormalizesEveryFixture(t *testing.T) {
 				spans++
 				tenant, ok := res.Attributes().Get("aegis.tenant.id")
 				require.True(t, ok)
-				assert.Equal(t, testTenant, tenant.Str())
+				wantTenant := testTenant
+				if w.tenant != "" {
+					wantTenant = w.tenant
+				}
+				assert.Equal(t, wantTenant, tenant.Str())
 
 				got := span.Attributes().AsRaw()
 				assert.Equal(t, "aegis-telemetry/1", got["aegis.profile.version"])
 				assert.Equal(t, Version, got["aegis.normalizer.version"])
 				assert.Equal(t, w.sdk, got["aegis.source.sdk"])
-				assert.Equal(t, w.kind, got["aegis.span.kind"])
-				for k, v := range w.attrs {
+				kw := w
+				if w.kinds != nil {
+					kind, _ := got["aegis.span.kind"].(string)
+					var found bool
+					kw, found = w.kinds[kind]
+					require.True(t, found, "unexpected span kind %q", kind)
+					kw.kind = kind
+				}
+				assert.Equal(t, kw.kind, got["aegis.span.kind"])
+				for k, v := range kw.attrs {
 					assert.Equal(t, v, got[k], k)
 				}
-				for _, k := range w.absent {
+				for _, k := range kw.absent {
 					assert.NotContains(t, got, k)
 				}
 				for k := range got {
@@ -222,7 +272,11 @@ func TestNormalizesEveryFixture(t *testing.T) {
 					}
 				}
 			})
-			assert.Equal(t, 1, spans)
+			wantSpans := 1
+			if w.spans > 0 {
+				wantSpans = w.spans
+			}
+			assert.Equal(t, wantSpans, spans)
 			// Every attribute of every real fixture is mapped or known to its table.
 			assert.Empty(t, h.counts(unmappedMetric, "sdk", "attr"))
 			assert.Empty(t, h.counts(newerSchemaMetric, "sdk", "schema_url"))

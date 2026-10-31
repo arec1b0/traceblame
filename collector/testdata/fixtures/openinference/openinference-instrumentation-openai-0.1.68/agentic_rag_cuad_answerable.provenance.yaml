@@ -1,0 +1,87 @@
+sdk: openinference
+scenario: agentic_rag_cuad_answerable
+captured_at: '2026-10-31T17:35:47Z'
+capture_script: tools/fixtures/capture_agentic_rag.py
+capture_script_sha256: a036e191fca154af43fa7669fe9ee207ca7c7916905eb6f9f82509d9a5f8b626
+python: 3.12.15
+uv: 0.13.6
+packages:
+  openinference-instrumentation-openai: 0.1.68
+  openinference-instrumentation: 0.1.74
+  openinference-semantic-conventions: 0.1.43
+  openai: 3.41.0
+  opentelemetry-sdk: 1.45.2
+  opentelemetry-exporter-otlp-proto-http: 1.45.2
+  traceblame-py: 0.1.0
+  chromadb: 1.5.9
+  sentence-transformers: 6.2.0
+  torch: 2.15.0+cpu
+env:
+  ENABLE_QUERY_CACHE: 'false'
+  ENABLE_EMBEDDING_CACHE: 'false'
+  ENABLE_COST_TRACKING: 'false'
+  ANONYMIZED_TELEMETRY: 'False'
+  HF_HUB_OFFLINE: '1'
+  HF_HUB_DISABLE_TELEMETRY: '1'
+  TOKENIZERS_PARALLELISM: 'false'
+  TRACEBLAME_ENABLED: '1'
+  TRACEBLAME_TENANT_ID: tenant-eval
+  TRACEBLAME_EVAL_RUN_ID: rag-cuad-20261031-s7-3a8545b-b
+content_capture: false
+content_check: passed
+model:
+  name: qwen2.5:7b
+  digest: 845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e
+  server: ollama
+  server_version: 0.40.5
+endpoint: http://localhost:11434/v1
+collector: otelcol-contrib 0.164.0 (sha256 f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4)
+fixture_sha256: 22948f6ffdf4f1d4eeacc8375b15e2ec39ae8b0bad0b059e2d36017a91aeb27a
+app:
+  repository: https://github.com/arec1b0/agentic-rag
+  commit: 0e3780d1f4fa84a19b242a93c341ced1a31d148f
+shim:
+  package: traceblame-py
+  version: 0.1.0
+  commit: 3a8545b20db64ee005bf657f2ac65435c9341350
+dataset:
+  name: CUAD v1, official test split
+  source: https://raw.githubusercontent.com/TheAtticusProject/cuad/67faa0e6023b04fcaae6cc09497ab00e5d63a2a2/data.zip
+  archive_sha256: f8161d18bea4e9c05e78fa6dda61c19c846fb8087ea969c172753bc2f45b999a
+  license: CC BY 4.0
+  seed: 7
+  n: 24
+  ratio: 0.5
+  stratum: answerable
+  qids:
+  - SoupmanInc_20150814_8-K_EX-10.1_9230148_EX-10.1_Franchise Agreement1__Post-Termination Services
+  - PAXMEDICA,INC_07_02_2020-EX-10.12-Master Service Agreement__Termination For Convenience
+  - HfEnterprisesInc_20191223_S-1_EX-10.22_11931299_EX-10.22_Development Agreement__Anti-Assignment
+  - PANDIONTHERAPEUTICSHOLDCOLLC_05_22_2020-EX-10.17-CONSULTING AGREEMENT__Revenue/Profit Sharing
+  - PcquoteComInc_19990721_S-1A_EX-10.11_6377149_EX-10.11_Co-Branding Agreement1__Parties
+  - GridironBionutrientsInc_20171206_8-K_EX-10.1_10972555_EX-10.1_Endorsement Agreement__Expiration Date
+  - ICORECONNECTINC_10_13_2010-EX-7.1-Strategic Alliance Agreement__Cap On Liability
+  - BizzingoInc_20120322_8-K_EX-10.17_7504499_EX-10.17_Endorsement Agreement__Termination For Convenience
+  - GSITECHNOLOGYINC_11_16_2009-EX-10.2-INTELLECTUAL PROPERTY AGREEMENT between SONY ELECTRONICS INC.
+    and GSI TECHNOLOGY, INC.__Change Of Control
+  - CENTRACKINTERNATIONALINC_10_29_1999-EX-10.3-WEB SITE HOSTING AGREEMENT__Expiration Date
+  - PACIRA PHARMACEUTICALS, INC. - A_R STRATEGIC LICENSING, DISTRIBUTION AND MARKETING AGREEMENT __Governing
+    Law
+  - HALITRON,INC_03_01_2005-EX-10.15-SPONSORSHIP AND DEVELOPMENT AGREEMENT__Post-Termination Services
+embedding_model:
+  name: sentence-transformers/all-MiniLM-L6-v2
+  revision: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+run:
+  script: tools/fixtures/agentic_rag/run.py
+  script_sha256: 46f77962e803da46c368f79851c9d57b2e8ac77ef4c19f3e04c209075b6774ac
+  outcomes:
+    answered: 11
+    empty_answer: 1
+  report: evals/reports/sdk-py-kind-2026-10-31.md
+notes:
+- Real CUAD questions, verbatim, each over the contract it is about; the app's RAGAgent with its retriever,
+  summarizer and calculator tools, and its LLM judge.
+- 'Exported through traceblame-py: content stays in-process (ADR-0006). The file is what the pinned collector
+  received; the kind agent got the same requests.'
+- gen_ai.provider.name / server.address describe the OpenAI client talking to Ollama's OpenAI-compatible
+  API, not the OpenAI service.
