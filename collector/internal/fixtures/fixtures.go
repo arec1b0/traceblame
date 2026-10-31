@@ -70,6 +70,22 @@ func All(tb testing.TB) []Fixture {
 	return out
 }
 
+// OneSpan is a fixture with a single span (one chat call), for tests that need any plain
+// export. The real application runs hold many traces, and their resources carry markers.
+const OneSpan = "openinference/openinference-instrumentation-openai-0.1.68/chat_basic"
+
+// ByID returns the fixture with that ID. It fails the test if there is none.
+func ByID(tb testing.TB, id string) Fixture {
+	tb.Helper()
+	for _, f := range All(tb) {
+		if f.ID == id {
+			return f
+		}
+	}
+	tb.Fatalf("fixtures: no fixture %s", id)
+	return Fixture{}
+}
+
 // SDK is the instrumentation family, the first path segment of the ID.
 func (f Fixture) SDK() string {
 	sdk, _, _ := strings.Cut(f.ID, "/")

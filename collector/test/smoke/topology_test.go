@@ -123,7 +123,7 @@ func TestTheAgentTakesTheTenantFromTheCredentials(t *testing.T) {
 	cfg := bytes.ReplaceAll([]byte(agentConfig), []byte("__HASH__"), []byte(shaPassword("secret-a")))
 	c, _ := startCustom(t, string(cfg))
 
-	td := fixtures.All(t)[0].Load(t)
+	td := fixtures.ByID(t, fixtures.OneSpan).Load(t)
 	td.ResourceSpans().At(0).Resource().Attributes().PutStr("aegis.tenant.id", "tenant-b")
 	body, err := (&ptrace.JSONMarshaler{}).MarshalTraces(td)
 	require.NoError(t, err)
@@ -272,7 +272,7 @@ func TestTheGatewayAcceptsOnlyAgentCertificates(t *testing.T) {
 		defer func() { _ = conn.Close() }()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, err = ptraceotlp.NewGRPCClient(conn).Export(ctx, ptraceotlp.NewExportRequestFromTraces(fixtures.All(t)[0].Load(t)))
+		_, err = ptraceotlp.NewGRPCClient(conn).Export(ctx, ptraceotlp.NewExportRequestFromTraces(fixtures.ByID(t, fixtures.OneSpan).Load(t)))
 		return err
 	}
 	assert.Error(t, export(nil), "no client certificate")
