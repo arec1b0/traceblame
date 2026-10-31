@@ -100,7 +100,7 @@ not.
 - **Root spans only (`trace_roots`, sorted by arrival) plus a separate index for late spans.**
   Rejected: two tables and two scans for one question, "which traces got spans in this
   window". #11 shipped `trace_roots` before this ADR settled. #39 adds `trace_arrivals`, and
-  the contract phase after #39 drops `trace_roots` and its view; nothing reads them.
+  the contract phase (#41) dropped `trace_roots` and its view; nothing read them.
 - **Core NATS publish into a server-side stream.** Rejected: at-most-once, and the sinks can
   disagree.
 - **Waiting for natsexporter's JetStream support.** Kept as the revisit trigger.

@@ -82,7 +82,7 @@ Alternatives considered:
 | D9 | `schema_migrations` | section 2 |
 | D10 | `operation` = `gen_ai.operation.name`, else the span name | §1.1 does not say |
 | D11 | `model` = `gen_ai.request.model`; the response model stays in `attrs` | required by the profile |
-| D12 | `trace_roots` (`MergeTree`, `ORDER BY (ingested_at, trace_id)`) and `trace_roots_from_otel` | the first watermark table (#11); superseded by D13 and dropped in the contract phase after #39 |
+| D12 | `trace_roots` (`MergeTree`, `ORDER BY (ingested_at, trace_id)`) and `trace_roots_from_otel` | the first watermark table (#11); superseded by D13; dropped by 0011 and 0012 (#41) |
 | D13 | `trace_arrivals` (`MergeTree`, `ORDER BY ingested_at`, TTL 2 d) and `trace_arrivals_from_otel` (#39) | the trace-assembler's watermark scan; section 4 |
 
 `findings`, `blame` and `injections` are as in §1.1, with `IF NOT EXISTS`.
@@ -92,7 +92,7 @@ Alternatives considered:
 ADR-0003 (Proposed) has the trace-assembler poll ClickHouse with a persisted watermark
 instead of consuming `spans.sampled`. #11 shipped `trace_roots` (root spans only, D12). #39
 replaces it with `trace_arrivals` (D13) as a forward-only expand step (0009, 0010). The
-contract phase after #39 drops `trace_roots` and its view. Each poll is one scan on arrival time:
+contract phase (#41: 0011 drops the view, 0012 the table) removed `trace_roots`. Each poll is one scan on arrival time:
 `GROUP BY trace_id` over `(watermark, now − grace]`. A trace with a root arrival is
 assembled; an assembled trace with new arrivals is re-assembled. `spans` is sorted by
 `(service, trace_id, start_ts)`, so that scan would read every recent span. Two options:
@@ -122,6 +122,9 @@ assembled; an assembled trace with new arrivals is re-assembled. `spans` is sort
   - it fails as soon as the normalizer is bypassed.
 
 **Negative and risks**
+- Contract-phase drops meet ClickHouse's `max_table_size_to_drop` (default 50 GB, error 359).
+  Migrations do not bypass it: the runner reports a refused drop with the migration, table,
+  size and limit, records nothing, and points to `docs/runbooks/clickhouse-drop-guard.md`.
 - The runner is ours to maintain.
 - Concurrent runners against one database are not locked against each other: run one Job
   per release.

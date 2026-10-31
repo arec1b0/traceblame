@@ -30,10 +30,8 @@ FIXTURES = discover_fixtures(ROOT / "collector" / "testdata" / "fixtures")
 # The capture's prompts and answers (tools/fixtures/capture.py), and what the captured errors
 # carry: tracebacks with local paths and the server's message that echoes the request.
 NEEDLES = ("France", "Paris", "weather", "Traceback", "/home/", "too short")
-# trace_roots goes in the contract phase after #39.
 TABLES = (
     "spans",
-    "trace_roots",
     "trace_arrivals",
     "findings",
     "blame",
@@ -246,20 +244,6 @@ def test_spans_carry_the_normalized_fields(loaded: tuple[ClickHouseServer, str, 
     assert (row["input_tokens"], row["output_tokens"]) == (38, 2)
     assert row["operation"] == "chat"
     assert row["http_status_code"] == 0
-
-
-def test_trace_roots_hold_one_row_per_root_span(loaded: tuple[ClickHouseServer, str, str]) -> None:
-    """Until the contract phase after #39 drops trace_roots, it keeps being fed."""
-    clickhouse, database, _ = loaded
-    roots = {
-        s["trace_id"]
-        for body in _posted()
-        for s in flatten_otlp_json(json.loads(body))
-        if not s["parent_span_id"]
-    }
-    rows = _rows(clickhouse, database, "trace_roots")
-    assert {r["trace_id"] for r in rows} == roots
-    assert all(r["end_ts"] >= r["start_ts"] for r in rows)
 
 
 def test_trace_arrivals_mark_every_trace_and_its_root(
