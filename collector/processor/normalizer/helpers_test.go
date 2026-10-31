@@ -51,6 +51,12 @@ func newHarness(t *testing.T, mutate func(*Config)) *harness {
 // run normalizes td and returns the single export the processor forwarded.
 func (h *harness) run(td ptrace.Traces) ptrace.Traces {
 	h.t.Helper()
+	return h.runCtx(context.Background(), td)
+}
+
+// runCtx is run with a request context, e.g. one that carries client auth.
+func (h *harness) runCtx(ctx context.Context, td ptrace.Traces) ptrace.Traces {
+	h.t.Helper()
 	set := processortest.NewNopSettings(componentType)
 	set.TelemetrySettings = h.tel.NewTelemetrySettings()
 	set.Logger = h.logger
@@ -59,7 +65,7 @@ func (h *harness) run(td ptrace.Traces) ptrace.Traces {
 	require.NoError(h.t, p.Start(context.Background(), componenttest.NewNopHost()))
 	defer func() { require.NoError(h.t, p.Shutdown(context.Background())) }()
 	h.sink.Reset()
-	require.NoError(h.t, p.ConsumeTraces(context.Background(), td))
+	require.NoError(h.t, p.ConsumeTraces(ctx, td))
 	got := h.sink.AllTraces()
 	require.Len(h.t, got, 1)
 	return got[0]

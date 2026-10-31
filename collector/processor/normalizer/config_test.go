@@ -25,7 +25,8 @@ func TestConfigFromYAML(t *testing.T) {
 	require.NoError(t, conf.Unmarshal(cfg))
 	require.NoError(t, cfg.Validate())
 	assert.Equal(t, &Config{
-		Profile: "aegis-telemetry/1", TenantID: "acme", MaxLabelValues: 50, MaxUnmappedValueBytes: 512,
+		Profile: "aegis-telemetry/1", TenantSource: TenantSourceConfig, TenantID: "acme",
+		TenantAuthAttribute: "username", MaxLabelValues: 50, MaxUnmappedValueBytes: 512,
 	}, cfg)
 }
 
