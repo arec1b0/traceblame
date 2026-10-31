@@ -38,6 +38,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: latency-thresholds
+            - configMapRef:
+                name: eval-tenants
           lifecycle:
             preStop:
               sleep:

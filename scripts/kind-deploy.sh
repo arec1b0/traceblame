@@ -87,6 +87,9 @@ collector="${ROOT}/deploy/kind/collector"
   --from-file="${collector}/gateway-bench.yaml" --dry-run=client -o yaml | "${KCTL[@]}" apply -f -
 "${KCTL[@]}" -n observability create configmap latency-thresholds --from-env-file="${collector}/latency-thresholds.env" \
   --dry-run=client -o yaml | "${KCTL[@]}" apply -f -
+# One allowlist for both tiers (#36): the restart below rolls agents and gateways together.
+"${KCTL[@]}" -n observability create configmap eval-tenants --from-env-file="${collector}/eval-tenants.env" \
+  --dry-run=client -o yaml | "${KCTL[@]}" apply -f -
 
 step "agents and gateways"
 BUSYBOX_IMAGE="${BUSYBOX_IMAGE}" envsubst '${BUSYBOX_IMAGE}' <"${ROOT}/deploy/kind/manifests/20-agent.yaml" \
