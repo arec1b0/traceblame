@@ -82,27 +82,32 @@ Alternatives considered:
 | D9 | `schema_migrations` | section 2 |
 | D10 | `operation` = `gen_ai.operation.name`, else the span name | §1.1 does not say |
 | D11 | `model` = `gen_ai.request.model`; the response model stays in `attrs` | required by the profile |
-| D12 | `trace_roots` (`ReplacingMergeTree`, `ORDER BY (end_ts, trace_id)`) and `trace_roots_from_otel` | the trace-assembler's watermark scan; section 4 |
+| D12 | `trace_roots` (`MergeTree`, `ORDER BY (ingested_at, trace_id)`) and `trace_roots_from_otel` | the trace-assembler's watermark scan; section 4 |
 
 `findings`, `blame` and `injections` are as in §1.1, with `IF NOT EXISTS`.
 
 ### 4. Root spans for the trace-assembler's watermark
 
-ADR-0003 (draft) proposes that the trace-assembler read root spans from ClickHouse with a
-persisted watermark instead of consuming `spans.sampled`: root spans ended before
-now − grace (30 s), with idempotent `trace_summary` writes. `spans` is sorted by
-`(service, trace_id, start_ts)`, so that query would scan every recent span. Two options:
+ADR-0003 (Proposed) has the trace-assembler read root spans from ClickHouse with a
+persisted watermark instead of consuming `spans.sampled`. The watermark runs on arrival time,
+`ingested_at` (ClickHouse's clock when the exporter's insert lands): roots that arrived after
+the watermark and before now − grace (start 5 s), in keyset order `(ingested_at, trace_id)`.
+`spans` is sorted by `(service, trace_id, start_ts)`, so that query would scan every recent
+span. Two options:
 
 - **A projection on `spans`.** Rejected: a projection cannot filter rows, so it would store
-  a second copy of every span just to sort them by end time.
+  a second copy of every span just to sort them by arrival.
 - **`trace_roots`, fed by a materialized view.** Chosen.
-  - The view keeps root spans only (`ParentSpanId = ''`), one row per trace.
-  - The sort key is `(end_ts, trace_id)`, so the scan reads by primary key; the integration
-    test checks `EXPLAIN indexes = 1`.
-  - `ingested_at` lets the assembler catch roots that arrive after the watermark passed
-    their `end_ts`.
-  - `ReplacingMergeTree` absorbs a root exported twice.
-  - TTL 30 d, like `spans`.
+  - The view keeps root spans only (`ParentSpanId = ''`); `ingested_at` defaults to
+    `now64(3)` at insert.
+  - The sort key is `(ingested_at, trace_id)`, the watermark's keyset, and the partition key
+    is `toDate(ingested_at)`. The integration test checks `EXPLAIN indexes = 1`: the min-max
+    index prunes parts newer than the grace, and the primary key condition is on
+    `ingested_at`.
+  - Plain `MergeTree`: a root exported twice is two rows, and (re)assembly is idempotent
+    (ADR-0003). A `ReplacingMergeTree` would deduplicate only rows with the same
+    `ingested_at`, so it would add nothing.
+  - TTL 30 d by arrival day.
 
 ## Consequences
 
