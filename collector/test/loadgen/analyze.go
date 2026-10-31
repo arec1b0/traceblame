@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -187,6 +189,10 @@ func analyze(args []string, out io.Writer) error {
 		}
 	}
 
+	if _, ok := environment["commit"]; !ok {
+		environment["commit"], environment["dirty"] = gitState(".")
+	}
+
 	rep := Report{
 		Environment: environment, Load: loads, Phases: map[string]*PhaseStats{},
 		Latency: map[string]LatencyStat{}, Hard: map[string]bool{}, DecisionWait: decisionWait.String(),
@@ -328,22 +334,105 @@ func analyze(args []string, out io.Writer) error {
 	rep.Hard["no_spans_lost_on_scale_down"] = rep.ScaleDownLoss == 0
 	rep.Hard["tenant_from_credentials"] = rep.TenantErrors == 0
 
-	if err := os.MkdirAll(*outDir, 0o750); err != nil {
+	names := make([]string, 0, len(windows))
+	for _, w := range windows {
+		names = append(names, w.Name)
+	}
+	return writeReport(rep, names, *outDir, *name, out)
+}
+
+// writeReport writes <name>.json and <name>.md and prints the Markdown.
+func writeReport(rep Report, transitions []string, outDir, name string, out io.Writer) error {
+	if err := os.MkdirAll(outDir, 0o750); err != nil {
 		return err
 	}
 	js, err := json.MarshalIndent(rep, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(*outDir, *name+".json"), append(js, '\n'), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, name+".json"), append(js, '\n'), 0o600); err != nil {
 		return err
 	}
-	md := markdown(rep, windows)
-	if err := os.WriteFile(filepath.Join(*outDir, *name+".md"), []byte(md), 0o600); err != nil {
+	md := markdown(rep, transitions)
+	if err := os.WriteFile(filepath.Join(outDir, name+".md"), []byte(md), 0o600); err != nil {
 		return err
 	}
 	_, err = io.WriteString(out, md)
 	return err
+}
+
+// gitState is the commit (git rev-parse HEAD) the run was made on, and whether the tree had
+// changes: tracked or untracked, apart from the reports a run writes itself. "unknown" outside
+// a repository.
+func gitState(dir string) (commit, dirty string) {
+	head, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output() //nolint:gosec // fixed arguments
+	if err != nil {
+		return "unknown", "unknown"
+	}
+	status, err := exec.Command("git", "-C", dir, "status", "--porcelain", "--", ".", ":(top,exclude)evals/reports").Output() //nolint:gosec // fixed arguments
+	if err != nil {
+		return strings.TrimSpace(string(head)), "unknown"
+	}
+	return strings.TrimSpace(string(head)), strconv.FormatBool(len(bytes.TrimSpace(status)) > 0)
+}
+
+// render rewrites a report's Markdown (and JSON) from its JSON, without rerunning the bench.
+// --set adds or overrides Environment entries, for facts the run did not record.
+func render(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("render", flag.ContinueOnError)
+	in := fs.String("report", "", "report JSON written by analyze")
+	outDir := fs.String("out", ".", "report directory")
+	name := fs.String("name", "", "report file name, without extension")
+	var sets multiFlag
+	fs.Var(&sets, "set", "Environment entry key=value (repeatable)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	raw, err := os.ReadFile(filepath.Clean(*in))
+	if err != nil {
+		return err
+	}
+	var rep Report
+	if err := json.Unmarshal(raw, &rep); err != nil {
+		return fmt.Errorf("%s: %w", *in, err)
+	}
+	if rep.Environment == nil {
+		rep.Environment = map[string]string{}
+	}
+	for _, kv := range sets {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok || k == "" {
+			return fmt.Errorf("--set %q: expected key=value", kv)
+		}
+		rep.Environment[k] = v
+	}
+	var transitions []string
+	for n := range rep.Phases {
+		if n != "steady" {
+			transitions = append(transitions, n)
+		}
+	}
+	sort.Strings(transitions)
+	return writeReport(rep, transitions, *outDir, *name, out)
+}
+
+type multiFlag []string
+
+func (m *multiFlag) String() string     { return strings.Join(*m, ",") }
+func (m *multiFlag) Set(v string) error { *m = append(*m, v); return nil }
+
+func ordinal(n int) string {
+	switch {
+	case n%100 >= 11 && n%100 <= 13:
+		return fmt.Sprintf("%dth", n)
+	case n%10 == 1:
+		return fmt.Sprintf("%dst", n)
+	case n%10 == 2:
+		return fmt.Sprintf("%dnd", n)
+	case n%10 == 3:
+		return fmt.Sprintf("%drd", n)
+	}
+	return fmt.Sprintf("%dth", n)
 }
 
 func pass(ok bool) string {
@@ -353,7 +442,7 @@ func pass(ok bool) string {
 	return "FAIL"
 }
 
-func markdown(r Report, windows []bench.Window) string {
+func markdown(r Report, transitions []string) string {
 	var b strings.Builder
 	w := func(format string, a ...any) { fmt.Fprintf(&b, format, a...) }
 	w("# Gateway scaling 2 → 4 → 2 under steady load (issue #10)\n\n")
@@ -371,6 +460,9 @@ func markdown(r Report, windows []bench.Window) string {
 	for _, l := range r.Load {
 		w("| %d | %s | %.0f | %d | %d | %d | %d | %d | %d |\n", l.Pod, l.Tenant, l.Rate, l.Traces, l.SpansPer, l.ErrorEvery, l.SentSpans, l.UnsentSpans, l.ExportErrors)
 	}
+	if len(r.Load) > 0 {
+		w("\nNote: error every %s trace = stress profile, not expected production ratio.\n", ordinal(r.Load[0].ErrorEvery))
+	}
 	w("\n## Hard criteria\n\n| Criterion | Result |\n|---|---|\n")
 	w("| 0 spans lost in transport (every span stored, or dropped by a tail_sampling decision) | %s (%d lost, %d unsent) |\n", pass(r.Hard["no_spans_lost_in_transport"]), r.SpansLost, r.UnsentSpans)
 	steadySplit := 0
@@ -384,10 +476,7 @@ func markdown(r Report, windows []bench.Window) string {
 	w("\n## Phases\n\nA trace belongs to a transition when its lifetime overlaps [scale command − longest trace, ring settled + decision_wait (%s) + 5 s].\n\n", r.DecisionWait)
 	w("Split window: start times of the split traces, relative to the scale command. Expected length <= ring update (command until the new replica count is ready) + decision_wait.\n\n")
 	w("| Phase | Traces | Stored | Dropped | Split | Lost | Split rate | Split window (ms after command) | Ring update (ms) | Window length / expected max (ms) | ERROR traces split | of which complete |\n|---|---:|---:|---:|---:|---:|---:|---|---:|---|---:|---:|\n")
-	names := []string{"steady"}
-	for _, win := range windows {
-		names = append(names, win.Name)
-	}
+	names := append([]string{"steady"}, transitions...)
 	for _, n := range names {
 		s := r.Phases[n]
 		if s == nil {
@@ -417,5 +506,6 @@ func markdown(r Report, windows []bench.Window) string {
 		l := r.Latency[s]
 		w("| %s | %d | %d | %d | %.3f | %d |\n", s, l.ThresholdMS, l.Traces, l.Slow, l.Share, l.SlowStored)
 	}
+	w("\nSlow traces that are not fully stored are split traces (each half was below the threshold on its own gateway): see [#38](https://github.com/arec1b0/traceblame/issues/38).\n")
 	return b.String()
 }

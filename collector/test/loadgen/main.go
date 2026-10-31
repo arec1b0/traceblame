@@ -3,6 +3,7 @@
 //	loadgen thresholds  per-service p95 of the generated traffic, as an env file
 //	loadgen run         steady load to an agent over OTLP/gRPC with basic auth
 //	loadgen analyze     account for every span of a run and write the report
+//	loadgen render      rewrite a report's Markdown from its JSON (no rerun)
 //	loadgen probe       try a TCP connection (NetworkPolicy check)
 //
 // Traffic replays the content-off golden fixture spans (internal/bench); trace ids encode
@@ -16,7 +17,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: loadgen thresholds|run|analyze|probe [flags]")
+		fmt.Fprintln(os.Stderr, "usage: loadgen thresholds|run|analyze|render|probe [flags]")
 		os.Exit(2)
 	}
 	var err error
@@ -27,6 +28,8 @@ func main() {
 		err = run(os.Args[2:], os.Stdout)
 	case "analyze":
 		err = analyze(os.Args[2:], os.Stdout)
+	case "render":
+		err = render(os.Args[2:], os.Stdout)
 	case "probe":
 		err = probe(os.Args[2:], os.Stdout)
 	default:
