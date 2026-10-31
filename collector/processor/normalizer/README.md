@@ -39,15 +39,16 @@ SDK span ─▶ detect SDK ─▶ mapping table ─▶ redact content ─▶ che
 5. **Eval markers** (#36, [ADR-0005](../../../docs/adr/0005-tenant-identity-at-the-first-authenticated-hop.md)).
    `aegis.eval.run.id` (resource) and `aegis.fault.injection.id` (span) make the gateway
    keep the whole trace. They are kept only when the resource's tenant (after the tenant
-   source) is in `eval_tenants` and the value passes the profile pattern
-   (`^[A-Za-z0-9._:-]{1,128}$`). Otherwise they are dropped and counted in
-   `traceblame_normalizer_eval_marker_rejected_total`, with reason `tenant_not_allowed` or
-   `pattern`. The check runs on every span, whatever table matched. The agent and the
+   source) is in `eval_tenants`, the marker is in its own scope, and the value passes the
+   profile pattern (`^[A-Za-z0-9._:-]{1,128}$`), checked in that order. Otherwise they are
+   dropped and counted once in `traceblame_normalizer_eval_marker_rejected_total`, with
+   reason `tenant_not_allowed`, `scope` or `pattern`, and not as invalid attributes. The
+   check runs on every span, whatever table matched. The agent and the
    gateway run it with the same list, so the gateway's pass keeps what the agent accepted.
 6. **Check.** Every profile attribute is coerced to its profile type when that loses
    nothing, e.g. `"16"` → `16`, or a scalar → a one-element array. Otherwise it is dropped
    and counted. `aegis.*` keys outside the profile, or in the wrong scope, are dropped and
-   counted: the namespace is closed. Everything else passes through. Attributes that
+   counted: the namespace is closed (the eval markers are counted by step 5). Everything else passes through. Attributes that
    neither the profile nor the table knows are counted as unmapped. The exception is on
    GenAI spans: those longer than `max_unmapped_value_bytes` are dropped and counted
    instead, failing closed on content no rule names yet.
@@ -79,7 +80,7 @@ processors:
 | `traceblame_normalizer_newer_schema_spans_total` | `sdk`, `schema_url` | `schema_url` newer than every table of the SDK |
 | `traceblame_normalizer_invalid_attrs_total` | `sdk`, `attr` | profile attributes it could not repair (see Check) |
 | `traceblame_normalizer_dropped_large_values_total` | `sdk`, `attr` | unknown attributes dropped from GenAI spans for their size (see Check) |
-| `traceblame_normalizer_eval_marker_rejected_total` | `tenant`, `attr`, `reason` | eval and fault markers dropped: `tenant_not_allowed` or `pattern` (see Eval markers). A security signal: a marker forces 100% sampling. The run or injection id is never a label. `tenant="_none"`: no tenant |
+| `traceblame_normalizer_eval_marker_rejected_total` | `tenant`, `attr`, `reason` | eval and fault markers dropped: `tenant_not_allowed`, `scope` or `pattern` (see Eval markers). A security signal: a marker forces 100% sampling. The run or injection id is never a label. `tenant="_none"`: no tenant |
 
 The names follow design §1.5 exactly; the end-to-end smoke tests scrape them from the built
 collector.

@@ -42,8 +42,9 @@ two-tier topology:
     sampling and pollute the D1 ground truth.
   - The normalizer keeps a marker only for a tenant in `eval_tenants`, decided on the tenant
     this ADR establishes: the authenticated one on the agent, the agent-stamped one on the
-    gateway. Any other marker, or one that fails the profile pattern, is dropped and counted
-    in `traceblame_normalizer_eval_marker_rejected_total{tenant, attr, reason}`. It is a
+    gateway. Any other marker, one in the wrong scope, or one that fails the profile pattern
+    is dropped and counted in `traceblame_normalizer_eval_marker_rejected_total{tenant, attr,
+    reason}` (`tenant_not_allowed`, `scope`, `pattern`). It is a
     security signal, so it is not lumped into `invalid_attrs_total`, and an id is never a
     label.
   - Both tiers check, with one list from one source (in kind, the `eval-tenants` ConfigMap

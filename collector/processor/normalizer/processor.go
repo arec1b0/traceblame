@@ -80,8 +80,8 @@ func (p *normalizerProcessor) normalizeResource(ctx context.Context, attrs pcomm
 		if p.tables.IsContent(name) {
 			return true
 		}
-		if isMarker("resource", name) {
-			return !p.keepMarker(ctx, tenant, "", name, v)
+		if isMarker(name) {
+			return !p.keepMarker(ctx, "resource", tenant, "", name, v)
 		}
 		return !p.keepAttribute(ctx, "resource", mapping.UnknownSDK, "", name, v)
 	})
@@ -132,8 +132,8 @@ func (p *normalizerProcessor) normalizeSpan(ctx context.Context, scope mapping.S
 
 	attrs.RemoveIf(func(name string, v pcommon.Value) bool {
 		// Markers do not depend on the SDK: they are checked on every span, table or not.
-		if isMarker("span", name) {
-			return !p.keepMarker(ctx, tenant, traceID, name, v)
+		if isMarker(name) {
+			return !p.keepMarker(ctx, "span", tenant, traceID, name, v)
 		}
 		if !p.keepAttribute(ctx, "span", sdk, traceID, name, v) {
 			return true
