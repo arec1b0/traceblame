@@ -1,6 +1,7 @@
 """The migrations against a real ClickHouse: tables, idempotency, checksums, N-1."""
 
 import os
+import time
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -17,11 +18,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.integration
 
+# Start value of the trace-assembler's grace (ADR-0003), as in contract/trace_roots_read.sql.
+WATERMARK_GRACE_S = 5
+
 ENGINES = {
     "spans": "MergeTree",
     "otel_traces_ingest": "Null",
     "spans_from_otel": "MaterializedView",
-    "trace_roots": "ReplacingMergeTree",
+    "trace_roots": "MergeTree",
     "trace_roots_from_otel": "MaterializedView",
     "findings": "ReplacingMergeTree",
     "blame": "ReplacingMergeTree",
@@ -68,6 +72,11 @@ def test_the_contract_statements_run_on_the_schema(
                 client.command(sql)
             else:
                 results[name] = client.query_rows(sql)
+        # The watermark scan sees a root only once it is older than the grace (ADR-0003).
+        deadline = time.monotonic() + WATERMARK_GRACE_S + 10
+        while not results["trace_roots_read.sql"] and time.monotonic() < deadline:
+            time.sleep(0.5)
+            results["trace_roots_read.sql"] = client.query_rows(_statement("trace_roots_read.sql"))
         (span,) = results["spans_read.sql"]
         cols = [
             "trace_id",
@@ -116,26 +125,39 @@ def test_the_contract_statements_run_on_the_schema(
         assert len(results["blame_read.sql"]) == 1
         assert len(results["injections_read.sql"]) == 1
         (root,) = results["trace_roots_read.sql"]
-        assert root[0] == b"0af7651916cd43dd8448eb211c80319c"
-        assert root[1] == b"b7ad6b7169203331"
+        assert root[1] == b"0af7651916cd43dd8448eb211c80319c"
+        assert root[2] == b"b7ad6b7169203331"
     finally:
         client.close()
+
+
+def _statement(name: str) -> str:
+    (sql,) = [s for n, s in contract.packaged() if n == name]
+    return sql
+
+
+def _index_section(plan: str, index: str) -> str:
+    """The lines of one index (Min-Max, Partition, PrimaryKey) in EXPLAIN indexes = 1."""
+    assert index in plan, plan
+    return plan.split(index, 1)[1].split("Granules", 1)[0]
 
 
 def test_the_watermark_query_reads_by_primary_key(
     clickhouse: ClickHouseServer, database: str
 ) -> None:
-    """The assembler's scan (ADR-0003 draft) uses trace_roots' sort key, end_ts."""
+    """The assembler's scan (ADR-0003) prunes partitions and granules on ingested_at."""
     client = clickhouse.client(database)
     try:
         migrate(client, packaged())
         for name, statement in contract.packaged():
             if name.endswith("_write.sql"):
                 client.command(statement)  # an empty table has no parts to read an index of
-        (sql,) = [s for n, s in contract.packaged() if n == "trace_roots_read.sql"]
+        sql = _statement("trace_roots_read.sql")
         plan = "\n".join(str(r[0]) for r in client.query_rows(f"EXPLAIN indexes = 1 {sql}"))
-        assert "PrimaryKey" in plan
-        assert "end_ts" in plan.split("PrimaryKey", 1)[1].split("Granules", 1)[0]
+        primary = _index_section(plan, "PrimaryKey")
+        assert "ingested_at" in primary, plan
+        assert "Condition: true" not in primary, plan
+        assert "ingested_at" in _index_section(plan, "Min-Max"), plan
     finally:
         client.close()
 
