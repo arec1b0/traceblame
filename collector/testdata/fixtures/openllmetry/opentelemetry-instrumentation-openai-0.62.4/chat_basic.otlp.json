@@ -24,7 +24,7 @@
           {
             "key": "service.instance.id",
             "value": {
-              "stringValue": "72f5f158-6d1b-4c38-bd5f-51fe98b196ae"
+              "stringValue": "f1708ab6-1962-4fa1-bf19-d4ef7c9d668b"
             }
           },
           {
@@ -43,13 +43,13 @@
           },
           "spans": [
             {
-              "traceId": "054334b61a68d6d1c9c48571d0e4a4d5",
-              "spanId": "f0fda7bc587c34e2",
+              "traceId": "cf553dcaa5095cf7c36135ad3b49a94d",
+              "spanId": "aeffca0c91dce759",
               "flags": 256,
               "name": "openai.chat",
               "kind": 3,
-              "startTimeUnixNano": "1793386091747602754",
-              "endTimeUnixNano": "1793386092027545521",
+              "startTimeUnixNano": "1793421307681566351",
+              "endTimeUnixNano": "1793421308003265719",
               "attributes": [
                 {
                   "key": "gen_ai.operation.name",
@@ -90,7 +90,7 @@
                 {
                   "key": "gen_ai.openai.api_base",
                   "value": {
-                    "stringValue": "http://172.22.96.1:11434/v1/"
+                    "stringValue": "http://localhost:11434/v1/"
                   }
                 },
                 {
@@ -102,7 +102,7 @@
                 {
                   "key": "gen_ai.response.id",
                   "value": {
-                    "stringValue": "chatcmpl-238"
+                    "stringValue": "chatcmpl-600"
                   }
                 },
                 {
