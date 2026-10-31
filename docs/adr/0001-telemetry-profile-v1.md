@@ -122,10 +122,15 @@ snapshot of the v1.41.1 registry (issue #3).
   | a requirement tightened to `required` or `conditionally_required`, or a new attribute added at that level | a pattern, const or enum constraint removed |
   | a pattern, const or enum constraint added or changed, or a kind's operations constrained | an attribute removed from the forbidden list |
   | an attribute added to the forbidden list | the semconv pin changed, with no major change at attribute level |
+| a `source.algorithm` added, removed or reworded (whitespace and line wrapping are ignored) | |
 
   Removing, renaming or retyping is major for optional attributes too: consumers may read
   them, and the `aegis.*` namespace is closed. A pin change is judged by what it does to
   the profile's attributes, not by the version string.
+  An algorithm is judged by its normalized text, so any wording change is major: shims and
+  the normalizer must agree on it byte for byte, and stored values follow the old one. A
+  future `algorithm_version` field could let a pure rewording be minor; adding it is itself a
+  profile change.
 - Every normalized span carries `aegis.profile.version` = `aegis-telemetry/1`. This
   matches `profile_version` in the design's ClickHouse `spans` table and blame API.
 
