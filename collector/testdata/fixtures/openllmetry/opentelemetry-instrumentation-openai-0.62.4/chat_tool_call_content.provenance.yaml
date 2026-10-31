@@ -1,0 +1,32 @@
+sdk: openllmetry
+scenario: chat_tool_call_content
+captured_at: '2026-10-31T05:01:11Z'
+capture_script: tools/fixtures/capture_openllmetry.py
+capture_script_sha256: e0c38cbb61012bef0a6105f0cce4b4b7321576de71a4d45925861350335ea644
+capture_common_sha256: 6a324125dae16b8a3bae4035ce82126954a9f58d50ac83455e670aaff21d30f4
+python: 3.12.15
+uv: 0.13.6
+packages:
+  opentelemetry-instrumentation-openai: 0.62.4
+  opentelemetry-semantic-conventions-ai: 0.5.1
+  openai: 3.41.0
+  opentelemetry-sdk: 1.45.2
+  opentelemetry-exporter-otlp-proto-http: 1.45.2
+env:
+  TRACELOOP_TRACE_CONTENT: 'true'
+content_capture: true
+model:
+  name: qwen2.5:7b
+  digest: 845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e
+  server: ollama
+  server_version: 0.40.5
+endpoint: http://localhost:11434/v1
+collector: otelcol-contrib 0.164.0 (sha256 f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4)
+fixture_sha256: 53a55ae3122dd369d0873d0f7732d28aa04cc7f1afa7488355e0ddc5c6337fa4
+notes:
+- chat.completions.create with one function tool (get_weather), temperature=0, seed=7, max_tokens=64;
+  the model answers with a tool call
+- gen_ai.provider.name / server.address describe the OpenAI client talking to Ollama's OpenAI-compatible
+  API, not the OpenAI service.
+- 'Content capture ON: the prompt and completion are in the export on purpose, so the normalizer''s redaction
+  is tested on real SDK output. The prompt is a harmless public fact.'

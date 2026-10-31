@@ -17,7 +17,7 @@
 #   events (issue #7).
 profile: aegis-telemetry
 major: 1
-revision: 1.1.0
+revision: 1.2.0
 
 semconv:
   repository: open-telemetry/semantic-conventions
@@ -200,12 +200,16 @@ attributes:
     source:
       aegis: extension
       derived_from: [gen_ai.tool.call.arguments]
-      algorithm: first 16 hex chars of sha256 over the canonical JSON of the arguments
+      algorithm: >-
+        first 16 lowercase hex chars of SHA-256 over the RFC 8785 (JCS) serialization of the
+        arguments; over their raw UTF-8 bytes when they are not I-JSON
     requirement: {tool: conditionally_required}
     condition: when the arguments are observed in-process (the loop detector needs it)
     brief: >-
       Hash of the tool call arguments. The shim computes it in-process, so the arguments
-      themselves are never exported.
+      themselves are never exported; the normalizer derives it when an SDK exports
+      gen_ai.tool.call.arguments anyway. The hash is unkeyed: arguments with few possible
+      values (a namespace, a city) can be recovered by hashing every candidate (ADR-0002).
 
   # Retrieval
   - name: gen_ai.data_source.id

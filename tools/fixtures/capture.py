@@ -7,7 +7,8 @@
 For each capture: start the pinned otelcol-contrib (OTLP/HTTP in, file exporter out), run
 the SDK's capture script against Ollama's OpenAI-compatible API, stop the collector, and
 write <scenario>.otlp.json plus <scenario>.provenance.yaml under collector/testdata/fixtures.
-Every SDK mode captures every request in REQUESTS. Content capture is off in every SDK.
+Every SDK mode captures every request in REQUESTS with content capture off. The *_content
+scenarios capture with content on, so the normalizer's redaction is tested on real output.
 
 Run from WSL2 or Linux: `make fixtures` (see collector/testdata/fixtures/README.md).
 """
@@ -129,6 +130,7 @@ class Capture:
     env: dict[str, str]
     request: Request
     notes: tuple[str, ...] = ()
+    content_capture: bool = False
 
 
 # Content-off settings of each SDK (what the shims will set).
@@ -187,6 +189,28 @@ _SDK_MODES: tuple[tuple[str, str, str, dict[str, str], str, tuple[str, ...]], ..
     ),
 )
 
+# Content-on settings (issue #9): the normalizer must remove what these exports carry, so
+# every *_content fixture carries content. The default otel-genai mode puts content into log
+# events, not spans, and otel-genai records no embeddings input on spans in any mode.
+_CONTENT_MODES: dict[tuple[str, str], tuple[dict[str, str], tuple[str, ...]]] = {
+    ("openinference", ""): ({}, ("chat_basic", "chat_tool_call", "embeddings_basic")),
+    ("openllmetry", ""): (
+        {"TRACELOOP_TRACE_CONTENT": "true"},
+        ("chat_basic", "chat_tool_call", "embeddings_basic"),
+    ),
+    ("otel-genai", "_latest_experimental"): (
+        {
+            "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
+            "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "SPAN_ONLY",
+        },
+        ("chat_basic", "chat_tool_call"),
+    ),
+}
+_CONTENT_NOTE = (
+    "Content capture ON: the prompt and completion are in the export on purpose, so the "
+    "normalizer's redaction is tested on real SDK output. The prompt is a harmless public fact."
+)
+
 CAPTURES = tuple(
     Capture(
         sdk=sdk,
@@ -199,6 +223,20 @@ CAPTURES = tuple(
     )
     for sdk, script, instrumentation, env, suffix, notes in _SDK_MODES
     for request in REQUESTS.values()
+) + tuple(
+    Capture(
+        sdk=sdk,
+        scenario=f"{name}{suffix}_content",
+        script=script,
+        instrumentation=instrumentation,
+        env=_CONTENT_MODES[(sdk, suffix)][0],
+        request=REQUESTS[name],
+        notes=(_CONTENT_NOTE, *notes),
+        content_capture=True,
+    )
+    for sdk, script, instrumentation, _env, suffix, notes in _SDK_MODES
+    if (sdk, suffix) in _CONTENT_MODES
+    for name in _CONTENT_MODES[(sdk, suffix)][1]
 )
 
 COLLECTOR_CONFIG = """\
@@ -363,7 +401,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--ollama-url", help="default: localhost, then the WSL2 host")
     parser.add_argument(
-        "--only", help="capture only this sdk/scenario, e.g. openllmetry/chat_basic"
+        "--only",
+        action="append",
+        help="capture only this sdk/scenario, e.g. openllmetry/chat_basic (repeatable)",
     )
     args = parser.parse_args()
 
@@ -381,7 +421,7 @@ def main() -> int:
     otelcol_version, otelcol_sha256 = tool_pin("otelcol-contrib")
 
     for capture in CAPTURES:
-        if args.only and args.only != f"{capture.sdk}/{capture.scenario}":
+        if args.only and f"{capture.sdk}/{capture.scenario}" not in args.only:
             continue
         print(f"capture: {capture.sdk}/{capture.scenario}", file=sys.stderr)
         with tempfile.TemporaryDirectory() as tmp:
@@ -404,6 +444,7 @@ def main() -> int:
             "uv": uv_version,
             "packages": packages,
             "env": capture.env,
+            "content_capture": capture.content_capture,
             "model": {
                 "name": capture.request.model,
                 "digest": capture.request.digest,

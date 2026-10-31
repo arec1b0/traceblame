@@ -1,11 +1,13 @@
 """Golden fixtures are real, untouched, content-free exports, and the profile applies to them."""
 
+import json
 import os
 import re
 from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from traceblame_contracts.fixtures import Fixture, discover_fixtures
 from traceblame_contracts.normalizers import (
@@ -27,14 +29,37 @@ pytestmark = pytest.mark.contract
 FIXTURES = discover_fixtures(FIXTURES_ROOT)
 SDKS = {"openinference", "openllmetry", "otel-genai"}
 
-# Vendor attributes that carry prompt/completion content when content capture is on.
-_VENDOR_CONTENT = re.compile(
-    r"^((input|output)\.value"
-    r"|llm\.(input|output)_messages\..*"
-    r"|llm\.prompts?(\..*)?"
-    r"|gen_ai\.(prompt|completion)\..*)$"
-)
+MAPPINGS = ROOT / "collector" / "processor" / "normalizer" / "mappings"
 _REDACTED = "__REDACTED__"
+# Words of the capture prompts and answers (tools/fixtures/capture.py): what content capture
+# puts into the *_content fixtures, and nothing else in a fixture contains.
+_NEEDLES = ("France", "Paris", "weather")
+
+
+def _content_rules(profile: Profile) -> tuple[set[str], list[re.Pattern[str]]]:
+    """The normalizer's content rules: the profile's forbidden list plus every table's."""
+    names = {f.name for f in profile.forbidden}
+    patterns: list[re.Pattern[str]] = []
+    for path in sorted(MAPPINGS.rglob("*.yaml")):
+        table: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8"))
+        entries: list[str | dict[str, str]] = table.get("content", [])
+        for entry in entries:
+            if isinstance(entry, str):
+                names.add(entry)
+            else:
+                patterns.append(re.compile(entry["pattern"]))
+    return names, patterns
+
+
+def _content_attributes(spans: list[dict[str, Any]], profile: Profile) -> list[str]:
+    names, patterns = _content_rules(profile)
+    return [
+        f"{span['span_id']}: {key}"
+        for span in spans
+        for holder in (span["resource"], span["attributes"])
+        for key, value in holder.items()
+        if (key in names or any(p.search(key) for p in patterns)) and value != _REDACTED
+    ]
 
 
 def test_every_sdk_has_a_fixture() -> None:
@@ -63,15 +88,18 @@ def test_fixture_is_well_formed_otlp_json(fixture: Fixture) -> None:
 
 
 @pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f.id)
-def test_fixture_carries_no_raw_content(fixture: Fixture, profile: Profile) -> None:
-    forbidden = {f.name for f in profile.forbidden}
-    leaks = [
-        f"{span['span_id']}: {key}"
-        for span in flatten_otlp_json(fixture.load())
-        for key, value in span["attributes"].items()
-        if (key in forbidden or _VENDOR_CONTENT.match(key)) and value != _REDACTED
-    ]
-    assert leaks == []
+def test_fixture_carries_content_only_when_captured_with_it(fixture: Fixture) -> None:
+    """Content-off exports hold no prompt or completion text; content-on ones must, or the
+    redaction tests prove nothing. Judged by the text itself, not by attribute names: the
+    normalizer also drops metadata attributes by policy (e.g. llm.invocation_parameters)."""
+    text = fixture.path.read_text(encoding="utf-8")
+    found = [n for n in _NEEDLES if n in text]
+    if fixture.provenance().content_capture:
+        assert found, "a content_capture fixture without content proves nothing"
+        assert fixture.id.endswith("_content")
+    else:
+        assert found == []
+        assert not fixture.id.endswith("_content")
 
 
 # The contract gate: the collector's normalizer (collector/cmd/normalize), built by
@@ -108,3 +136,12 @@ def test_normalized_fixture_names_its_sdk_and_normalizer(
     for span in normalized[fixture.id]:
         assert span["attributes"]["aegis.source.sdk"] == fixture.provenance().sdk
         assert re.fullmatch(r"\d+\.\d+\.\d+", span["attributes"]["aegis.normalizer.version"])
+
+
+@pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f.id)
+def test_normalized_fixture_carries_no_content(
+    fixture: Fixture, normalized: dict[str, list[dict[str, Any]]], profile: Profile
+) -> None:
+    assert _content_attributes(normalized[fixture.id], profile) == []
+    exported = json.dumps(GO.normalize(fixture.load()))
+    assert [n for n in _NEEDLES if n in exported] == []

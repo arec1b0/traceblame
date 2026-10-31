@@ -32,3 +32,19 @@ known:
   - gen_ai.openai.api_base
   - gen_ai.openai.response.system_fingerprint
   - gen_ai.usage.total_tokens
+
+# Prompt/completion content (issue #9): dropped on every span, never mapped. Names from
+# opentelemetry-semantic-conventions-ai 0.5.1 (SpanAttributes) and the *_content fixtures;
+# gen_ai.input.messages / gen_ai.output.messages are forbidden by the profile already.
+content:
+  - gen_ai.tool.definitions
+  - traceloop.entity.input
+  - traceloop.entity.output
+  - traceloop.prompt.template
+  - traceloop.prompt.template_variables
+  - gen_ai.content.completion.chunk
+  - llm.content.completion.chunk
+  - gen_ai.task.input
+  - gen_ai.task.output
+  - pattern: '^gen_ai\.(prompt|completion)\.'
+  - pattern: '^llm\.request\.functions(\.|$)'

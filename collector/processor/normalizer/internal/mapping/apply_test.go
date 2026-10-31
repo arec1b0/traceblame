@@ -131,9 +131,10 @@ func TestKind(t *testing.T) {
 func TestKnown(t *testing.T) {
 	tb := table(t, "openinference/0")
 	assert.True(t, tb.Known("llm.token_count.total"))
-	assert.True(t, tb.Known("embedding.embeddings.3.embedding.vector"))
-	assert.False(t, tb.Known("embedding.embeddings.x.embedding.vector"))
-	assert.False(t, tb.Known("llm.tools.0.tool.json_schema"))
+	assert.True(t, tb.Known("input.mime_type"))
+	assert.False(t, tb.Known("embedding.embeddings.3.embedding.vector"), "content, not known")
+	assert.False(t, tb.Known("llm.tools.0.tool.json_schema"), "content, not known")
+	assert.False(t, tb.Known("llm.cost.total"))
 }
 
 func TestApplyIsDeterministic(t *testing.T) {

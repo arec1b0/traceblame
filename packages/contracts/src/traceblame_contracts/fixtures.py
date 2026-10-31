@@ -44,6 +44,9 @@ class Provenance(_Model):
     uv: str
     packages: dict[str, str]
     env: dict[str, str]
+    # True only for *_content scenarios: content capture was on, so the export carries
+    # prompt/completion text on purpose (the normalizer's redaction tests need it).
+    content_capture: bool = False
     model: ModelInfo
     endpoint: str
     collector: str

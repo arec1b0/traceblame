@@ -120,6 +120,24 @@ match: {scopes: [s]}
 `,
 		}, "schema_version"},
 		{"bad schema_version", map[string]string{"a/0.yaml": validTable + "schema_version: one\n"}, "schema_version one"},
+		{"bad content pattern", map[string]string{"a/0.yaml": validTable + `
+content: [{pattern: "("}]
+`}, "content pattern"},
+		{"known and content at once", map[string]string{"a/0.yaml": validTable + `
+known: [input.value]
+content: [input.value]
+`}, "input.value is both known and content"},
+		{"content as an attr source", map[string]string{"a/0.yaml": validTable + `
+map:
+  - to: gen_ai.request.model
+    from: [{attr: input.value}]
+content: [input.value]
+`}, "input.value is content"},
+		{"forbidden attribute as an attr source", map[string]string{"a/0.yaml": validTable + `
+map:
+  - to: gen_ai.request.model
+    from: [{attr: gen_ai.input.messages}]
+`}, "gen_ai.input.messages is content"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fsys := fstest.MapFS{}

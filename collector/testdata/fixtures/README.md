@@ -30,11 +30,23 @@ Every SDK mode captures every request:
 | `chat_error` | `chat.completions.create` with `messages=[]`: HTTP 400 `invalid_request_error` | `qwen2.5:7b` |
 | `embeddings_basic` | `embeddings.create` with one input | `nomic-embed-text` |
 
+**Content-on fixtures** (`*_content`, issue #9). They are the only exports with
+`content_capture: true` in their provenance. Each SDK's content switch was on:
+- OpenInference: no `OPENINFERENCE_HIDE_*` settings;
+- OpenLLMetry: `TRACELOOP_TRACE_CONTENT=true`;
+- otel-genai latest experimental: `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY`.
+
+They cover `chat_basic`, `chat_tool_call` and, where the SDK records it on spans,
+`embeddings_basic`. Their prompt and completion text is in the export on purpose, so the
+normalizer's redaction is tested on real output. `make contract` checks that every
+content-on fixture carries content and every other fixture carries none. The default
+otel-genai mode has no content variant, because it writes content to log events.
+
 The calls go to a local Ollama server through its OpenAI-compatible API. That is why the
 spans name `openai` as the provider and a local address as the server.
 
-- **Prompts.** They are harmless public facts, and content capture is off in every SDK.
-  `make contract` checks that no prompt or completion text is present.
+- **Prompts.** They are harmless public facts. Content capture is off in every SDK except
+  for the `*_content` scenarios.
 - **Models.** Each request pins the Ollama model digest it must run on, in
   `tools/fixtures/capture.py`. The capture fails on any other model build, and the
   provenance records the model name and digest.

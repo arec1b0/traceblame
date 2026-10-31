@@ -6,14 +6,17 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
+
+	"github.com/arec1b0/traceblame/collector/processor/normalizer/internal/profile"
 )
 
 // Registry holds every table and picks the one for a span (ADR-0001, "Normalizer behaviour
 // on a newer schema_url").
 type Registry struct {
-	tables []*Table
-	bySDK  map[string][]*Table // sorted by schema version, oldest first
-	sdks   []string            // match order
+	profile *profile.Profile
+	tables  []*Table
+	bySDK   map[string][]*Table // sorted by schema version, oldest first
+	sdks    []string            // match order
 }
 
 // Scope is what selection reads from the span's instrumentation scope and resource.
@@ -40,8 +43,8 @@ func (s Selection) SDK() string {
 	return s.Table.SDK
 }
 
-func newRegistry(tables []*Table) (*Registry, error) {
-	r := &Registry{tables: tables, bySDK: map[string][]*Table{}}
+func newRegistry(tables []*Table, p *profile.Profile) (*Registry, error) {
+	r := &Registry{profile: p, tables: tables, bySDK: map[string][]*Table{}}
 	for _, t := range tables {
 		r.bySDK[t.SDK] = append(r.bySDK[t.SDK], t)
 	}
@@ -130,4 +133,19 @@ func (r *Registry) matchMarkers(attrs pcommon.Map) string {
 		}
 	}
 	return ""
+}
+
+// IsContent reports whether name is prompt/completion content: a forbidden attribute of the
+// profile, or content in any table. It applies to every span, whatever its SDK, so content
+// rules fail closed.
+func (r *Registry) IsContent(name string) bool {
+	if r.profile.IsForbidden(name) {
+		return true
+	}
+	for _, t := range r.tables {
+		if t.isContent(name) {
+			return true
+		}
+	}
+	return false
 }
