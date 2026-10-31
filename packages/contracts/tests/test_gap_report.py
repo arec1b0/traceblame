@@ -1,5 +1,6 @@
 import copy
 import json
+from pathlib import Path
 from typing import Any
 
 from traceblame_contracts.gap_report import (
@@ -11,7 +12,11 @@ from traceblame_contracts.gap_report import (
 )
 from traceblame_contracts.jsonschema_gen import generate_json_schema
 from traceblame_contracts.normalizers import IdentityNormalizer
-from traceblame_contracts.profile import Profile
+from traceblame_contracts.profile import Profile, load_profile
+
+ROOT_PROFILE = (
+    Path(__file__).resolve().parents[3] / "schemas" / "profile" / "aegis-telemetry.v1.yaml"
+)
 
 
 def _profile(doc: dict[str, Any], extra: list[dict[str, Any]] | None = None) -> Profile:
@@ -145,3 +150,21 @@ def test_renderings() -> None:
     doc = json.loads(render_json(gaps, "aegis-telemetry/1", "1.1.0"))
     assert doc["profile"] == "aegis-telemetry/1"
     assert doc["fixtures"][0]["raw_violations"] == {"attributes: x is required": 2}
+
+
+def test_opt_in_eval_and_fault_markers_are_never_missing() -> None:
+    """#36: the markers are opt-in, so their absence is not a gap on any span kind."""
+    profile = load_profile(ROOT_PROFILE)
+    for name in ("aegis.eval.run.id", "aegis.fault.injection.id"):
+        spec = profile.attribute(name)
+        assert spec is not None, name
+        assert set(spec.requirement.values()) == {"opt_in"}
+    span = {
+        "status": {"code": "STATUS_CODE_UNSET"},
+        "resource": {},
+        "attributes": {},
+    }
+    for kind in profile.span_kinds:
+        span["attributes"] = {"aegis.span.kind": kind}
+        missing = missing_attributes(span, profile)
+        assert not [m for m in missing if "aegis.eval.run.id" in m or "aegis.fault" in m]

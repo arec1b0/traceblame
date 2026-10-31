@@ -20,7 +20,7 @@
 #   events (issue #7).
 profile: aegis-telemetry
 major: 1
-revision: 1.4.0
+revision: 1.5.0
 
 semconv:
   repository: open-telemetry/semantic-conventions
@@ -286,6 +286,29 @@ attributes:
     requirement: {all: conditionally_required}
     condition: when the span passed an AgentGate decision
     brief: AgentGate decision id.
+
+  # Eval and fault-injection markers (opt-in, #36). The gateway keeps every marked trace,
+  # so the normalizer keeps a marker only for tenants in its eval_tenants allowlist
+  # (ADR-0005); the pattern bounds what a marker can carry.
+  - name: aegis.eval.run.id
+    scope: resource
+    type: string
+    pattern: "^[A-Za-z0-9._:-]{1,128}$"
+    source: {aegis: extension}
+    requirement: {all: opt_in}
+    brief: >-
+      Eval run the trace belongs to. Set by the eval harness through the shims on every trace
+      of a run. The gateway keeps marked traces at 100%, so the normalizer keeps the marker
+      only for tenants in its eval_tenants allowlist.
+  - name: aegis.fault.injection.id
+    scope: span
+    type: string
+    pattern: "^[A-Za-z0-9._:-]{1,128}$"
+    source: {aegis: extension}
+    requirement: {all: opt_in}
+    brief: >-
+      Fault injection applied at this span; joins injections.injection_id. Set by faults/.
+      Kept only for tenants in eval_tenants, like aegis.eval.run.id.
 
   # Content (opt-in only)
   - name: aegis.content.ref

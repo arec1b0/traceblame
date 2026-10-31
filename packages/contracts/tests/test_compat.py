@@ -647,3 +647,20 @@ def test_adopting_version_1_on_the_committed_args_hash_is_minor() -> None:
     assert source.pop("algorithm_version") == 1
     assert _classified(base, head) == [("minor", "algorithm_version_adopted")]
     assert _diff(base, head).bump == "minor"
+
+
+def test_the_eval_and_fault_markers_are_two_optional_additions() -> None:
+    """#36 on the real profile: 1.4.0 -> 1.5.0 adds two opt-in attributes, nothing else."""
+    path = Path(__file__).resolve().parents[3] / "schemas" / "profile" / "aegis-telemetry.v1.yaml"
+    head = yaml.safe_load(path.read_text(encoding="utf-8"))
+    base = copy.deepcopy(head)
+    for name in ("aegis.eval.run.id", "aegis.fault.injection.id"):
+        _without(base, name)
+    assert _classified(base, head) == [
+        ("minor", "attribute_added"),
+        ("minor", "attribute_added"),
+    ]
+    assert [c.subject for c in _diff(base, head).changes] == [
+        "aegis.eval.run.id",
+        "aegis.fault.injection.id",
+    ]
