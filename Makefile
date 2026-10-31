@@ -18,6 +18,11 @@ COV_GATED := services/detectors services/attributor
 # Go packages under the same gate, as MODULE_DIR:PACKAGES.
 GO_COV_GATED := collector:./processor/normalizer/...
 
+# Base revision of the "no breaking change" contract test. CI sets it to origin/<base branch>;
+# locally the default is origin/main, fetched first (a stale local main gives false results).
+CONTRACT_BASE_REF ?= origin/main
+export CONTRACT_BASE_REF
+
 KIND_CLUSTER := traceblame
 
 # Collector distribution (collector/builder-config.yaml, ocb from tools/versions.env).
@@ -50,6 +55,9 @@ test: ## Unit tests: pytest with coverage gates, go test -race
 	done
 
 contract: ## Contract tests: profile/schema sync, semconv pin, fixtures through the normalizer; gap report in .contract/
+	@if [ "$(origin CONTRACT_BASE_REF)" = file ]; then \
+	  git fetch origin main --quiet || { echo "cannot fetch origin main; set CONTRACT_BASE_REF to override" >&2; exit 1; }; \
+	fi
 	cd collector && go build -o "$(TRACEBLAME_NORMALIZE_BIN)" ./cmd/normalize
 	$(UV_RUN) traceblame-contracts gen-schema --check
 	$(UV_RUN) traceblame-contracts gap-report

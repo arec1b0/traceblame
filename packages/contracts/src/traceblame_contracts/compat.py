@@ -4,7 +4,9 @@ Every change is classified:
 - major: breaks producers or consumers of the old revision, so it needs the next profile
   major. An attribute removed, renamed or retyped (optional or not), an enum value removed,
   a requirement tightened to required/conditionally_required, a constraint added, a newly
-  forbidden attribute.
+  forbidden attribute, a `source.algorithm` added, removed or changed (ADR-0002, section 5).
+  Producers and the normalizer must agree on an algorithm byte for byte, and hashes already
+  stored follow the old one; only whitespace and line wrapping in its text are ignored.
 - minor: backward compatible, so it is allowed within a major. An optional attribute or
   enum value added, a requirement loosened, a constraint removed, and a semconv pin change.
 
@@ -15,7 +17,7 @@ profile's attributes, which the semconv snapshot contract test keeps in sync wit
 from dataclasses import dataclass
 from typing import Literal
 
-from traceblame_contracts.profile import AttributeSpec, Profile, RequirementLevel
+from traceblame_contracts.profile import AegisSource, AttributeSpec, Profile, RequirementLevel
 
 Severity = Literal["major", "minor"]
 Bump = Literal["major", "minor", "none"]
@@ -120,6 +122,7 @@ def _attribute_changes(old: Profile, new: Profile) -> list[Change]:
             changes.append(Change("major", "scope_changed", a.name, f"{a.scope} -> {b.scope}"))
         changes += _requirement_changes(a, b, kinds)
         changes += _constraint_changes(a, b)
+        changes += _algorithm_changes(a, b)
     for b in new.attributes:
         if old.attribute(b.name) is None:
             if any(b.level_for(kind) in _ENFORCED for kind in kinds):
@@ -163,6 +166,23 @@ def _constraint_changes(a: AttributeSpec, b: AttributeSpec) -> list[Change]:
             if added := sorted(set(b.enum) - set(a.enum)):
                 changes.append(Change("minor", "enum_value_added", a.name, ", ".join(added)))
     return changes
+
+
+def _algorithm(spec: AttributeSpec) -> str | None:
+    """The algorithm text with whitespace runs collapsed, so wrapping is not a change."""
+    text = spec.source.algorithm if isinstance(spec.source, AegisSource) else None
+    return None if text is None else " ".join(text.split())
+
+
+def _algorithm_changes(a: AttributeSpec, b: AttributeSpec) -> list[Change]:
+    before, after = _algorithm(a), _algorithm(b)
+    if before == after:
+        return []
+    if before is None:
+        return [Change("major", "algorithm_added", a.name, after or "")]
+    if after is None:
+        return [Change("major", "algorithm_removed", a.name, before)]
+    return [Change("major", "algorithm_changed", a.name, f"{before} -> {after}")]
 
 
 def _forbidden_changes(old: Profile, new: Profile) -> list[Change]:
