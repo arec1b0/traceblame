@@ -20,10 +20,17 @@ from traceblame_contracts.validate import validate_span
 
 _GAP_LEVELS = ("recommended", "conditionally_required")
 
+
 # Conditions the report can evaluate; other conditionally required attributes count as
 # missing whenever they are absent, with their condition shown.
+def _on_error(span: Mapping[str, Any]) -> bool:
+    return span["status"]["code"] == "STATUS_CODE_ERROR"
+
+
 _CONDITIONS: dict[str, Callable[[Mapping[str, Any]], bool]] = {
-    "error.type": lambda span: span["status"]["code"] == "STATUS_CODE_ERROR",
+    "error.type": _on_error,
+    # Read from the client's error message (#29): successful calls never carry it.
+    "http.response.status_code": _on_error,
 }
 
 

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"math"
 	"net/url"
+	"strconv"
+	"strings"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -55,7 +57,16 @@ func (t *Table) Apply(span ptrace.Span) {
 
 func (s Source) read(span ptrace.Span) (pcommon.Value, bool) {
 	var v pcommon.Value
+	if s.OnError && span.Status().Code() != ptrace.StatusCodeError {
+		return v, false
+	}
 	switch {
+	case s.StatusMessage:
+		msg := span.Status().Message()
+		if msg == "" {
+			return v, false
+		}
+		v = pcommon.NewValueStr(msg)
 	case s.Attr != "":
 		got, ok := span.Attributes().Get(s.Attr)
 		if !ok {
@@ -73,9 +84,6 @@ func (s Source) read(span ptrace.Span) (pcommon.Value, bool) {
 		}
 		v = field
 	case s.Event != "":
-		if s.OnError && span.Status().Code() != ptrace.StatusCodeError {
-			return v, false
-		}
 		got, ok := eventAttribute(span, s.Event, s.Field)
 		if !ok {
 			return v, false
@@ -84,20 +92,67 @@ func (s Source) read(span ptrace.Span) (pcommon.Value, bool) {
 	}
 	out := pcommon.NewValueEmpty()
 	v.CopyTo(out)
-	if s.Convert == "url_host" {
+	if s.re != nil {
 		if out.Type() != pcommon.ValueTypeStr {
 			return out, false
 		}
-		u, err := url.Parse(out.Str())
-		if err != nil || u.Hostname() == "" {
+		m := s.re.FindStringSubmatch(out.Str())
+		if m == nil {
 			return out, false
 		}
-		out.SetStr(u.Hostname())
+		out.SetStr(m[1])
+	}
+	if !convert(s.Convert, out) {
+		return out, false
 	}
 	if len(s.Values) > 0 {
 		mapValues(out, s.Values)
 	}
 	return out, true
+}
+
+// convert applies a named converter in place; false means the source yields nothing.
+//   - url_host: the host of a URL.
+//   - http_status: exactly three digits, 100-599, as an int; anything else is no status.
+//   - class_name: the part after the last ".", e.g. openai.BadRequestError -> BadRequestError.
+func convert(name string, v pcommon.Value) bool {
+	switch name {
+	case "":
+		return true
+	case "url_host":
+		if v.Type() != pcommon.ValueTypeStr {
+			return false
+		}
+		u, err := url.Parse(v.Str())
+		if err != nil || u.Hostname() == "" {
+			return false
+		}
+		v.SetStr(u.Hostname())
+		return true
+	case "http_status":
+		if v.Type() != pcommon.ValueTypeStr {
+			return false
+		}
+		s := v.Str()
+		if len(s) != 3 || strings.Trim(s, "0123456789") != "" {
+			return false
+		}
+		code, err := strconv.Atoi(s)
+		if err != nil || code < 100 || code > 599 {
+			return false
+		}
+		v.SetInt(int64(code))
+		return true
+	case "class_name":
+		if v.Type() != pcommon.ValueTypeStr {
+			return false
+		}
+		s := v.Str()
+		v.SetStr(s[strings.LastIndex(s, ".")+1:])
+		return v.Str() != ""
+	default:
+		return false
+	}
 }
 
 // jsonField reads one top-level field of a JSON object; numbers become int when integral.

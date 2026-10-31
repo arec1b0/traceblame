@@ -22,7 +22,7 @@ var normalizerOwned = map[string]bool{
 	"aegis.normalizer.version": true,
 }
 
-var converters = map[string]bool{"": true, "url_host": true}
+var converters = map[string]bool{"": true, "url_host": true, "http_status": true, "class_name": true}
 
 // Load reads every *.yaml table under fsys and checks it against the profile.
 func Load(fsys fs.FS, p *profile.Profile) (*Registry, error) {
@@ -113,7 +113,8 @@ func (t *Table) check(p *profile.Profile, sdks map[string]bool) error {
 			return fmt.Errorf("%s is both known and content", name)
 		}
 	}
-	for _, r := range t.Map {
+	for i := range t.Map {
+		r := &t.Map[i]
 		if err := checkRule(r, p); err != nil {
 			return err
 		}
@@ -177,7 +178,7 @@ func (t *Table) checkKind(p *profile.Profile) error {
 	return nil
 }
 
-func checkRule(r Rule, p *profile.Profile) error {
+func checkRule(r *Rule, p *profile.Profile) error {
 	a, ok := p.Attribute(r.To)
 	switch {
 	case normalizerOwned[r.To]:
@@ -189,16 +190,30 @@ func checkRule(r Rule, p *profile.Profile) error {
 	case len(r.From) == 0:
 		return fmt.Errorf("%s: no sources", r.To)
 	}
-	for _, s := range r.From {
+	for j := range r.From {
+		s := &r.From[j]
 		kinds := 0
 		for _, set := range []string{s.Attr, s.JSON, s.Event} {
 			if set != "" {
 				kinds++
 			}
 		}
+		if s.StatusMessage {
+			kinds++
+		}
+		if s.Match != "" {
+			re, err := regexp.Compile(s.Match)
+			if err != nil {
+				return fmt.Errorf("%s: match %q: %w", r.To, s.Match, err)
+			}
+			if re.NumSubexp() != 1 {
+				return fmt.Errorf("%s: match %q needs exactly one capture group", r.To, s.Match)
+			}
+			s.re = re
+		}
 		switch {
 		case kinds != 1:
-			return fmt.Errorf("%s: a source needs exactly one of attr, json, event", r.To)
+			return fmt.Errorf("%s: a source needs exactly one of attr, json, event, status_message", r.To)
 		case (s.JSON != "" || s.Event != "") && s.Field == "":
 			return fmt.Errorf("%s: a json or event source needs a field", r.To)
 		case s.Keep && s.Attr == "":

@@ -19,8 +19,10 @@ SDK span ─▶ detect SDK ─▶ mapping table ─▶ redact content ─▶ che
    - No table matched: `aegis.source.sdk=unknown`. Nothing is renamed and nothing is counted
      as unmapped, which keeps non-GenAI spans (HTTP, DB) out of the drift signal.
 2. **Map.** Each rule fills one profile attribute from the first source that has a value.
-   A source is an attribute, a field of a JSON attribute, or an `exception` event on error
-   spans. A profile name the SDK already emits wins over sources. Attribute sources are
+   A source is an attribute, a field of a JSON attribute, an `exception` event, or the status
+   message, optionally narrowed by a one-group regex. On failed calls this reads
+   `http.response.status_code` out of the client's "Error code: NNN" (100–599 only) before
+   the message is dropped, and `error.type` is the class name alone in every SDK (#29). A profile name the SDK already emits wins over sources. Attribute sources are
    consumed (removed) unless marked `keep`.
 3. **Redact** (issue #9, [ADR-0002](../../../docs/adr/0002-content-redaction-and-opt-in-capture.md)).
    - Content attributes are dropped from every span, its events, links and resource,

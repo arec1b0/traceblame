@@ -52,10 +52,18 @@ map:
   - to: gen_ai.response.finish_reasons
     from:
       - attr: llm.finish_reason
-  # OpenInference records failures only as an exception event (fixture chat_error).
+  # OpenInference records failures only as an exception event (fixture chat_error). The
+  # event names the class with its module (openai.BadRequestError); the other SDKs report
+  # the class name alone, so keep that one spelling (#29).
   - to: error.type
     from:
-      - {event: exception, field: exception.type, on_error: true}
+      - {event: exception, field: exception.type, on_error: true, convert: class_name}
+  # The OpenAI client's errors read "Error code: NNN - <body>" (#29). Only that prefix is
+  # read, and only a 100-599 status; the rest of the message is dropped as before (#9).
+  - to: http.response.status_code
+    from:
+      - {status_message: true, on_error: true, match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)', convert: http_status}
+      - {event: exception, field: exception.message, on_error: true, match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)', convert: http_status}
 
 known:
   - openinference.span.kind
