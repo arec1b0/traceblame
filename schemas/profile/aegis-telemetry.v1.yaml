@@ -20,7 +20,7 @@
 #   events (issue #7).
 profile: aegis-telemetry
 major: 1
-revision: 1.5.0
+revision: 1.6.0
 
 semconv:
   repository: open-telemetry/semantic-conventions
@@ -261,6 +261,32 @@ attributes:
     source: {semconv: gen_ai.agent.id}
     requirement: {agent: opt_in}
     brief: Unique agent id.
+
+  # Content-free output features (#12, #16). The shims compute them in-process from content
+  # they never export (ADR-0002, ADR-0006); ids only, never text.
+  - name: aegis.output.parse_ok
+    scope: span
+    type: boolean
+    source:
+      aegis: extension
+      derived_from: [gen_ai.output.messages]
+    requirement: {llm: opt_in}
+    brief: >-
+      Whether the output is what the request's structured-output format asked for: a JSON
+      object for response_format json_object, an instance of the schema for json_schema. Set
+      by the shim only on calls that asked for structured output (schema_violation needs it).
+  - name: aegis.output.cited_doc_ids
+    scope: span
+    type: string[]
+    source:
+      aegis: extension
+      derived_from: [gen_ai.output.messages, aegis.retrieval.doc_ids]
+    requirement: {llm: opt_in}
+    brief: >-
+      Ids from aegis.retrieval.doc_ids of retrieval spans that ended before this call started,
+      in the same trace, that the output cites, in order of first citation and without
+      repeats; empty when it cites none. Set by the shim only when the trace retrieved
+      something before the call (retrieval_miss needs it).
 
   # Correlation
   - name: aegis.session.id
