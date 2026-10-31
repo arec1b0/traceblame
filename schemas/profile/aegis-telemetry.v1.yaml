@@ -17,7 +17,7 @@
 #   events (issue #7).
 profile: aegis-telemetry
 major: 1
-revision: 1.0.0
+revision: 1.1.0
 
 semconv:
   repository: open-telemetry/semantic-conventions
@@ -89,6 +89,24 @@ attributes:
     brief: >-
       Span class the detectors key on. Set by the normalizer, so that upstream renames of
       operation names touch only mapping tables.
+  - name: aegis.source.sdk
+    scope: span
+    type: string
+    enum: [openinference, openllmetry, otel-genai, unknown]
+    source:
+      aegis: extension
+      derived_from: [openinference.span.kind]
+    requirement: {all: recommended}
+    brief: >-
+      Instrumentation family the normalizer detected from the scope, schema_url and marker
+      attributes; it selects the mapping table. `unknown` when no table matched.
+  - name: aegis.normalizer.version
+    scope: span
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    source: {aegis: extension}
+    requirement: {all: recommended}
+    brief: Version of the normalizer build and its embedded mapping tables. Set by the normalizer.
 
   # GenAI operation
   - name: gen_ai.operation.name
