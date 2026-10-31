@@ -82,32 +82,35 @@ Alternatives considered:
 | D9 | `schema_migrations` | section 2 |
 | D10 | `operation` = `gen_ai.operation.name`, else the span name | §1.1 does not say |
 | D11 | `model` = `gen_ai.request.model`; the response model stays in `attrs` | required by the profile |
-| D12 | `trace_roots` (`MergeTree`, `ORDER BY (ingested_at, trace_id)`) and `trace_roots_from_otel` | the trace-assembler's watermark scan; section 4 |
+| D12 | `trace_roots` (`MergeTree`, `ORDER BY (ingested_at, trace_id)`) and `trace_roots_from_otel` | the first watermark table (#11); superseded by D13 and dropped in the contract phase after #39 |
+| D13 | `trace_arrivals` (`MergeTree`, `ORDER BY ingested_at`, TTL 2 d) and `trace_arrivals_from_otel` (#39) | the trace-assembler's watermark scan; section 4 |
 
 `findings`, `blame` and `injections` are as in §1.1, with `IF NOT EXISTS`.
 
-### 4. Root spans for the trace-assembler's watermark
+### 4. Arrivals for the trace-assembler's watermark
 
-ADR-0003 (Proposed) has the trace-assembler read root spans from ClickHouse with a
-persisted watermark instead of consuming `spans.sampled`. The watermark runs on arrival time,
-`ingested_at` (ClickHouse's clock when the exporter's insert lands): roots that arrived after
-the watermark and before now − grace (start 5 s), in keyset order `(ingested_at, trace_id)`.
-`spans` is sorted by `(service, trace_id, start_ts)`, so that query would scan every recent
-span. Two options:
+ADR-0003 (Proposed) has the trace-assembler poll ClickHouse with a persisted watermark
+instead of consuming `spans.sampled`. #11 shipped `trace_roots` (root spans only, D12). #39
+replaces it with `trace_arrivals` (D13) as a forward-only expand step (0009, 0010). The
+contract phase after #39 drops `trace_roots` and its view. Each poll is one scan on arrival time:
+`GROUP BY trace_id` over `(watermark, now − grace]`. A trace with a root arrival is
+assembled; an assembled trace with new arrivals is re-assembled. `spans` is sorted by
+`(service, trace_id, start_ts)`, so that scan would read every recent span. Two options:
 
-- **A projection on `spans`.** Rejected: a projection cannot filter rows, so it would store
-  a second copy of every span just to sort them by arrival.
-- **`trace_roots`, fed by a materialized view.** Chosen.
-  - The view keeps root spans only (`ParentSpanId = ''`); `ingested_at` defaults to
-    `now64(3)` at insert.
-  - The sort key is `(ingested_at, trace_id)`, the watermark's keyset, and the partition key
-    is `toDate(ingested_at)`. The integration test checks `EXPLAIN indexes = 1`: the min-max
-    index prunes parts newer than the grace, and the primary key condition is on
-    `ingested_at`.
-  - Plain `MergeTree`: a root exported twice is two rows, and (re)assembly is idempotent
-    (ADR-0003). A `ReplacingMergeTree` would deduplicate only rows with the same
-    `ingested_at`, so it would add nothing.
-  - TTL 30 d by arrival day.
+- **A projection on `spans`.** Rejected: a projection cannot filter or aggregate columns
+  away, so it would store a second copy of every span just to sort them by arrival.
+- **`trace_arrivals`, fed by a materialized view.** Chosen.
+  - **Rows.** One per trace, service and tenant of each exporter insert.
+  - **Columns.** Only `trace_id`, `ingested_at` (`now64(3)` at insert), `is_root`, `service`
+    and `tenant_id`: nothing else of a span, so no content.
+  - **Order.** `ORDER BY ingested_at`, `PARTITION BY toDate(ingested_at)`. The integration
+    test checks `EXPLAIN indexes = 1` with a root arrival and a late non-root arrival: the
+    min-max index prunes the parts before the watermark, and the primary key is searched
+    binary on `ingested_at`.
+  - **Engine.** Plain `MergeTree`. Several rows per trace are the point: the scan aggregates
+    them.
+  - **TTL.** 2 days, by arrival day: the assembly window only, not the 30 days of `spans`
+    (ADR-0003).
 
 ## Consequences
 
