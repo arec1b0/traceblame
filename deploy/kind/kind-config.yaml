@@ -4,6 +4,11 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: traceblame
+# A fixed API server port: on WSL2, Docker Desktop cannot expose some of the random high ports
+# kind picks ("/forwards/expose returned unexpected status: 500"), e.g. 45399; 16443 works.
+networking:
+  apiServerAddress: 127.0.0.1
+  apiServerPort: 16443
 nodes:
   - role: control-plane
   - role: worker

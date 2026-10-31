@@ -36,7 +36,7 @@ type manifest struct {
 }
 
 // release is the collector release line pinned in tools/versions.env.
-type release struct{ beta, stable, contrib string }
+type release struct{ beta, stable, contrib, contribStable string }
 
 func versionsEnv(t *testing.T) map[string]string {
 	t.Helper()
@@ -55,13 +55,15 @@ func pinnedRelease(t *testing.T) release {
 	t.Helper()
 	env := versionsEnv(t)
 	r := release{
-		beta:    "v" + env["OCB_VERSION"],
-		stable:  "v" + env["OTELCOL_CORE_STABLE_VERSION"],
-		contrib: "v" + env["OTELCOL_CONTRIB_MODULES_VERSION"],
+		beta:          "v" + env["OCB_VERSION"],
+		stable:        "v" + env["OTELCOL_CORE_STABLE_VERSION"],
+		contrib:       "v" + env["OTELCOL_CONTRIB_MODULES_VERSION"],
+		contribStable: "v" + env["OTELCOL_CONTRIB_STABLE_VERSION"],
 	}
 	require.NotEqual(t, "v", r.beta, "OCB_VERSION missing from tools/versions.env")
 	require.NotEqual(t, "v", r.stable, "OTELCOL_CORE_STABLE_VERSION missing from tools/versions.env")
 	require.NotEqual(t, "v", r.contrib, "OTELCOL_CONTRIB_MODULES_VERSION missing from tools/versions.env")
+	require.NotEqual(t, "v", r.contribStable, "OTELCOL_CONTRIB_STABLE_VERSION missing from tools/versions.env")
 	return r
 }
 
@@ -129,7 +131,7 @@ func TestGoModRequiresTheSameRelease(t *testing.T) {
 		case strings.HasPrefix(path, coreModules):
 			assert.Contains(t, []string{r.beta, r.stable}, version, path)
 		case strings.HasPrefix(path, contribModules):
-			assert.Equal(t, r.contrib, version, path)
+			assert.Contains(t, []string{r.contrib, r.contribStable}, version, path)
 		}
 	}
 }

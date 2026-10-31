@@ -1,0 +1,10 @@
+# Namespaces of the kind cluster (design §1.1 deployment topology).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bench

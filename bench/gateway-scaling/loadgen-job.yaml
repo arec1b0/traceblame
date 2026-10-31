@@ -1,0 +1,39 @@
+# One load generator (bench/gateway-scaling/run.sh fills in ${...}): pinned to a worker, it
+# sends to the agent on its own node (otel-agent Service, internalTrafficPolicy: Local) with
+# its tenant's credentials.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadgen-${POD}
+  namespace: bench
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: loadgen
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: ${NODE}
+      containers:
+        - name: loadgen
+          image: traceblame-loadgen:local
+          imagePullPolicy: Never
+          args:
+            - run
+            - --fixtures=/fixtures
+            - --endpoint=otel-agent.observability.svc:4317
+            - --user=${TENANT}
+            - --password=$(TENANT_PASSWORD)
+            - --run-id=${RUN_ID}
+            - --pod=${POD}
+            - --rate=${RATE}
+            - --duration=${LOAD}s
+          env:
+            - name: TENANT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: tenant-credentials, key: "${TENANT}"}
+          resources:
+            requests: {cpu: 500m, memory: 256Mi}
+            limits: {memory: 1Gi}

@@ -1,0 +1,124 @@
+# otel-gateway Deployment, 2-4 replicas (design §1.1). Scale-down drains: preStop waits for
+# the agents' resolvers to drop the pod, then tail_sampling decides its pending traces and
+# the exporter flushes; terminationGracePeriodSeconds (75 s) >= preStop (15 s) +
+# decision_wait (30 s) + export timeout (10 s).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-gateway
+  namespace: observability
+  labels:
+    app: otel-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: otel-gateway
+  template:
+    metadata:
+      labels:
+        app: otel-gateway
+    spec:
+      terminationGracePeriodSeconds: 75
+      containers:
+        - name: otelcol
+          image: traceblame-otelcol:local
+          imagePullPolicy: Never
+          args: ["--config=/etc/otelcol/config/gateway.yaml"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef: {fieldPath: metadata.name}
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                secretKeyRef: {name: clickhouse-credentials, key: user}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: clickhouse-credentials, key: password}
+          envFrom:
+            - configMapRef:
+                name: latency-thresholds
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 15
+          ports:
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: metrics, containerPort: 8888}
+            - {name: health, containerPort: 13133}
+          readinessProbe:
+            httpGet: {path: /, port: 13133}
+          livenessProbe:
+            httpGet: {path: /, port: 13133}
+            initialDelaySeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: config, mountPath: /etc/otelcol/config, readOnly: true}
+            - {name: tls, mountPath: /etc/otelcol/tls, readOnly: true}
+      volumes:
+        - name: config
+          configMap:
+            name: gateway-config
+        - name: tls
+          secret:
+            secretName: gateway-tls
+---
+# The name in the gateway's certificate (agents set server_name_override to it).
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-gateway
+  namespace: observability
+spec:
+  selector:
+    app: otel-gateway
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: 4317}
+---
+# What the agents' k8s resolver watches (design §1.1: headless Service for the resolver).
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-gateway-headless
+  namespace: observability
+spec:
+  clusterIP: None
+  selector:
+    app: otel-gateway
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: 4317}
+---
+# Only agents reach the gateways' OTLP port (ADR-0005; the receiver also requires an agent
+# client certificate). Health and metrics stay open for probes and scraping.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: otel-gateway
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app: otel-gateway
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: otel-agent
+      ports:
+        - {protocol: TCP, port: 4317}
+    - ports:
+        - {protocol: TCP, port: 13133}
+        - {protocol: TCP, port: 8888}

@@ -32,7 +32,7 @@ OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
 export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
 .PHONY: help bootstrap lint test contract integration security fixtures kind-up kind-down \
-	collector collector-smoke collector-image
+	kind-deploy bench-scaling collector collector-smoke collector-image
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-16s %s\n", $$1, $$2 }'
@@ -84,8 +84,14 @@ fixtures: ## Re-capture golden span fixtures from Ollama (OLLAMA_URL=...; see co
 	bash scripts/install-tools.sh otelcol-contrib
 	uv run --locked --script tools/fixtures/capture.py $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
 
-kind-up: ## Create the local kind cluster (needs Docker in WSL)
+kind-up: ## Create the local kind cluster, namespaces and generated Secrets (needs Docker in WSL)
 	@bash scripts/kind-up.sh
+
+kind-deploy: ## Deploy ClickHouse, the migrations and the agent/gateway tiers into kind (after kind-up)
+	@bash scripts/kind-deploy.sh
+
+bench-scaling: ## Measure span loss and split traces while scaling the gateway 2->4->2 (evals/reports/)
+	@bash bench/gateway-scaling/run.sh
 
 kind-down: ## Delete the local kind cluster
 	kind delete cluster --name $(KIND_CLUSTER)

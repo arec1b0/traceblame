@@ -1,0 +1,137 @@
+{
+  "environment": {
+    "clickhouse": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779 via Altinity operator 0.27.4, 1 shard x 1 replica",
+    "cluster": "kind 0.33.0, node image kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5, Kubernetes v1.37.0, 1 control plane + 2 workers",
+    "collector": "traceblame-otelcol:local (otelcol-contrib 0.164 module set), image sha256:3323cc9648e2c1421290b3107e40f4209ef616dd452dea78d35e0dc817750e42",
+    "date": "2026-10-31",
+    "gateway drain": "preStop sleep 15 s, terminationGracePeriodSeconds 75 s, decision_wait 30 s, export timeout 10 s",
+    "host": "WSL2 (Windows 11), Docker Desktop: 16 CPUs, 16768454656 bytes",
+    "load": "2 generators x 100 traces/s x 360 s, 4 spans per trace, every 2nd trace an error trace; spans exported as they end",
+    "network policy probe (non-agent pod -\u003e gateway:4317)": "blocked otel-gateway.observability.svc:4317: dial tcp 10.96.21.31:4317: i/o timeout",
+    "routing": "loadbalancing exporter, routing_key traceID, k8s resolver (EndpointSlices)",
+    "run id": "33105c8e",
+    "scaling": "2 -\u003e 4 at T+120 s, 4 -\u003e 2 at T+240 s"
+  },
+  "load": [
+    {
+      "run_id": 856710286,
+      "pod": 0,
+      "tenant": "tenant-a",
+      "t0_ns": 1793437510076249724,
+      "rate": 100,
+      "traces": 36000,
+      "spans": 144000,
+      "sent_spans": 144000,
+      "unsent_spans": 0,
+      "export_errors": 0,
+      "finished_ns": 1793437876089806004,
+      "spans_per_trace": 4,
+      "error_every": 2,
+      "seed": 7
+    },
+    {
+      "run_id": 856710286,
+      "pod": 1,
+      "tenant": "tenant-b",
+      "t0_ns": 1793437510084690246,
+      "rate": 100,
+      "traces": 36000,
+      "spans": 144000,
+      "sent_spans": 144000,
+      "unsent_spans": 0,
+      "export_errors": 0,
+      "finished_ns": 1793437876242862486,
+      "spans_per_trace": 4,
+      "error_every": 2,
+      "seed": 7
+    }
+  ],
+  "phases": {
+    "scale 2-\u003e4": {
+      "traces": 11621,
+      "spans": 46484,
+      "stored": 6758,
+      "dropped": 4760,
+      "split": 103,
+      "lost": 0,
+      "lost_spans": 0,
+      "dropped_spans": 19185,
+      "error_split": 82,
+      "error_split_complete": 14,
+      "split_rate": 0.008863264779278892,
+      "split_window_from_ms": -2355.594636,
+      "split_window_to_ms": 13282.845886,
+      "ring_update_ms": 14107.161554,
+      "expected_split_window_max_ms": 44107.161554,
+      "split_window_within_expected": true
+    },
+    "scale 4-\u003e2": {
+      "traces": 15055,
+      "spans": 60220,
+      "stored": 8819,
+      "dropped": 6154,
+      "split": 82,
+      "lost": 0,
+      "lost_spans": 0,
+      "dropped_spans": 24725,
+      "error_split": 54,
+      "error_split_complete": 9,
+      "split_rate": 0.005446695450016606,
+      "split_window_from_ms": -3749.11393,
+      "split_window_to_ms": 1020.88607,
+      "ring_update_ms": 31301.646451,
+      "expected_split_window_max_ms": 61301.646451,
+      "split_window_within_expected": true
+    },
+    "steady": {
+      "traces": 45324,
+      "spans": 181296,
+      "stored": 26648,
+      "dropped": 18676,
+      "split": 0,
+      "lost": 0,
+      "lost_spans": 0,
+      "dropped_spans": 74704,
+      "error_split": 0,
+      "error_split_complete": 0,
+      "split_rate": 0
+    }
+  },
+  "latency_policy": {
+    "bench-openinference": {
+      "threshold_ms": 4704,
+      "traces": 24000,
+      "slow": 1115,
+      "share": 0.04645833333333333,
+      "slow_stored": 1104
+    },
+    "bench-openllmetry": {
+      "threshold_ms": 4426,
+      "traces": 24000,
+      "slow": 1146,
+      "share": 0.04775,
+      "slow_stored": 1138
+    },
+    "bench-otel-genai": {
+      "threshold_ms": 4261,
+      "traces": 24000,
+      "slow": 1175,
+      "share": 0.04895833333333333,
+      "slow_stored": 1163
+    }
+  },
+  "tenant_mismatches": 0,
+  "unsent_spans": 0,
+  "spans_sent": 288000,
+  "spans_stored": 169386,
+  "spans_dropped_by_decision": 118614,
+  "spans_lost": 0,
+  "hard_criteria": {
+    "no_spans_lost_in_transport": true,
+    "no_spans_lost_on_scale_down": true,
+    "no_split_traces_in_steady_state": true,
+    "tenant_from_credentials": true
+  },
+  "decision_wait": "30s",
+  "scale_down_lost_spans": 0
+}

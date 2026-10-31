@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -105,6 +106,51 @@ func startCollector(t *testing.T, normalizerYAML, logLevel string) *collector {
 		logPath:    filepath.Join(dir, "collector.log"),
 	}
 	cfg := fmt.Sprintf(configTemplate, health, otlp, normalizerYAML, c.outPath, c.logPath, metrics, logLevel)
+	return launch(t, bin, dir, c, cfg)
+}
+
+// Ports and paths of a custom collector config (startCustom).
+type Ports struct {
+	Health, OTLP, Metrics int
+	Out, Log, Dir         string
+}
+
+// startCustom runs OTELCOL_BIN with a config template ({{.Health}}, {{.OTLP}}, {{.Out}},
+// {{.Log}}, {{.Metrics}}, {{.Dir}}); otlpURL points at an OTLP/HTTP receiver on {{.OTLP}}.
+func startCustom(t *testing.T, tmpl string) (*collector, Ports) {
+	t.Helper()
+	return startCustomStaged(t, tmpl, nil)
+}
+
+// startCustomStaged is startCustom with stage(dir) run first, to put files under {{.Dir}}.
+func startCustomStaged(t *testing.T, tmpl string, stage func(dir string)) (*collector, Ports) {
+	t.Helper()
+	bin := os.Getenv("OTELCOL_BIN")
+	if bin == "" {
+		t.Skip("OTELCOL_BIN is not set: run `make collector-smoke`")
+	}
+	dir := t.TempDir()
+	if stage != nil {
+		stage(dir)
+	}
+	p := Ports{
+		Health: freePort(t), OTLP: freePort(t), Metrics: freePort(t),
+		Out: filepath.Join(dir, "traces.jsonl"), Log: filepath.Join(dir, "collector.log"), Dir: dir,
+	}
+	var b strings.Builder
+	require.NoError(t, template.Must(template.New("config").Parse(tmpl)).Execute(&b, p))
+	c := &collector{
+		otlpURL:    fmt.Sprintf("http://127.0.0.1:%d/v1/traces", p.OTLP),
+		healthURL:  fmt.Sprintf("http://127.0.0.1:%d/", p.Health),
+		metricsURL: fmt.Sprintf("http://127.0.0.1:%d/metrics", p.Metrics),
+		outPath:    p.Out,
+		logPath:    p.Log,
+	}
+	return launch(t, bin, dir, c, b.String()), p
+}
+
+func launch(t *testing.T, bin, dir string, c *collector, cfg string) *collector {
+	t.Helper()
 	cfgPath := filepath.Join(dir, "config.yaml")
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o600))
 

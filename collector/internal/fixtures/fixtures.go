@@ -5,6 +5,7 @@
 package fixtures
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -35,10 +36,8 @@ func Root() string {
 	return filepath.Join(filepath.Dir(file), "..", "..", "testdata", "fixtures")
 }
 
-// All returns every fixture, sorted by ID. It fails the test if there are none.
-func All(tb testing.TB) []Fixture {
-	tb.Helper()
-	root := Root()
+// Discover returns every fixture under root, sorted by ID.
+func Discover(root string) ([]Fixture, error) {
 	var out []Fixture
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, suffix) {
@@ -52,25 +51,50 @@ func All(tb testing.TB) []Fixture {
 		return nil
 	})
 	if err != nil {
+		return nil, err
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+// All returns every fixture, sorted by ID. It fails the test if there are none.
+func All(tb testing.TB) []Fixture {
+	tb.Helper()
+	out, err := Discover(Root())
+	if err != nil {
 		tb.Fatalf("fixtures: %v", err)
 	}
 	if len(out) == 0 {
-		tb.Fatalf("fixtures: none under %s", root)
+		tb.Fatalf("fixtures: none under %s", Root())
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
+}
+
+// SDK is the instrumentation family, the first path segment of the ID.
+func (f Fixture) SDK() string {
+	sdk, _, _ := strings.Cut(f.ID, "/")
+	return sdk
+}
+
+// Read unmarshals the fixture into a fresh ptrace.Traces.
+func (f Fixture) Read() (ptrace.Traces, error) {
+	raw, err := os.ReadFile(f.Path)
+	if err != nil {
+		return ptrace.Traces{}, err
+	}
+	td, err := (&ptrace.JSONUnmarshaler{}).UnmarshalTraces(raw)
+	if err != nil {
+		return ptrace.Traces{}, fmt.Errorf("fixtures: %s: %w", f.ID, err)
+	}
+	return td, nil
 }
 
 // Load unmarshals the fixture into a fresh ptrace.Traces.
 func (f Fixture) Load(tb testing.TB) ptrace.Traces {
 	tb.Helper()
-	raw, err := os.ReadFile(f.Path)
+	td, err := f.Read()
 	if err != nil {
 		tb.Fatalf("fixtures: %v", err)
-	}
-	td, err := (&ptrace.JSONUnmarshaler{}).UnmarshalTraces(raw)
-	if err != nil {
-		tb.Fatalf("fixtures: %s: %v", f.ID, err)
 	}
 	return td
 }

@@ -1,0 +1,121 @@
+# otel-agent DaemonSet (design §1.1): one per node. The loadbalancing exporter's k8s resolver
+# watches the gateways' EndpointSlices: a namespaced Role with get/list/watch on those only.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-agent
+  namespace: observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: otel-agent-endpointslices
+  namespace: observability
+rules:
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: otel-agent-endpointslices
+  namespace: observability
+subjects:
+  - kind: ServiceAccount
+    name: otel-agent
+    namespace: observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: otel-agent-endpointslices
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: otel-agent
+  namespace: observability
+  labels:
+    app: otel-agent
+spec:
+  selector:
+    matchLabels:
+      app: otel-agent
+  template:
+    metadata:
+      labels:
+        app: otel-agent
+    spec:
+      serviceAccountName: otel-agent
+      # The file_storage queue lives on the node (hostPath) so it survives a restart; the
+      # collector runs as distroless nonroot, so the directory is handed to its uid first.
+      initContainers:
+        - name: queue-dir
+          image: ${BUSYBOX_IMAGE}
+          command: ["sh", "-c", "mkdir -p /var/lib/otelcol/queue && chown -R 65532:65532 /var/lib/otelcol/queue"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: queue
+              mountPath: /var/lib/otelcol
+      containers:
+        - name: otelcol
+          image: traceblame-otelcol:local
+          imagePullPolicy: Never
+          args: ["--config=/etc/otelcol/config/agent.yaml"]
+          ports:
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: otlp-http, containerPort: 4318}
+            - {name: metrics, containerPort: 8888}
+            - {name: health, containerPort: 13133}
+          readinessProbe:
+            httpGet: {path: /, port: 13133}
+          livenessProbe:
+            httpGet: {path: /, port: 13133}
+            initialDelaySeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: config, mountPath: /etc/otelcol/config, readOnly: true}
+            - {name: tenants, mountPath: /etc/otelcol/tenants, readOnly: true}
+            - {name: tls, mountPath: /etc/otelcol/tls, readOnly: true}
+            - {name: queue, mountPath: /var/lib/otelcol}
+      volumes:
+        - name: config
+          configMap:
+            name: agent-config
+        - name: tenants
+          secret:
+            secretName: tenants-htpasswd
+        - name: tls
+          secret:
+            secretName: agent-tls
+        - name: queue
+          hostPath:
+            path: /var/lib/otelcol
+            type: DirectoryOrCreate
+---
+# Apps send to the agent on their own node.
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-agent
+  namespace: observability
+spec:
+  selector:
+    app: otel-agent
+  internalTrafficPolicy: Local
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: 4317}
+    - {name: otlp-http, port: 4318, targetPort: 4318}
