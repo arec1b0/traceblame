@@ -85,7 +85,12 @@ Both shims implement these rules exactly.
 **`aegis.tool.args_hash`.** As profile `source.algorithm` (`algorithm_version: 1`). The
 arguments are hashed as text; a shim that holds them as an object serializes them with ASCII
 escapes first (Python `json.dumps(ensure_ascii=True)`), which JCS reverses for valid text.
-Each shim runs every golden vector (`schemas/profile/vectors/v1/`).
+When the raw-bytes fallback meets a string with lone surrogates, which have no UTF-8 form,
+each one becomes U+FFFD, as a JavaScript `TextEncoder` does. Each shim runs every golden
+vector (`schemas/profile/vectors/v1/`). One known divergence from the normalizer: Python's
+JSON parser stops at about 1000 levels of nesting where Go's stops at 10000, so arguments
+nested that deep are hashed as raw bytes by the Python shim and canonicalized by the
+normalizer.
 
 **`aegis.output.parse_ok`.** Set on an LLM span only when the request's `response_format`
 has `type` `json_object` or `json_schema`:
