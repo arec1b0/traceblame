@@ -28,7 +28,7 @@ make kind-down
   htpasswd user. The gateway accepts only agents, by mTLS client certificate plus a
   NetworkPolicy, and keeps that value.
 - **No NATS.** `natsexporter` v0.164.1 cannot publish to JetStream. The gateway exports to
-  ClickHouse only; the trace-assembler is to poll `trace_roots` by arrival time instead
+  ClickHouse only; the trace-assembler is to poll `trace_arrivals` by arrival time instead
   (ADR-0003, Proposed; #35).
 - **memory_limiter.** The cluster configs use `limit_percentage`, which works with the
   container memory limits. Local smoke tests on WSL2 merge

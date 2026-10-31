@@ -2,132 +2,147 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-31
-- **Issue:** #10 (topology), #11 (`trace_roots`); implementation #35
+- **Issue:** #10 (topology), #11 (`trace_roots`), #39 (`trace_arrivals`); implementation #35
 - **Decider:** Daniil Krizhanovskyi
 
 ## Context
 
 Design §1.1 has the gateway export each sampled span twice: into ClickHouse `spans`, and to
-the NATS JetStream stream `spans.sampled`. The trace-assembler consumes `spans.sampled`,
+the NATS JetStream stream `spans.sampled`. The trace-assembler consumes `spans.sampled`. It
 closes a trace at root span end + grace (30 s), writes `trace_summary` and publishes
 `trace.completed`.
 
 The collector cannot do the NATS half reliably:
-- **natsexporter cannot publish to JetStream.** Contrib v0.164.1 is at development stability,
-  and its README says "JetStream publishing is not yet implemented; a configured `jetstream`
-  block is rejected at startup".
-- **Core NATS gives no ack.** Publishing core NATS subjects into a stream configured on the
-  server persists the messages, but the publisher gets no ack. The hop is then at-most-once,
-  while the gateway → ClickHouse hop retries and queues.
+- **No JetStream in natsexporter.** Contrib v0.164.1 is at development stability, and its
+  README says "JetStream publishing is not yet implemented; a configured `jetstream` block is
+  rejected at startup".
+- **Core NATS has no ack.** Publishing core NATS subjects into a stream configured on the
+  server persists the messages, but the publisher gets no ack. That makes the hop
+  at-most-once, while the gateway → ClickHouse hop retries and queues.
 - **Two sinks can disagree.** With two exporters, a span can reach one sink and not the other.
-  The assembler would then close traces that ClickHouse lacks, or miss traces it holds.
+  The assembler would then close traces that ClickHouse lacks, or miss traces that it holds.
 
 ClickHouse is where detectors read traces anyway. The gateway's tail sampling holds a trace
-until its decision (`decision_wait`, 30 s after its first span) and then releases all its
-spans together. A root therefore reaches ClickHouse together with its trace, up to
-`decision_wait` after the root ended. A watermark on the root's end time has to wait out that
-delay; a watermark on arrival time does not.
+until its decision (`decision_wait`, 30 s after its first span), then releases all its spans
+together. So a root reaches ClickHouse with its trace, up to `decision_wait` after it ended.
+A watermark on end time would wait that out a second time; a watermark on arrival time does
+not.
 
 ## Decision
 
 - **The gateway exports to ClickHouse only.** #10 already runs this way.
-- **The watermark runs on arrival time.**
-  - `ingested_at` is ClickHouse's clock when the exporter's insert lands (`DEFAULT now64(3)`).
-  - `trace_roots` (#11, ADR-0004 section 4) is sorted and partitioned by it:
-    `ORDER BY (ingested_at, trace_id)`.
-  - Each poll reads the next batch in keyset order: rows after
-    `(watermark_ingested_at, watermark_trace_id)` with `ingested_at <= now64(3) − grace`,
-    `LIMIT batch`.
-  - The upper bound uses ClickHouse's own clock, so the assembler host's clock does not
-    matter.
-  - The contract statement is `contract/trace_roots_read.sql`, and the integration test checks
-    its `EXPLAIN`.
-- **The grace is a batching margin**, start value 5 s, in config (CLAUDE.md rule 8). It covers
-  two things:
+- **Arrivals are recorded in `trace_arrivals`** (#39, ADR-0004 section 4).
+  - A materialized view writes one row per trace, service and tenant of every exporter insert.
+  - Columns: `trace_id`, `ingested_at`, `is_root` (the insert holds the trace's root span),
+    `service` and `tenant_id`. Nothing else of a span.
+  - `ingested_at` is ClickHouse's clock when the insert lands.
+  - The table is sorted and partitioned by `ingested_at`.
+- **One watermark scan per poll.**
+  - `GROUP BY trace_id` over the window `(watermark, now64(3) − grace]`, returning `has_root`,
+    the trace's services and tenants, and its last arrival. The integration test checks its
+    `EXPLAIN` with a root and a late non-root arrival.
+  - It lives in `tests/integration/trace_arrivals_scan.sql` until the assembler (#35) makes it
+    a contract statement. Then the table is on main, so code N still runs on schema N-1.
+  - The upper bound uses ClickHouse's clock, so the assembler host's clock does not matter.
+  - The watermark advances to the window's upper bound. The window is capped (max window,
+    config, start 60 s), so a backlog is worked off in steps.
+- **The grace is a batching margin**, start 5 s, in config (CLAUDE.md rule 8). It covers:
   - the time between an insert's stamp and its part becoming visible;
   - one trace's release being split across consecutive exporter batches.
 
-  The first assembly of a trace usually sees all its spans.
-- **Re-assembly is the main path, not a patch.** A trace is assembled whenever spans of it
-  arrive, and assembly is idempotent:
-  - **Triggers.** The root's arrival triggers the first assembly. Any later arrival of the
-    trace's spans triggers a re-assembly.
-  - **Sources of late spans:** the tail sampler forwarding spans after a cached decision; an
-    agent queue draining after a gateway outage; the second half of a trace split across
-    gateways (#38), which its own gateway releases at its own decision.
-  - **Arrival index.** Roots come from `trace_roots`. Later spans need an index of the same
-    shape: one row per trace and insert, keyed `(ingested_at, trace_id)`, fed by a
-    materialized view from every insert. It lands with the assembler change (#35), as an
-    expand migration whose DDL is reviewed there.
-  - **What is written:**
-    - `trace_summary` is keyed by `(trace_id, assembler_version)`, with a `revision` (the
-      latest `ingested_at` among the trace's spans) as the version of a `ReplacingMergeTree`.
-      An identical re-assembly writes the same row; one with more spans supersedes it.
-    - `trace.completed` carries `trace_id`, `revision`, the span count and the assembler
-      version. It is published with JetStream publish-ack and
-      `Nats-Msg-Id = trace_id/assembler_version/revision`. The stream's duplicate window drops
-      a repeated revision; a new revision is a new message.
-- **The watermark is persisted in Postgres.** Postgres already holds the control-plane state
+  So the first assembly of a trace usually sees all of it.
+- **Re-assembly is the main path, not a patch.** Per trace in the window:
+  - **Root arrival in the window:** assemble the trace (again, if it was assembled before).
+  - **No root in the window, already assembled:** the arrivals are late spans, so
+    re-assemble. Sources of late spans:
+    - the tail sampler forwarding spans after a cached decision;
+    - an agent queue draining after a gateway outage;
+    - the other half of a trace split across gateways (#38), released at its own gateway's
+      decision.
+  - **No root in the window, not yet assembled:** wait. The root's arrival triggers the
+    assembly, which reads all of the trace's spans. A trace whose root never arrives, such as
+    a split trace whose root half was dropped, is counted as an orphan.
+  - **Assembly reads the trace's spans** from `spans` with `service IN (…) AND trace_id IN (…)`,
+    the leading key of `spans`.
+- **Idempotent writes.**
+  - `trace_summary` is keyed by `(trace_id, assembler_version)`. Its `revision` is the trace's
+    last arrival, and serves as the version of a `ReplacingMergeTree`: an identical
+    re-assembly writes the same row, and one with more spans supersedes it.
+  - `trace.completed` carries `trace_id`, `revision`, the span count and the assembler
+    version. It is published with JetStream publish-ack and
+    `Nats-Msg-Id = trace_id/assembler_version/revision`. The stream's duplicate window drops a
+    repeated revision; a new revision is a new message.
+- **The watermark is persisted in Postgres**, which already holds control-plane state
   (replay_jobs).
-  - There is one row per assembler partition: the two replicas are leader-free and partition
+  - There is one row per assembler partition. The two replicas are leader-free and partition
     by `cityHash64(trace_id) % N` (design §1.1 deployment).
-  - The row is updated only after the batch's summaries are written and the messages acked
+  - A row is updated only after the window's summaries are written and the messages acked
     (at-least-once).
-  - Changing N restarts every partition from the smallest watermark. Idempotency makes the
+  - Changing N restarts every partition from the smallest watermark; idempotency makes the
     overlap safe.
+- **`trace_arrivals` lives only for the assembly window.** The TTL starts at 2 days, by
+  arrival day, not the 30 days of `spans`.
+  - It must exceed the longest watermark lag (an assembler outage).
+  - Changing it takes a migration (`MODIFY TTL`).
 - **NATS JetStream stays** for events our own services publish with publish-ack:
   `trace.completed`, `traceblame.finding.v1` and `traceblame.blame.v1`.
-- **On acceptance, `spans.sampled` is removed** from design §1.1 and the CLAUDE.md stack line:
+- **On acceptance, `spans.sampled` is removed** from design §1.1:
   - component 4: "export в ClickHouse + NATS" becomes ClickHouse only;
   - the data flow line;
-  - the NATS streams in the deployment topology.
+  - the NATS streams in the deployment topology;
+  - the CLAUDE.md stack line.
 
 ## Alternatives considered
 
-- **A watermark on `end_ts` with a 30 s grace** (the first draft). Rejected:
-  - a root arrives up to `decision_wait` after it ended, so the grace has to cover the sampling
-    delay and adds it to the lag a second time;
-  - late arrivals need an `ingested_at` pass anyway.
+- **A watermark on `end_ts` with a 30 s grace** (the first draft). Rejected: a root arrives up
+  to `decision_wait` after it ended. The grace would have to cover the sampling delay, adding
+  it to the lag a second time, and late arrivals would need a second pass anyway.
+- **Root spans only (`trace_roots`, sorted by arrival) plus a separate index for late spans.**
+  Rejected: two tables and two scans for one question, "which traces got spans in this
+  window". #11 shipped `trace_roots` before this ADR settled. #39 adds `trace_arrivals`, and
+  the contract phase after #39 drops `trace_roots` and its view; nothing reads them.
 - **Core NATS publish into a server-side stream.** Rejected: at-most-once, and the sinks can
   disagree.
-- **Waiting for natsexporter's JetStream support.** This is the revisit trigger below.
+- **Waiting for natsexporter's JetStream support.** Kept as the revisit trigger.
 
 ## Revisit trigger
 
-Contrib `natsexporter` JetStream support reaches beta. At that point, compare a pushed
-`spans.sampled` against this polling path on lag and on ClickHouse load.
+Contrib `natsexporter` JetStream support reaches beta. Then compare a pushed `spans.sampled`
+against this polling path, on lag and on ClickHouse load.
 
 ## Consequences
 
 **Query load on ClickHouse**
-- **Per poll and replica:** one range scan of `trace_roots` and one of the arrival index. Both
-  prune by the min-max index and the primary key, and read in order.
-- **Spans:** one batched read of the batch's spans, `trace_id IN (…)`. `spans` is sorted by
-  service first, so this read relies on the bloom filter index on `trace_id` (ADR-0004 D7). It
-  is the dominant cost, and it grows with traces per second, not spans per second.
-- **Partition filter:** each replica reads the whole range and discards the other partitions'
-  rows (`cityHash64(trace_id) % N`). That is fine at demo scale; the query duration and read
-  rows are metrics.
+- **The watermark scan.** Each poll and replica runs one range scan of `trace_arrivals` and
+  aggregates it by `trace_id`. The min-max index and a binary search on the primary key prune
+  it, and the rows are a few bytes each.
+- **The spans read.** Each poll also does one batched read of the window's spans. `service` is
+  the leading key of `spans`, so this read uses the primary key, with the bloom filter on
+  `trace_id` (ADR-0004 D7) on top.
+- **Partitioning.** Each replica scans the whole window and drops other partitions' traces
+  (`cityHash64(trace_id) % N`). That is fine at demo scale; query duration and rows read are
+  metrics.
 
 **Late spans after the watermark**
-- **Re-assembly handles them**, and it costs a re-run of the detectors and the attributor for
-  that trace.
-  - Detectors (#15) must treat a new revision as replacing their earlier findings for the
-    trace.
-  - Re-assemblies and late-span delay are metrics.
-- **A part that becomes visible later than the grace after its stamp is never scanned.**
+- **Cost of re-assembly.** Re-assembly handles late spans, at the cost of a detector and
+  attributor re-run for that trace. Detectors (#15) must treat a new revision as replacing
+  their earlier findings for the trace. Re-assemblies, orphans and late-span delay are
+  metrics.
+- **Late-visible parts are never scanned.** A part that becomes visible later than the grace
+  after its stamp falls behind the watermark.
   - The grace must exceed the longest insert, which the exporter's batch size bounds.
-  - A reconciliation compares the traces in `trace_roots` against `trace_summary` for closed
-    hours, and alerts on misses.
+  - A reconciliation compares the traces in `trace_arrivals` against `trace_summary` for
+    closed hours, and alerts on misses.
   - With ClickHouse replicas (the design's path to 2 replicas + Keeper), the grace must also
     cover replication lag, or the assembler reads from the inserting replica.
 
 **Lag SLO impact**
-- Pipeline lag is span end → blame written, p95 ≤ 60 s (alert PipelineLagHigh). The path is:
+- Pipeline lag is measured from span end to blame written, with p95 ≤ 60 s (alert
+  PipelineLagHigh). The path is:
   1. the gateway's `decision_wait`: 30 s after the trace's first span, unchanged by this ADR;
   2. the exporter batch;
   3. the grace (5 s);
   4. the poll interval (config, start 2 s).
-- The assembler sees a trace about 35–40 s after its first span ended, leaving about 20 s for
-  the detectors and the attributor. The `end_ts` draft would have added another 30 s.
-- Re-assembled traces are the slow tail; they are measured separately.
+- The assembler sees a trace about 35–40 s after its first span ended, which leaves about 20 s
+  for the detectors and the attributor. The `end_ts` draft would have added another 30 s.
+- Re-assembled traces are the slow tail and are measured separately.
