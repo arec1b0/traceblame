@@ -21,6 +21,8 @@ ENGINES = {
     "spans": "MergeTree",
     "otel_traces_ingest": "Null",
     "spans_from_otel": "MaterializedView",
+    "trace_roots": "ReplacingMergeTree",
+    "trace_roots_from_otel": "MaterializedView",
     "findings": "ReplacingMergeTree",
     "blame": "ReplacingMergeTree",
     "injections": "MergeTree",
@@ -31,7 +33,7 @@ ENGINES = {
 def test_migrate_creates_every_table_once(clickhouse: ClickHouseServer, database: str) -> None:
     client = clickhouse.client(database)
     try:
-        assert [m.version for m in migrate(client, packaged())] == [1, 2, 3, 4, 5, 6]
+        assert [m.version for m in migrate(client, packaged())] == [1, 2, 3, 4, 5, 6, 7, 8]
         assert migrate(client, packaged()) == [], "a second run applies nothing"
         rows = client.query_rows(
             f"SELECT name, engine FROM system.tables WHERE database = '{database}'"  # noqa: S608
@@ -113,6 +115,27 @@ def test_the_contract_statements_run_on_the_schema(
         assert len(results["findings_read.sql"]) == 1
         assert len(results["blame_read.sql"]) == 1
         assert len(results["injections_read.sql"]) == 1
+        (root,) = results["trace_roots_read.sql"]
+        assert root[0] == b"0af7651916cd43dd8448eb211c80319c"
+        assert root[1] == b"b7ad6b7169203331"
+    finally:
+        client.close()
+
+
+def test_the_watermark_query_reads_by_primary_key(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """The assembler's scan (ADR-0003 draft) uses trace_roots' sort key, end_ts."""
+    client = clickhouse.client(database)
+    try:
+        migrate(client, packaged())
+        for name, statement in contract.packaged():
+            if name.endswith("_write.sql"):
+                client.command(statement)  # an empty table has no parts to read an index of
+        (sql,) = [s for n, s in contract.packaged() if n == "trace_roots_read.sql"]
+        plan = "\n".join(str(r[0]) for r in client.query_rows(f"EXPLAIN indexes = 1 {sql}"))
+        assert "PrimaryKey" in plan
+        assert "end_ts" in plan.split("PrimaryKey", 1)[1].split("Granules", 1)[0]
     finally:
         client.close()
 

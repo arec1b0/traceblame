@@ -2,6 +2,7 @@ import pytest
 
 from traceblame_storage.cli import main
 from traceblame_storage.client import Target, parse_url
+from traceblame_storage.migrations import packaged
 
 
 def test_parse_url() -> None:
@@ -25,4 +26,4 @@ def test_parse_url_rejects(url: str) -> None:
 
 def test_check_passes_on_the_packaged_migrations(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["check"]) == 0
-    assert "6 migration(s) ok" in capsys.readouterr().out
+    assert f"{len(packaged())} migration(s) ok" in capsys.readouterr().out
