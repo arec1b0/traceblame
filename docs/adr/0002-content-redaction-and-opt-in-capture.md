@@ -70,6 +70,12 @@ Three more facts shape the decision:
   - Profile 1.2.0 fixes the algorithm: the first 16 lowercase hex characters of SHA-256 over
     the RFC 8785 (JCS) serialization. Arguments that are not I-JSON are hashed over their
     raw UTF-8 bytes.
+  - Profile 1.2.0 reworded an algorithm that profile 1.1.0 left undefined ("canonical JSON"),
+    and shipped as a minor revision because the checker did not yet see algorithm changes.
+    Under the rule from issue #28 it is major. It stays 1.2.0 within `aegis-telemetry/1`:
+    nothing computed `aegis.tool.args_hash` under the 1.1.0 text (the normalizer implements
+    1.2.0, and the shims, #12 and #13, have not started), so no hash disagrees. The next
+    algorithm change needs the next major.
   - A hash the shim set wins. Shims and the normalizer must agree byte for byte; the
     normalizer's JCS is tested against the RFC's own vectors.
 - **No content digests** such as `aegis.content.input_hash`.
@@ -83,8 +89,8 @@ Three more facts shape the decision:
     with no keys to distribute.
   - Keyed hashing is a future decision, e.g. HMAC-SHA-256 with a per-tenant key from the
     content store's key service. It changes the profile algorithm and needs keys in every
-    shim. It also needs the compat checker to treat an algorithm change as major, which
-    today it does not see at all.
+    shim. It is a major change: the compat checker classifies an algorithm added, removed
+    or reworded as major (issue #28).
 
 ### 3. Opt-in content capture (design only, not implemented)
 
@@ -122,6 +128,20 @@ store (MinIO, keys, 7d TTL)", M3. Its design:
 The agent tier keeps spans in a `file_storage` queue on the node's disk, before the gateway,
 so content must be removed before that queue. The content stage must be able to run on the
 agent tier, and the processor runs on either tier. The tier layout belongs to issue #10.
+
+### 5. Amends ADR-0001 §2
+
+ADR-0001 is Accepted and stays as written. This section adds one row to its table of
+major changes (issue #28), and the compat checker implements it:
+
+| Major (needs `aegis-telemetry/<N+1>`) | Minor |
+|---|---|
+| a `source.algorithm` added, removed or reworded (whitespace and line wrapping are ignored) | none |
+
+An algorithm is judged by its normalized text, so any wording change is major: shims and
+the normalizer must agree on it byte for byte, and stored values follow the old one. A
+future `algorithm_version` field could let a pure rewording be minor; adding it is itself a
+profile change, so it is a separate decision.
 
 ## Consequences
 

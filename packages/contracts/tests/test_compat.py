@@ -32,6 +32,23 @@ def _changes(old: dict[str, Any], new: dict[str, Any]) -> list[tuple[str, str]]:
     return [(c.severity, c.rule) for c in _diff(old, new).changes]
 
 
+def _algorithm(profile: dict[str, Any], text: str | None) -> None:
+    """Set (or with None remove) the source.algorithm of aegis.span.kind, the carrier here."""
+    source = _attr(profile, "aegis.span.kind")["source"]
+    if text is None:
+        source.pop("algorithm", None)
+    else:
+        source["algorithm"] = text
+
+
+# args_hash's algorithm text in profile 1.1.0 and 1.2.0, as folded by the YAML loader.
+_ARGS_HASH_1_1_0 = "first 16 hex chars of sha256 over the canonical JSON of the arguments"
+_ARGS_HASH_1_2_0 = (
+    "first 16 lowercase hex chars of SHA-256 over the RFC 8785 (JCS) serialization of the "
+    "arguments; over their raw UTF-8 bytes when they are not I-JSON"
+)
+
+
 def _repin(profile: dict[str, Any], version: str) -> None:
     profile["semconv"]["version"] = version
     profile["semconv"]["commit"] = "f" * 40
@@ -133,6 +150,63 @@ def test_new_forbidden_attribute_is_major(old: dict[str, Any], new: dict[str, An
     assert _changes(old, new) == [("major", "forbidden_added")]
 
 
+def test_added_algorithm_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _algorithm(new, _ARGS_HASH_1_1_0)
+    assert _changes(old, new) == [("major", "algorithm_added")]
+    assert _diff(old, new).bump == "major"
+
+
+def test_removed_algorithm_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _algorithm(old, _ARGS_HASH_1_1_0)
+    assert _changes(old, new) == [("major", "algorithm_removed")]
+
+
+def test_changed_algorithm_text_is_major(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _algorithm(old, "first 16 hex chars of sha256")
+    _algorithm(new, "first 12 hex chars of sha256")
+    (change,) = _diff(old, new).changes
+    assert (change.severity, change.rule) == ("major", "algorithm_changed")
+    assert change.subject == "aegis.span.kind"
+    assert change.detail == "first 16 hex chars of sha256 -> first 12 hex chars of sha256"
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ("sha256 of the arguments", "SHA256 of the arguments"),
+        ("sha256 of the arguments", "sha256 of the arguments."),
+        ("first 16 hex chars", "first 16 lowercase hex chars"),
+    ],
+    ids=["case", "punctuation", "word"],
+)
+def test_any_wording_change_of_the_algorithm_is_major(
+    old: dict[str, Any], new: dict[str, Any], before: str, after: str
+) -> None:
+    _algorithm(old, before)
+    _algorithm(new, after)
+    assert _changes(old, new) == [("major", "algorithm_changed")]
+
+
+def test_args_hash_rewording_of_profile_1_2_0_is_major(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    """The 1.1.0 -> 1.2.0 change (#9) would have needed aegis-telemetry/2 under this rule."""
+    _algorithm(old, _ARGS_HASH_1_1_0)
+    _algorithm(new, _ARGS_HASH_1_2_0)
+    assert _changes(old, new) == [("major", "algorithm_changed")]
+    assert breaking_within_major(Profile.model_validate(old), Profile.model_validate(new))
+
+
+def test_algorithm_change_with_a_major_bump_passes(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    _algorithm(old, _ARGS_HASH_1_1_0)
+    _algorithm(new, _ARGS_HASH_1_2_0)
+    new["major"] = 2
+    _attr(new, "aegis.profile.version")["const"] = "aegis-telemetry/2"
+    assert breaking_within_major(Profile.model_validate(old), Profile.model_validate(new)) == []
+
+
 # Minor: allowed within the major.
 
 
@@ -204,6 +278,44 @@ def test_pin_moving_to_the_genai_repository_is_minor(
         "1.41.1 -> 1.42.0 (open-telemetry/semantic-conventions -> "
         "open-telemetry/semantic-conventions-genai)"
     )
+
+
+@pytest.mark.parametrize(
+    "after",
+    [
+        "first 16 hex chars  of sha256\n  over the canonical JSON",
+        "  first 16 hex chars of sha256 over the\tcanonical JSON\n",
+        "first 16 hex chars of sha256\nover the\ncanonical JSON",
+    ],
+    ids=["double-space-and-wrap", "padding-and-tab", "one-word-per-line"],
+)
+def test_algorithm_whitespace_and_wrapping_are_not_changes(
+    old: dict[str, Any], new: dict[str, Any], after: str
+) -> None:
+    _algorithm(old, "first 16 hex chars of sha256 over the canonical JSON")
+    _algorithm(new, after)
+    assert _diff(old, new).changes == ()
+    assert _diff(old, new).bump == "none"
+
+
+def test_brief_rewording_is_not_a_change(old: dict[str, Any], new: dict[str, Any]) -> None:
+    _attr(new, "gen_ai.request.model")["brief"] = "A different description."
+    assert _diff(old, new).changes == ()
+
+
+def test_new_attribute_with_an_algorithm_is_not_an_algorithm_change(
+    old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    spec = {
+        "name": "aegis.tool.args_hash",
+        "scope": "span",
+        "type": "string",
+        "source": {"aegis": "extension", "algorithm": _ARGS_HASH_1_2_0},
+        "requirement": {"llm": "recommended"},
+        "brief": "Hash.",
+    }
+    new["attributes"].append(spec)
+    assert _changes(old, new) == [("minor", "attribute_added")]
 
 
 def test_removed_forbidden_attribute_is_minor(old: dict[str, Any], new: dict[str, Any]) -> None:
