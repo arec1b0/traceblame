@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"go.opentelemetry.io/collector/client"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -63,12 +64,31 @@ func (p *normalizerProcessor) processTraces(ctx context.Context, td ptrace.Trace
 }
 
 func (p *normalizerProcessor) normalizeResource(ctx context.Context, attrs pcommon.Map) {
-	if _, ok := attrs.Get(tenantAttr); !ok && p.cfg.TenantID != "" {
-		attrs.PutStr(tenantAttr, p.cfg.TenantID)
-	}
+	p.setTenant(ctx, attrs)
 	attrs.RemoveIf(func(name string, v pcommon.Value) bool {
 		return p.tables.IsContent(name) || !p.keepAttribute(ctx, "resource", mapping.UnknownSDK, "", name, v)
 	})
+}
+
+// setTenant applies the tenant source (ADR-0005). In auth mode the authenticated client
+// names the tenant and a shim value never survives.
+func (p *normalizerProcessor) setTenant(ctx context.Context, attrs pcommon.Map) {
+	if p.cfg.TenantSource != TenantSourceAuth {
+		if _, ok := attrs.Get(tenantAttr); !ok && p.cfg.TenantID != "" {
+			attrs.PutStr(tenantAttr, p.cfg.TenantID)
+		}
+		return
+	}
+	if auth := client.FromContext(ctx).Auth; auth != nil {
+		if tenant, ok := auth.GetAttribute(p.cfg.TenantAuthAttribute).(string); ok && tenant != "" {
+			attrs.PutStr(tenantAttr, tenant)
+			return
+		}
+	}
+	if _, ok := attrs.Get(tenantAttr); ok {
+		attrs.Remove(tenantAttr)
+		p.tel.invalid.add(ctx, mapping.UnknownSDK, tenantAttr, "")
+	}
 }
 
 func (p *normalizerProcessor) normalizeSpan(ctx context.Context, scope mapping.Scope, span ptrace.Span) {
