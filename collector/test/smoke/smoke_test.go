@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,6 +86,39 @@ func TestNormalizerCountersUseTheirDesignNames(t *testing.T) {
 	}
 	assert.NotContains(t, metrics, "otelcol_traceblame_", "no otelcol_ prefix (design §1.5 names)")
 	assert.NotContains(t, metrics, "_total_total")
+}
+
+// What content capture puts into the *_content fixtures (tools/fixtures/capture.py prompts and
+// answers), and what the captured errors carry: tracebacks with local paths, and the
+// server's message that echoes the request ("[] is too short - 'messages'").
+var leaks = []string{"France", "Paris", "weather", "Traceback", "/home/", "too short"}
+
+func TestNoContentLeavesTheDistribution(t *testing.T) {
+	c := startCollector(t, normalizerSettings, "debug")
+	posted := 0
+	for _, fx := range fixtures.All(t) {
+		if !strings.HasSuffix(fx.ID, "_content") && !strings.Contains(fx.ID, "/chat_error") {
+			continue
+		}
+		raw, err := os.ReadFile(fx.Path)
+		require.NoError(t, err)
+		found := false
+		for _, l := range leaks {
+			found = found || strings.Contains(string(raw), l)
+		}
+		require.True(t, found, "%s carries nothing to leak", fx.ID)
+		c.post(t, raw)
+		posted++
+	}
+	require.GreaterOrEqual(t, posted, 8)
+
+	out := c.exportedText(t)
+	require.NotEmpty(t, out)
+	logs := strings.Join(c.logLines(t), "\n")
+	for _, l := range leaks {
+		assert.NotContains(t, out, l, "exported spans")
+		assert.NotContains(t, logs, l, "collector logs")
+	}
 }
 
 func TestLogsAreJSON(t *testing.T) {

@@ -1,3 +1,5 @@
 profile: aegis-telemetry/1
 tenant_id: acme
 max_label_values: 50
+max_unmapped_value_bytes: 512
+content_capture: false

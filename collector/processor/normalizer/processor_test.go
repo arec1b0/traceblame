@@ -139,6 +139,39 @@ var fixtureWants = map[string]want{
 	"otel-genai/opentelemetry-instrumentation-openai-v2-2.4b0/embeddings_basic_latest_experimental": {
 		sdk: "otel-genai", kind: "embedding", attrs: embedding(localhost),
 	},
+	// Content capture on (issue #9): the same mapping, and the content is gone.
+	"openinference/openinference-instrumentation-openai-0.1.68/chat_basic_content": {
+		sdk: "openinference", kind: "llm", attrs: llm("qwen2.5:7b", chatBasic),
+		absent: []string{"input.value", "output.value", "llm.input_messages.0.message.content", "llm.output_messages.0.message.content", "llm.invocation_parameters"},
+	},
+	"openinference/openinference-instrumentation-openai-0.1.68/chat_tool_call_content": {
+		sdk: "openinference", kind: "llm", attrs: llm("qwen2.5:7b", chatToolCall),
+		absent: []string{"llm.tools.0.tool.json_schema", "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments"},
+	},
+	"openinference/openinference-instrumentation-openai-0.1.68/embeddings_basic_content": {
+		sdk: "openinference", kind: "embedding", attrs: embedding(nil),
+		absent: []string{"embedding.embeddings.0.embedding.text", "embedding.embeddings.0.embedding.vector", "embedding.invocation_parameters"},
+	},
+	"openllmetry/opentelemetry-instrumentation-openai-0.62.4/chat_basic_content": {
+		sdk: "openllmetry", kind: "llm", attrs: llm("qwen2.5:7b", merge(chatBasic, localhost)),
+		absent: []string{"gen_ai.input.messages", "gen_ai.output.messages"},
+	},
+	"openllmetry/opentelemetry-instrumentation-openai-0.62.4/chat_tool_call_content": {
+		sdk: "openllmetry", kind: "llm", attrs: llm("qwen2.5:7b", merge(chatToolCall, localhost)),
+		absent: []string{"gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.tool.definitions"},
+	},
+	"openllmetry/opentelemetry-instrumentation-openai-0.62.4/embeddings_basic_content": {
+		sdk: "openllmetry", kind: "embedding", attrs: embedding(localhost),
+		absent: []string{"gen_ai.input.messages"},
+	},
+	"otel-genai/opentelemetry-instrumentation-openai-v2-2.4b0/chat_basic_latest_experimental_content": {
+		sdk: "otel-genai", kind: "llm", attrs: llm("qwen2.5:7b", merge(chatBasic, localhost)),
+		absent: []string{"gen_ai.input.messages", "gen_ai.output.messages"},
+	},
+	"otel-genai/opentelemetry-instrumentation-openai-v2-2.4b0/chat_tool_call_latest_experimental_content": {
+		sdk: "otel-genai", kind: "llm", attrs: llm("qwen2.5:7b", merge(chatToolCall, localhost)),
+		absent: []string{"gen_ai.input.messages", "gen_ai.output.messages"},
+	},
 }
 
 func TestEveryFixtureHasAnExpectation(t *testing.T) {
@@ -204,16 +237,16 @@ func TestUnmappedAttributesPassThroughAndAreCounted(t *testing.T) {
 	td := fixtureByID(t, "openllmetry/opentelemetry-instrumentation-openai-0.62.4/chat_basic").Load(t)
 	attrs := firstSpan(td).Attributes()
 	attrs.PutStr("gen_ai.request.reasoning_effort", "low")
-	attrs.PutStr("llm.tools.0.tool.json_schema", "{}")
-	attrs.PutStr("llm.tools.1.tool.json_schema", "{}")
+	attrs.PutStr("app.retries.0.reason", "timeout")
+	attrs.PutStr("app.retries.1.reason", "timeout")
 
 	h := newHarness(t, nil)
 	got := firstSpan(h.run(td)).Attributes().AsRaw()
 	assert.Equal(t, "low", got["gen_ai.request.reasoning_effort"])
-	assert.Contains(t, got, "llm.tools.1.tool.json_schema")
+	assert.Contains(t, got, "app.retries.1.reason")
 	assert.Equal(t, map[string]int64{
 		"openllmetry|gen_ai.request.reasoning_effort": 1,
-		"openllmetry|llm.tools.*.tool.json_schema":    2,
+		"openllmetry|app.retries.*.reason":            2,
 	}, h.counts(unmappedMetric, "sdk", "attr"))
 
 	// The first sighting of each label set is logged with the trace id, never the value.

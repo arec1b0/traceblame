@@ -195,6 +195,15 @@ func (c *collector) exported(t *testing.T) []ptrace.Traces {
 	return out
 }
 
+// exportedText stops the collector and returns the file exporter's output as written.
+func (c *collector) exportedText(t *testing.T) string {
+	t.Helper()
+	c.stop(t)
+	raw, err := os.ReadFile(c.outPath)
+	require.NoError(t, err)
+	return string(raw)
+}
+
 // logLines stops the collector and returns its log, one entry per line.
 func (c *collector) logLines(t *testing.T) []string {
 	t.Helper()
