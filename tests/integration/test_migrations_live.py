@@ -26,6 +26,17 @@ SCAN = (Path(__file__).parent / "trace_arrivals_scan.sql").read_text(encoding="u
 WATERMARK_GRACE_S = 5
 SCAN_WATERMARK = "toDateTime64('2026-10-30 23:59:00.000', 3)"
 
+# The fault injector's write with injection_id, and the join of an injection to the span it
+# was applied at (#36). They use a column new in this schema, so they are not contract
+# statements yet (code N must run on schema N-1); faults/ (#14) moves them into contract/.
+INJECTION_BY_ID_WRITE = (Path(__file__).parent / "injections_by_id_write.sql").read_text(
+    encoding="utf-8"
+)
+INJECTION_BY_ID_READ = (Path(__file__).parent / "injections_by_id_read.sql").read_text(
+    encoding="utf-8"
+)
+INJECTION_ID_MIGRATION = "injections_injection_id"
+
 ENGINES = {
     "spans": "MergeTree",
     "otel_traces_ingest": "Null",
@@ -42,7 +53,7 @@ ENGINES = {
 def test_migrate_creates_every_table_once(clickhouse: ClickHouseServer, database: str) -> None:
     client = clickhouse.client(database)
     try:
-        assert [m.version for m in migrate(client, packaged())] == list(range(1, 13))
+        assert [m.version for m in migrate(client, packaged())] == [m.version for m in packaged()]
         assert migrate(client, packaged()) == [], "a second run applies nothing"
         rows = client.query_rows(
             f"SELECT name, engine FROM system.tables WHERE database = '{database}'"  # noqa: S608
@@ -235,7 +246,8 @@ def test_the_drop_guard_fails_clearly_and_a_rerun_applies_only_the_refused_drop(
 ) -> None:
     """#41: ClickHouse refuses DROP TABLE above max_table_size_to_drop (error 359). The runner
     names the migration, table, size and limit and points to the runbook; 0012 is not
-    recorded (0011 stays applied); lifting the limit and re-running applies only 0012."""
+    recorded (0011 stays applied); lifting the limit and re-running applies 0012 and the
+    migrations after it, nothing before."""
     client = clickhouse.client(database)
     try:
         migrations = packaged()
@@ -265,7 +277,9 @@ def test_the_drop_guard_fails_clearly_and_a_rerun_applies_only_the_refused_drop(
         assert "trace_roots_from_otel" not in tables
 
         client.command("SET max_table_size_to_drop = 0")
-        assert [m.version for m in migrate(client, migrations)] == [12]
+        assert [m.version for m in migrate(client, migrations)] == [
+            m.version for m in migrations if m.version >= 12
+        ], "0012 and the migrations after it"
         tables = {
             r[0]
             for r in client.query_rows(
@@ -281,3 +295,44 @@ def test_the_runbook_is_linked_from_the_migration() -> None:
     sql = next(m.sql for m in packaged() if m.version == 12)
     assert "docs/runbooks/clickhouse-drop-guard.md" in sql
     assert (ROOT / "docs" / "runbooks" / "clickhouse-drop-guard.md").is_file()
+
+
+def _injected_span_write() -> str:
+    """spans_write.sql for the span the fault was injected at (aegis.fault.injection.id)."""
+    sql = _statement("spans_write.sql")
+    last = "'server.port', '11434')"
+    assert sql.count(last) == 1
+    return sql.replace(
+        last, "'server.port', '11434', 'aegis.fault.injection.id', 'inj-contract-1')"
+    )
+
+
+def test_injection_id_expands_injections_for_old_and_new_writers(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """#36: rows written before the column read '', both writers work after it, and an
+    injection joins the span it was applied at by (trace_id, injection_id)."""
+    client = clickhouse.client(database)
+    try:
+        before = [m for m in packaged() if m.name != INJECTION_ID_MIGRATION]
+        assert len(before) == len(packaged()) - 1
+        migrate(client, before)
+        client.command(_statement("injections_write.sql"))  # code N-1 on schema N-1
+        migrate(client, packaged())
+
+        ids = (
+            "SELECT injection_id FROM injections"
+            " WHERE trace_id = '0af7651916cd43dd8448eb211c80319c'"
+        )
+        assert client.query_rows(ids) == [("",)]
+        client.command(_statement("injections_write.sql"))  # code N-1 on schema N
+        client.command(INJECTION_BY_ID_WRITE)  # code N
+        assert sorted(r[0] for r in client.query_rows(ids)) == ["", "", "inj-contract-1"]
+
+        client.command(_injected_span_write())
+        rows = client.query_rows(INJECTION_BY_ID_READ)
+        assert [(r[0], r[1], bytes(r[2]).decode()) for r in rows] == [
+            ("inj-contract-1", "context_truncation", "b7ad6b7169203331")
+        ]
+    finally:
+        client.close()

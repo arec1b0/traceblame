@@ -14,3 +14,8 @@ The trace-assembler's watermark scan (ADR-0003) is not here yet. It reads `trace
 which is new in this schema, so as a contract statement it would fail on schema N-1. It
 lives in `tests/integration/trace_arrivals_scan.sql`, and the assembler (#35) moves it here
 once the table is on main.
+
+The fault injector's write with `injections.injection_id`, and the join of an injection to the
+span it was applied at (`spans.attrs['aegis.fault.injection.id']`, #36), are not here either:
+the column is new in this schema. They live in `tests/integration/injections_by_id_write.sql`
+and `injections_by_id_read.sql`, and `faults/` (#14) moves them here once the column is on main.
