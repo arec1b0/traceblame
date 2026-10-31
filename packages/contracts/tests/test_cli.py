@@ -1,4 +1,6 @@
 import json
+import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,31 @@ def test_gen_schema_check(profile_path: Path, capsys: pytest.CaptureFixture[str]
     assert "out of date" in capsys.readouterr().err
     main(["gen-schema", "--profile", str(profile_path)])
     assert main(["gen-schema", "--profile", str(profile_path), "--check"]) == 0
+
+
+def test_gen_schema_mirrors_the_profile(profile_path: Path, tmp_path: Path) -> None:
+    mirror = tmp_path / "mirror"
+    assert main(["gen-schema", "--profile", str(profile_path), "--mirror", str(mirror)]) == 0
+    assert (mirror / profile_path.name).read_bytes() == profile_path.read_bytes()
+
+
+def test_gen_schema_check_covers_the_mirror(
+    profile_path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    mirror = tmp_path / "mirror"
+    args = ["gen-schema", "--profile", str(profile_path), "--mirror", str(mirror)]
+    main(args)
+    (mirror / profile_path.name).write_text("stale\n", "utf-8")
+    assert main([*args, "--check"]) == 1
+    assert f"{mirror / profile_path.name} is out of date" in capsys.readouterr().err
+
+
+def test_gen_schema_mirrors_only_the_default_profile_by_default(
+    profile_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert main(["gen-schema", "--profile", str(profile_path)]) == 0
+    assert not (tmp_path / "collector").exists()
 
 
 def test_validate_reports_violations(
@@ -75,3 +102,28 @@ def test_compat(
     out = capsys.readouterr().out
     assert "[major] forbidden_added" in out
     assert "required bump: major" in out
+
+
+def test_gap_report_writes_markdown_and_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    write_fixture: Callable[..., Path],
+) -> None:
+    fixtures = tmp_path / "fixtures"
+    write_fixture(fixtures / "openinference" / "openinference-instrumentation-openai-0.1.68")
+    identity = tmp_path / "traceblame-normalize"
+    identity.write_text(f"#!{sys.executable}\nimport sys\nsys.stdout.write(sys.stdin.read())\n")
+    identity.chmod(0o755)
+    monkeypatch.setenv("TRACEBLAME_NORMALIZE_BIN", str(identity))
+    out = tmp_path / "report"
+    profile = Path(__file__).resolve().parents[3] / "schemas/profile/aegis-telemetry.v1.yaml"
+
+    args = ["gap-report", "--fixtures", str(fixtures), "--profile", str(profile), "--out", str(out)]
+    assert main(args) == 0
+    md = (out / "gap-report.md").read_text("utf-8")
+    assert "openinference/openinference-instrumentation-openai-0.1.68/chat_basic" in md
+    doc = json.loads((out / "gap-report.json").read_text("utf-8"))
+    assert doc["profile"] == "aegis-telemetry/1"
+    assert len(doc["fixtures"]) == 1
+    assert "gap-report.md" in capsys.readouterr().out

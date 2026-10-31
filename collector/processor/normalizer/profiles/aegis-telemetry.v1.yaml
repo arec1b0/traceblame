@@ -1,0 +1,303 @@
+# aegis-telemetry profile v1: the shape of a normalized span that TraceBlame consumes.
+#
+# Decision record: docs/adr/0001-telemetry-profile-v1.md
+# Generated JSON Schema: aegis-telemetry.v1.schema.json (`make contract` checks it is in sync).
+#
+# Rules (enforced by traceblame_contracts.profile and the contract tests):
+# - Every non-aegis attribute exists, undeprecated and with this type, in the pinned semconv
+#   release (snapshot: schemas/semconv/v1.41.1). Semconv attributes keep their names;
+#   renames from SDK conventions belong in the normalizer mapping tables.
+# - Own attributes live only under aegis.*, and the aegis.* namespace is closed.
+# - Within major 1 only minor changes are allowed: `traceblame-contracts compat` classifies
+#   every change as major or minor (rules in ADR-0001, section 2).
+# - Requirement levels are per span kind; `all` applies to every kind, and a kind-specific
+#   entry overrides it. The JSON Schema enforces `required`; `conditionally_required`
+#   carries its condition and is enforced by normalizer tests.
+# - Span events and links are outside profile v1; the normalizer drops content-bearing
+#   events (issue #7).
+profile: aegis-telemetry
+major: 1
+revision: 1.1.0
+
+semconv:
+  repository: open-telemetry/semantic-conventions
+  version: 1.41.1
+  commit: ead83b9b0fa36540c1642fce46e874f002ac23f1
+  schema_url: https://opentelemetry.io/schemas/1.41.1
+
+# Span classes the detectors key on. `operations` lists the gen_ai.operation.name values
+# allowed on spans of that kind.
+span_kinds:
+  llm:
+    description: Inference call to a generative model.
+    operations: [chat, text_completion, generate_content]
+  embedding:
+    description: Embeddings call.
+    operations: [embeddings]
+  retrieval:
+    description: Retrieval from a vector store, search index or other data source.
+    operations: [retrieval]
+  tool:
+    description: Execution of a tool requested by a model or an agent.
+    operations: [execute_tool]
+  agent:
+    description: Creation or invocation of an agent.
+    operations: [create_agent, invoke_agent]
+  chain:
+    description: Any other step of an application or workflow, GenAI or not.
+    operations: [invoke_workflow]
+
+attributes:
+  # Resource
+  - name: service.name
+    scope: resource
+    type: string
+    source: {semconv: service.name}
+    requirement: {all: required}
+    brief: Logical name of the instrumented service.
+  - name: service.version
+    scope: resource
+    type: string
+    source: {semconv: service.version}
+    requirement: {all: recommended}
+    brief: Version of the instrumented service.
+  - name: aegis.tenant.id
+    scope: resource
+    type: string
+    source: {aegis: extension}
+    requirement: {all: required}
+    brief: >-
+      Tenant that owns the telemetry. Set by the shim; the normalizer may fill it from
+      per-pipeline config.
+
+  # Profile and span class
+  - name: aegis.profile.version
+    scope: span
+    type: string
+    const: aegis-telemetry/1
+    source: {aegis: extension}
+    requirement: {all: required}
+    brief: Profile id of this normalized span. Set by the normalizer.
+  - name: aegis.span.kind
+    scope: span
+    type: string
+    enum: [llm, embedding, retrieval, tool, agent, chain]
+    source:
+      aegis: extension
+      derived_from: [gen_ai.operation.name, openinference.span.kind]
+    requirement: {all: required}
+    brief: >-
+      Span class the detectors key on. Set by the normalizer, so that upstream renames of
+      operation names touch only mapping tables.
+  - name: aegis.source.sdk
+    scope: span
+    type: string
+    enum: [openinference, openllmetry, otel-genai, unknown]
+    source:
+      aegis: extension
+      derived_from: [openinference.span.kind]
+    requirement: {all: recommended}
+    brief: >-
+      Instrumentation family the normalizer detected from the scope, schema_url and marker
+      attributes; it selects the mapping table. `unknown` when no table matched.
+  - name: aegis.normalizer.version
+    scope: span
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    source: {aegis: extension}
+    requirement: {all: recommended}
+    brief: Version of the normalizer build and its embedded mapping tables. Set by the normalizer.
+
+  # GenAI operation
+  - name: gen_ai.operation.name
+    scope: span
+    type: string
+    source: {semconv: gen_ai.operation.name}
+    requirement: {llm: required, embedding: required, retrieval: required, tool: required, agent: required, chain: opt_in}
+    brief: Name of the GenAI operation.
+  - name: gen_ai.provider.name
+    scope: span
+    type: string
+    source: {semconv: gen_ai.provider.name}
+    requirement: {llm: required, embedding: required}
+    brief: GenAI provider as identified by the instrumentation.
+  - name: gen_ai.request.model
+    scope: span
+    type: string
+    source: {semconv: gen_ai.request.model}
+    requirement: {llm: required, embedding: required}
+    brief: Model name in the request.
+  - name: gen_ai.response.model
+    scope: span
+    type: string
+    source: {semconv: gen_ai.response.model}
+    requirement: {llm: recommended, embedding: recommended}
+    brief: Model name in the response.
+  - name: gen_ai.request.max_tokens
+    scope: span
+    type: int
+    source: {semconv: gen_ai.request.max_tokens}
+    requirement: {llm: opt_in}
+    brief: Maximum number of tokens the model may generate.
+  - name: gen_ai.response.finish_reasons
+    scope: span
+    type: string[]
+    source: {semconv: gen_ai.response.finish_reasons}
+    requirement: {llm: conditionally_required}
+    condition: when the provider reports it (context_truncation needs it)
+    brief: Reasons the model stopped generating, one per choice.
+  - name: gen_ai.usage.input_tokens
+    scope: span
+    type: int
+    source: {semconv: gen_ai.usage.input_tokens}
+    requirement: {llm: conditionally_required, embedding: conditionally_required}
+    condition: when the provider reports it (context_truncation needs it)
+    brief: Number of input tokens.
+  - name: gen_ai.usage.output_tokens
+    scope: span
+    type: int
+    source: {semconv: gen_ai.usage.output_tokens}
+    requirement: {llm: conditionally_required}
+    condition: when the provider reports it
+    brief: Number of output tokens.
+  - name: gen_ai.conversation.id
+    scope: span
+    type: string
+    source: {semconv: gen_ai.conversation.id}
+    requirement: {llm: opt_in, agent: opt_in}
+    brief: Conversation or thread id, when the application has one.
+  - name: server.address
+    scope: span
+    type: string
+    source: {semconv: server.address}
+    requirement: {llm: recommended, embedding: recommended}
+    brief: Address of the GenAI server.
+  - name: error.type
+    scope: span
+    type: string
+    source: {semconv: error.type}
+    requirement: {all: conditionally_required}
+    condition: when the span status is ERROR
+    brief: Class of error the operation ended with.
+
+  # Tools
+  - name: gen_ai.tool.name
+    scope: span
+    type: string
+    source: {semconv: gen_ai.tool.name}
+    requirement: {tool: required}
+    brief: Name of the tool.
+  - name: gen_ai.tool.call.id
+    scope: span
+    type: string
+    source: {semconv: gen_ai.tool.call.id}
+    requirement: {tool: recommended}
+    brief: Id of the tool call.
+  - name: aegis.tool.args_hash
+    scope: span
+    type: string
+    pattern: "^[0-9a-f]{16}$"
+    source:
+      aegis: extension
+      derived_from: [gen_ai.tool.call.arguments]
+      algorithm: first 16 hex chars of sha256 over the canonical JSON of the arguments
+    requirement: {tool: conditionally_required}
+    condition: when the arguments are observed in-process (the loop detector needs it)
+    brief: >-
+      Hash of the tool call arguments. The shim computes it in-process, so the arguments
+      themselves are never exported.
+
+  # Retrieval
+  - name: gen_ai.data_source.id
+    scope: span
+    type: string
+    source: {semconv: gen_ai.data_source.id}
+    requirement: {retrieval: recommended}
+    brief: Data source used for retrieval or grounding.
+  - name: aegis.retrieval.doc_ids
+    scope: span
+    type: string[]
+    source:
+      aegis: extension
+      derived_from: [gen_ai.retrieval.documents]
+    requirement: {retrieval: recommended}
+    brief: Ids of the retrieved documents, in rank order.
+  - name: aegis.retrieval.scores
+    scope: span
+    type: double[]
+    source:
+      aegis: extension
+      derived_from: [gen_ai.retrieval.documents]
+    requirement: {retrieval: recommended}
+    brief: Retrieval scores, aligned with aegis.retrieval.doc_ids.
+
+  # Agents
+  - name: gen_ai.agent.name
+    scope: span
+    type: string
+    source: {semconv: gen_ai.agent.name}
+    requirement: {agent: recommended}
+    brief: Human-readable agent name.
+  - name: gen_ai.agent.id
+    scope: span
+    type: string
+    source: {semconv: gen_ai.agent.id}
+    requirement: {agent: opt_in}
+    brief: Unique agent id.
+
+  # Correlation
+  - name: aegis.session.id
+    scope: span
+    type: string
+    source:
+      aegis: extension
+      derived_from: [gen_ai.conversation.id, session.id]
+    requirement: {all: recommended}
+    brief: User or application session the span belongs to.
+  - name: aegis.bundle.digest
+    scope: span
+    type: string
+    pattern: "^sha256:[0-9a-f]{64}$"
+    source: {aegis: extension}
+    requirement: {all: conditionally_required}
+    condition: when the application runs a promptops bundle
+    brief: Digest of the promptops bundle the span ran under.
+  - name: aegis.decision.id
+    scope: span
+    type: string
+    source: {aegis: extension}
+    requirement: {all: conditionally_required}
+    condition: when the span passed an AgentGate decision
+    brief: AgentGate decision id.
+
+  # Content (opt-in only)
+  - name: aegis.content.ref
+    scope: span
+    type: string
+    pattern: "^s3://.+"
+    source: {aegis: extension}
+    requirement: {all: opt_in}
+    brief: >-
+      Reference to the encrypted out-of-band copy of prompt/completion content (TTL 7 d).
+      Present only when the tenant opted in to content capture.
+
+# Raw content must never reach a normalized span (CLAUDE.md hard rule 2).
+forbidden:
+  - name: gen_ai.input.messages
+    reason: raw prompt content
+  - name: gen_ai.output.messages
+    reason: raw completion content
+  - name: gen_ai.system_instructions
+    reason: raw system prompt content
+  - name: gen_ai.tool.call.arguments
+    reason: raw tool arguments; use aegis.tool.args_hash
+  - name: gen_ai.tool.call.result
+    reason: raw tool result content
+  - name: gen_ai.retrieval.query.text
+    reason: raw retrieval query content
+  - name: gen_ai.retrieval.documents
+    reason: may carry document content; use aegis.retrieval.doc_ids and aegis.retrieval.scores
+  - name: gen_ai.prompt
+    reason: deprecated raw prompt content
+  - name: gen_ai.completion
+    reason: deprecated raw completion content

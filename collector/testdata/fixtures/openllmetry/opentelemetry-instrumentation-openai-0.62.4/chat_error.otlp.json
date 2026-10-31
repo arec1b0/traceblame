@@ -1,0 +1,145 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.45.2"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "7ec79bda-852e-4e96-95c5-4b0ac92c5d15"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "traceblame-fixture-capture"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "opentelemetry.instrumentation.openai.v1",
+            "version": "0.62.4"
+          },
+          "spans": [
+            {
+              "traceId": "576093b696199ae84843a6513601989d",
+              "spanId": "cd17a6a2ced605ee",
+              "flags": 256,
+              "name": "openai.chat",
+              "kind": 3,
+              "startTimeUnixNano": "1793421316761504759",
+              "endTimeUnixNano": "1793421316772777434",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.max_tokens",
+                  "value": {
+                    "intValue": "16"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.temperature",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.is_streaming",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "gen_ai.openai.api_base",
+                  "value": {
+                    "stringValue": "http://localhost:11434/v1/"
+                  }
+                },
+                {
+                  "key": "error.type",
+                  "value": {
+                    "stringValue": "BadRequestError"
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1793421316772756082",
+                  "name": "exception",
+                  "attributes": [
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "openai.BadRequestError"
+                      }
+                    },
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "Error code: 400 - [] is too short - 'messages'"
+                      }
+                    },
+                    {
+                      "key": "exception.stacktrace",
+                      "value": {
+                        "stringValue": "Traceback (most recent call last):\n  File \"/home/dkare/.cache/uv/environments-v2/capture-openllmetry-62b4ca2d67c3fb62/lib/python3.12/site-packages/opentelemetry/instrumentation/openai/shared/chat_wrappers.py\", line 102, in chat_wrapper\n    response = wrapped(*args, **kwargs)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dkare/.cache/uv/environments-v2/capture-openllmetry-62b4ca2d67c3fb62/lib/python3.12/site-packages/openai/_utils/_utils.py\", line 298, in wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dkare/.cache/uv/environments-v2/capture-openllmetry-62b4ca2d67c3fb62/lib/python3.12/site-packages/openai/resources/chat/completions/completions.py\", line 1611, in create\n    return self._post(\n           ^^^^^^^^^^^\n  File \"/home/dkare/.cache/uv/environments-v2/capture-openllmetry-62b4ca2d67c3fb62/lib/python3.12/site-packages/openai/_base_client.py\", line 1474, in post\n    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))\n                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dkare/.cache/uv/environments-v2/capture-openllmetry-62b4ca2d67c3fb62/lib/python3.12/site-packages/openai/_base_client.py\", line 1248, in request\n    raise self._make_status_error_from_response(err.response) from None\nopenai.BadRequestError: Error code: 400 - [] is too short - 'messages'\n"
+                      }
+                    },
+                    {
+                      "key": "exception.escaped",
+                      "value": {
+                        "stringValue": "False"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {
+                "message": "Error code: 400 - [] is too short - 'messages'",
+                "code": 2
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

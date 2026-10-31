@@ -5,6 +5,9 @@
 # make security reports (SBOMs, scan results)
 .security/
 
+# make contract gap report
+.contract/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -39,6 +39,7 @@ class Provenance(_Model):
     captured_at: datetime
     capture_script: str
     capture_script_sha256: str = Field(pattern=_SHA256)
+    capture_common_sha256: str = Field(pattern=_SHA256)
     python: str
     uv: str
     packages: dict[str, str]

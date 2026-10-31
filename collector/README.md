@@ -6,7 +6,8 @@ and exporters, plus the TraceBlame normalizer processor.
 | Path | What it is |
 |---|---|
 | `builder-config.yaml` | ocb manifest; every component pinned to one upstream release line |
-| `processor/normalizer/` | the normalizer processor (component type `normalizer`) |
+| `processor/normalizer/` | the normalizer processor (component type `normalizer`), its mapping tables and profile copy |
+| `cmd/normalize/` | the normalizer as a CLI (OTLP/JSON stdin to stdout) for the contract stage |
 | `config/otelcol.yaml` | default configuration baked into the image |
 | `Dockerfile` | image build: ocb in a pinned Go image, binary on distroless `static:nonroot` |
 | `test/smoke/` | end-to-end tests of a built binary: OTLP/HTTP in, file exporter out |

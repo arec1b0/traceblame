@@ -1,8 +1,9 @@
 sdk: otel-genai
 scenario: chat_basic_latest_experimental
-captured_at: '2026-10-30T18:48:22Z'
+captured_at: '2026-10-31T04:35:37Z'
 capture_script: tools/fixtures/capture_otel_genai.py
 capture_script_sha256: 3019ad84fd56115612922461bb5ec1dd6a804b30a707450e55d660a35326f3bc
+capture_common_sha256: 6a324125dae16b8a3bae4035ce82126954a9f58d50ac83455e670aaff21d30f4
 python: 3.12.15
 uv: 0.13.6
 packages:
@@ -20,9 +21,9 @@ model:
   digest: 845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e
   server: ollama
   server_version: 0.40.5
-endpoint: http://172.22.96.1:11434/v1
+endpoint: http://localhost:11434/v1
 collector: otelcol-contrib 0.164.0 (sha256 f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4)
-fixture_sha256: 5171161504d5084dc13f50dbcdc63d4576faee95d1a040f03ea69ed05f0247d1
+fixture_sha256: 786b89f0c4083ca81e27b6848b17e1d315ae349344981dd345f004f5e146a438
 notes:
 - chat.completions.create, temperature=0, seed=7, max_tokens=16
 - gen_ai.provider.name / server.address describe the OpenAI client talking to Ollama's OpenAI-compatible

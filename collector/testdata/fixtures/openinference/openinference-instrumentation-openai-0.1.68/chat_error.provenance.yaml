@@ -1,0 +1,37 @@
+sdk: openinference
+scenario: chat_error
+captured_at: '2026-10-31T04:35:02Z'
+capture_script: tools/fixtures/capture_openinference.py
+capture_script_sha256: aa845425c2b105f52293dcc03c9df50d0d18b08b016cedf2bab89fcb94d58e14
+capture_common_sha256: 6a324125dae16b8a3bae4035ce82126954a9f58d50ac83455e670aaff21d30f4
+python: 3.12.15
+uv: 0.13.6
+packages:
+  openinference-instrumentation-openai: 0.1.68
+  openinference-instrumentation: 0.1.74
+  openinference-semantic-conventions: 0.1.43
+  openai: 3.41.0
+  opentelemetry-sdk: 1.45.2
+  opentelemetry-exporter-otlp-proto-http: 1.45.2
+env:
+  OPENINFERENCE_HIDE_INPUTS: 'true'
+  OPENINFERENCE_HIDE_OUTPUTS: 'true'
+  OPENINFERENCE_HIDE_INPUT_MESSAGES: 'true'
+  OPENINFERENCE_HIDE_OUTPUT_MESSAGES: 'true'
+  OPENINFERENCE_HIDE_INPUT_TEXT: 'true'
+  OPENINFERENCE_HIDE_OUTPUT_TEXT: 'true'
+  OPENINFERENCE_HIDE_EMBEDDINGS_TEXT: 'true'
+  OPENINFERENCE_HIDE_EMBEDDINGS_VECTORS: 'true'
+  OPENINFERENCE_HIDE_PROMPTS: 'true'
+model:
+  name: qwen2.5:7b
+  digest: 845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e
+  server: ollama
+  server_version: 0.40.5
+endpoint: http://localhost:11434/v1
+collector: otelcol-contrib 0.164.0 (sha256 f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4)
+fixture_sha256: d3da8dab46691f881f3884251f1a7aebf94186940ee07ebdfab599349e12002c
+notes:
+- 'chat.completions.create with messages=[]: HTTP 400 invalid_request_error'
+- gen_ai.provider.name / server.address describe the OpenAI client talking to Ollama's OpenAI-compatible
+  API, not the OpenAI service.

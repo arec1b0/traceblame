@@ -19,14 +19,13 @@ func NewFactory() processor.Factory {
 		processor.WithTraces(createTraces, stability))
 }
 
-func createDefaultConfig() component.Config {
-	return &Config{}
-}
-
 func createTraces(
 	ctx context.Context, set processor.Settings, cfg component.Config, next consumer.Traces,
 ) (processor.Traces, error) {
-	p := newProcessor()
+	p, err := newProcessor(cfg.(*Config), set.TelemetrySettings)
+	if err != nil {
+		return nil, err
+	}
 	return processorhelper.NewTraces(ctx, set, cfg, next, p.processTraces,
-		processorhelper.WithCapabilities(consumer.Capabilities{MutatesData: false}))
+		processorhelper.WithCapabilities(consumer.Capabilities{MutatesData: true}))
 }

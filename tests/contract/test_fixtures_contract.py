@@ -1,5 +1,6 @@
 """Golden fixtures are real, untouched, content-free exports, and the profile applies to them."""
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,13 @@ from typing import Any
 import pytest
 
 from traceblame_contracts.fixtures import Fixture, discover_fixtures
-from traceblame_contracts.normalizers import NORMALIZERS, Normalizer
+from traceblame_contracts.normalizers import (
+    BINARY_ENV,
+    CONFIG_ENV,
+    DEFAULT_GO_BINARY,
+    DEFAULT_GO_CONFIG,
+    GoNormalizer,
+)
 from traceblame_contracts.otlp import flatten_otlp_json
 from traceblame_contracts.profile import Profile
 from traceblame_contracts.validate import validate_span
@@ -67,30 +74,37 @@ def test_fixture_carries_no_raw_content(fixture: Fixture, profile: Profile) -> N
     assert leaks == []
 
 
-_PENDING_NORMALIZER = pytest.mark.xfail(
-    strict=True, reason="raw SDK exports conform only after the normalizer (issue #6)"
+# The contract gate: the collector's normalizer (collector/cmd/normalize), built by
+# `make contract`. Raw SDK exports (identity) go to the gap report instead.
+GO = GoNormalizer(
+    Path(os.environ.get(BINARY_ENV, ROOT / DEFAULT_GO_BINARY)),
+    Path(os.environ.get(CONFIG_ENV, ROOT / DEFAULT_GO_CONFIG)),
 )
 
 
-@pytest.mark.parametrize(
-    ("fixture", "normalizer"),
-    [
-        pytest.param(
-            f,
-            n,
-            id=f"{n.name}:{f.id}",
-            marks=[_PENDING_NORMALIZER] if n.name == "identity" else [],
-        )
-        for f in FIXTURES
-        for n in NORMALIZERS
-    ],
-)
+@pytest.fixture(scope="module")
+def normalized() -> dict[str, list[dict[str, Any]]]:
+    return {f.id: flatten_otlp_json(GO.normalize(f.load())) for f in FIXTURES}
+
+
+@pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f.id)
 def test_normalized_fixture_conforms_to_the_profile(
-    fixture: Fixture, normalizer: Normalizer, committed_schema: dict[str, Any]
+    fixture: Fixture,
+    normalized: dict[str, list[dict[str, Any]]],
+    committed_schema: dict[str, Any],
 ) -> None:
     violations = [
         f"{span['span_id']} {v.path}: {v.message}"
-        for span in flatten_otlp_json(normalizer.normalize(fixture.load()))
+        for span in normalized[fixture.id]
         for v in validate_span(span, committed_schema)
     ]
     assert violations == []
+
+
+@pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f.id)
+def test_normalized_fixture_names_its_sdk_and_normalizer(
+    fixture: Fixture, normalized: dict[str, list[dict[str, Any]]]
+) -> None:
+    for span in normalized[fixture.id]:
+        assert span["attributes"]["aegis.source.sdk"] == fixture.provenance().sdk
+        assert re.fullmatch(r"\d+\.\d+\.\d+", span["attributes"]["aegis.normalizer.version"])

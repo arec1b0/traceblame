@@ -55,12 +55,14 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   `uv sync --all-packages --locked`, Go module download, pre-commit hook environments
 - `make lint`: pre-commit over all tracked files (stage new files first)
 - `make test`: pytest with coverage gates (`COV_MIN`), `go test -race` per go.work module
-- `make contract`: `traceblame-contracts gen-schema --check` + `pytest -m contract`
-  (profile <-> JSON Schema, semconv snapshot, golden fixtures)
+- `make contract`: builds `collector/cmd/normalize`, `traceblame-contracts gen-schema --check`
+  (JSON Schema + the normalizer's profile copy), gap report in `.contract/`, `pytest -m contract`
+  (profile <-> JSON Schema, semconv snapshot, golden fixtures through the Go normalizer)
 - `make security`: gitleaks (full history), Syft SBOM, Grype gate (0 critical without a
   waiver in .grype.yaml); scanner images pinned by digest, needs Docker
 - `make fixtures`: re-capture golden fixtures from Ollama (`OLLAMA_URL=...`)
-- `uv run traceblame-contracts gen-schema`: regenerate the JSON Schema after editing the profile
+- `uv run traceblame-contracts gen-schema`: regenerate the JSON Schema and the normalizer's
+  embedded profile copy after editing the profile
 - `make collector`: ocb build of the collector distribution into `collector/_build/otelcol`
   (`GOWORK=off`; versions from tools/versions.env)
 - `make collector-smoke`: end-to-end tests of the built collector (`OTELCOL_BIN=...` to override)

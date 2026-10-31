@@ -1,0 +1,119 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.45.2"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "b4a1841e-da92-4745-a349-9eecb3350535"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "traceblame-fixture-capture"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "opentelemetry.instrumentation.openai_v2"
+          },
+          "spans": [
+            {
+              "traceId": "8e2129caae50af6bbde9105e86effe8c",
+              "spanId": "c7053dca401a7e81",
+              "flags": 256,
+              "name": "chat qwen2.5:7b",
+              "kind": 3,
+              "startTimeUnixNano": "1793421330958938236",
+              "endTimeUnixNano": "1793421330967108200",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.temperature",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.max_tokens",
+                  "value": {
+                    "intValue": "16"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.seed",
+                  "value": {
+                    "intValue": "7"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "localhost"
+                  }
+                },
+                {
+                  "key": "server.port",
+                  "value": {
+                    "intValue": "11434"
+                  }
+                },
+                {
+                  "key": "error.type",
+                  "value": {
+                    "stringValue": "BadRequestError"
+                  }
+                }
+              ],
+              "status": {
+                "message": "Error code: 400 - {'error': {'message': \"[] is too short - 'messages'\", 'type': 'invalid_request_error', 'param': None, 'code': None}}",
+                "code": 2
+              }
+            }
+          ],
+          "schemaUrl": "https://opentelemetry.io/schemas/1.30.0"
+        }
+      ]
+    }
+  ]
+}

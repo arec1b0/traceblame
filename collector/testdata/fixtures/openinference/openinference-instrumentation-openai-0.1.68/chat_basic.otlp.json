@@ -24,7 +24,7 @@
           {
             "key": "service.instance.id",
             "value": {
-              "stringValue": "58d77bda-8f2b-4092-bbaa-53dd404cf557"
+              "stringValue": "e5a99ee4-0532-4a77-a445-b756d86c7d62"
             }
           },
           {
@@ -43,13 +43,13 @@
           },
           "spans": [
             {
-              "traceId": "eb486f9a0cee4ee962b92e489feaaa75",
-              "spanId": "d666ef4f5e4b3778",
+              "traceId": "7cdc27eacbc27e1575c046b28a165890",
+              "spanId": "224a1eb5fcd035b6",
               "flags": 256,
               "name": "ChatCompletion",
               "kind": 1,
-              "startTimeUnixNano": "1793386086518243356",
-              "endTimeUnixNano": "1793386086755938233",
+              "startTimeUnixNano": "1793421294972686484",
+              "endTimeUnixNano": "1793421295684720610",
               "attributes": [
                 {
                   "key": "llm.system",
@@ -102,7 +102,7 @@
                 {
                   "key": "llm.token_count.prompt_details.cache_read",
                   "value": {
-                    "intValue": "37"
+                    "intValue": "24"
                   }
                 },
                 {

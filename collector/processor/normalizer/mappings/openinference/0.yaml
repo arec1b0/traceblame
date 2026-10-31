@@ -1,0 +1,69 @@
+# Mapping table: OpenInference conventions -> aegis-telemetry/1 (ADR-0001, adapter layer).
+# Format: ../README.md. Rows exist only for what a golden fixture shows, plus the
+# OpenInference span kinds (ADR-0001 maps RETRIEVER -> retrieval and so on).
+sdk: openinference
+version: "0"
+source: >-
+  openinference-semantic-conventions 0.1.43 as emitted by openinference-instrumentation-openai
+  0.1.68 (collector/testdata/fixtures/openinference/)
+match:
+  scope_prefixes: [openinference.instrumentation.]
+  markers: [openinference.span.kind]
+
+kind:
+  from: openinference.span.kind
+  values:
+    # OpenInference has no operation name. The OpenAI instrumentation names the span after
+    # the API it called: ChatCompletion, Completion, CreateEmbeddings.
+    LLM: {kind: llm, operation: chat, operation_by_span_name: {Completion: text_completion}}
+    EMBEDDING: {kind: embedding, operation: embeddings}
+    RETRIEVER: {kind: retrieval, operation: retrieval}
+    TOOL: {kind: tool, operation: execute_tool}
+    AGENT: {kind: agent, operation: invoke_agent}
+    CHAIN: {kind: chain}
+  # RERANKER, GUARDRAIL, EVALUATOR, PROMPT, UNKNOWN and values from newer conventions.
+  default: {kind: chain}
+
+map:
+  - to: gen_ai.provider.name
+    from:
+      - attr: llm.system
+  # llm.model_name / embedding.model_name come from the response: a failed request has
+  # only the invocation parameters (fixture chat_error).
+  - to: gen_ai.request.model
+    from:
+      - {json: llm.invocation_parameters, field: model}
+      - {json: embedding.invocation_parameters, field: model}
+      - attr: llm.model_name
+      - attr: embedding.model_name
+  - to: gen_ai.response.model
+    from:
+      - attr: llm.model_name
+      - attr: embedding.model_name
+  - to: gen_ai.request.max_tokens
+    from:
+      - {json: llm.invocation_parameters, field: max_tokens}
+  - to: gen_ai.usage.input_tokens
+    from:
+      - attr: llm.token_count.prompt
+  - to: gen_ai.usage.output_tokens
+    from:
+      - attr: llm.token_count.completion
+  - to: gen_ai.response.finish_reasons
+    from:
+      - attr: llm.finish_reason
+  # OpenInference records failures only as an exception event (fixture chat_error).
+  - to: error.type
+    from:
+      - {event: exception, field: exception.type, on_error: true}
+
+known:
+  - openinference.span.kind
+  - llm.token_count.total
+  - llm.token_count.prompt_details.cache_read
+  - llm.invocation_parameters
+  - embedding.invocation_parameters
+  # Content attributes; the fixtures hold OpenInference's __REDACTED__ placeholder.
+  - input.value
+  - output.value
+  - pattern: '^embedding\.embeddings\.\d+\.embedding\.(text|vector)$'

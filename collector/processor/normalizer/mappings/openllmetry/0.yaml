@@ -1,0 +1,34 @@
+# Mapping table: OpenLLMetry (Traceloop) conventions -> aegis-telemetry/1 (ADR-0001).
+# Format: ../README.md. Rows exist only for what a golden fixture shows.
+sdk: openllmetry
+version: "0"
+source: >-
+  opentelemetry-instrumentation-openai 0.62.4 with opentelemetry-semantic-conventions-ai 0.5.1
+  (collector/testdata/fixtures/openllmetry/)
+match:
+  # OpenLLMetry scopes share the opentelemetry.instrumentation. prefix with upstream
+  # instrumentations, so only exact names are matched.
+  scopes: [opentelemetry.instrumentation.openai.v1]
+
+# No kind rule: OpenLLMetry 0.62 sets gen_ai.operation.name, which the profile maps to a kind.
+
+map:
+  - to: gen_ai.response.finish_reasons
+    from:
+      # OpenLLMetry rewrites OpenAI's tool_calls to tool_call (fixture chat_tool_call).
+      - attr: gen_ai.response.finish_reasons
+        values: {tool_call: tool_calls}
+  - to: server.address
+    from:
+      - attr: gen_ai.openai.api_base
+        convert: url_host
+        keep: true
+
+known:
+  - gen_ai.request.temperature
+  - gen_ai.response.id
+  - gen_ai.usage.cache_read.input_tokens
+  - gen_ai.is_streaming
+  - gen_ai.openai.api_base
+  - gen_ai.openai.response.system_fingerprint
+  - gen_ai.usage.total_tokens

@@ -27,6 +27,11 @@ def test_committed_schema_is_generated_from_the_profile(profile: Profile) -> Non
     assert committed == render_json_schema(profile), "run `traceblame-contracts gen-schema`"
 
 
+def test_the_normalizer_embeds_the_same_profile() -> None:
+    mirror = ROOT / "collector" / "processor" / "normalizer" / "profiles" / PROFILE_PATH.name
+    assert mirror.read_bytes() == PROFILE_PATH.read_bytes(), "run `traceblame-contracts gen-schema`"
+
+
 def test_schema_is_valid_draft_2020_12(committed_schema: dict[str, Any]) -> None:
     Draft202012Validator.check_schema(committed_schema)
 

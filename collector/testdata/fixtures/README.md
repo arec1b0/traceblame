@@ -14,18 +14,32 @@ directory, for the same reason.
 
 ## What is captured
 
-| SDK | Instrumentation | Scenario | Notes |
-|---|---|---|---|
-| `openinference` | openinference-instrumentation-openai | `chat_basic` | `OPENINFERENCE_HIDE_*`: content attributes hold `__REDACTED__` |
-| `openllmetry` | opentelemetry-instrumentation-openai | `chat_basic` | `TRACELOOP_TRACE_CONTENT=false` |
-| `otel-genai` | opentelemetry-instrumentation-openai-v2 | `chat_basic` | default semconv mode (schema 1.30.0, `gen_ai.system`) |
-| `otel-genai` | opentelemetry-instrumentation-openai-v2 | `chat_basic_latest_experimental` | `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental` |
+Every SDK mode captures every request:
 
-Every capture makes the same non-streaming `chat.completions.create` call with the OpenAI
-Python client: `temperature=0`, a fixed seed and `max_tokens`. The call goes to a local
-Ollama server (`qwen2.5:7b`) through its OpenAI-compatible API. That is why the spans name
-`openai` as the provider and a private address as the server. Content capture is off in
-every SDK, and `make contract` checks that no prompt or completion text is present.
+| SDK | Instrumentation | Mode | Notes |
+|---|---|---|---|
+| `openinference` | openinference-instrumentation-openai | default | `OPENINFERENCE_HIDE_*`: content attributes hold `__REDACTED__` |
+| `openllmetry` | opentelemetry-instrumentation-openai | default | `TRACELOOP_TRACE_CONTENT=false` |
+| `otel-genai` | opentelemetry-instrumentation-openai-v2 | default | semconv 1.30.0 (`gen_ai.system`); scenario without suffix |
+| `otel-genai` | opentelemetry-instrumentation-openai-v2 | `_latest_experimental` | `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental` |
+
+| Request (scenario) | What the OpenAI Python client does | Model |
+|---|---|---|
+| `chat_basic` | `chat.completions.create`, one user message, `temperature=0`, fixed seed, `max_tokens` | `qwen2.5:7b` |
+| `chat_tool_call` | the same with one function tool (`get_weather`); the model answers with a tool call | `qwen2.5:7b` |
+| `chat_error` | `chat.completions.create` with `messages=[]`: HTTP 400 `invalid_request_error` | `qwen2.5:7b` |
+| `embeddings_basic` | `embeddings.create` with one input | `nomic-embed-text` |
+
+The calls go to a local Ollama server through its OpenAI-compatible API. That is why the
+spans name `openai` as the provider and a local address as the server.
+
+- **Prompts.** They are harmless public facts, and content capture is off in every SDK.
+  `make contract` checks that no prompt or completion text is present.
+- **Models.** Each request pins the Ollama model digest it must run on, in
+  `tools/fixtures/capture.py`. The capture fails on any other model build, and the
+  provenance records the model name and digest.
+- **Outcomes.** The capture also fails when a request does not produce its expected outcome,
+  e.g. a tool call or an HTTP 400.
 
 ## Re-capturing
 

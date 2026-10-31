@@ -1,0 +1,3 @@
+# Normalizer settings of the contract stage (make contract): the golden fixtures come from
+# shim-less SDKs, so the pipeline fills aegis.tenant.id, which the profile requires.
+tenant_id: contract-fixtures

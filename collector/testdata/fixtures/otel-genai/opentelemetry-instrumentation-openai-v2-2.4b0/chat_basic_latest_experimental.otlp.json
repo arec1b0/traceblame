@@ -24,7 +24,7 @@
           {
             "key": "service.instance.id",
             "value": {
-              "stringValue": "51e2be7d-47ba-4cdb-8ede-131869f0dee7"
+              "stringValue": "f3f4c8d9-6723-46e3-bfcc-2844d82db4b3"
             }
           },
           {
@@ -43,13 +43,13 @@
           },
           "spans": [
             {
-              "traceId": "02937512f87623f3605294e2bc4f2dff",
-              "spanId": "a6ab2c3a0b9a9d4f",
+              "traceId": "74e3abfe04fc1298aa46582ee3721f5d",
+              "spanId": "02edcee804cb28e7",
               "flags": 256,
               "name": "chat qwen2.5:7b",
               "kind": 3,
-              "startTimeUnixNano": "1793386101468260429",
-              "endTimeUnixNano": "1793386101788231824",
+              "startTimeUnixNano": "1793421336965043407",
+              "endTimeUnixNano": "1793421337275888772",
               "attributes": [
                 {
                   "key": "gen_ai.operation.name",
@@ -72,7 +72,7 @@
                 {
                   "key": "server.address",
                   "value": {
-                    "stringValue": "172.22.96.1"
+                    "stringValue": "localhost"
                   }
                 },
                 {
@@ -120,7 +120,7 @@
                 {
                   "key": "gen_ai.response.id",
                   "value": {
-                    "stringValue": "chatcmpl-567"
+                    "stringValue": "chatcmpl-324"
                   }
                 },
                 {
