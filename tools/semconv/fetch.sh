@@ -14,6 +14,7 @@ FILES=(
   model/error/registry.yaml
   model/gen-ai/registry.yaml
   model/gen-ai/deprecated/registry-deprecated.yaml
+  model/http/registry.yaml
   model/server/registry.yaml
   model/service/registry.yaml
 )
