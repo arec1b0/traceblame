@@ -406,6 +406,8 @@ traceblame_normalizer_newer_schema_spans_total{sdk,schema_url} — спаны с
 - 
 traceblame_normalizer_invalid_attrs_total{sdk,attr} — атрибуты профиля, которые normalizer не смог починить: неверный тип или нарушение pattern/enum/const (drop), неизвестные aegis.* (drop), gen_ai.operation.name вне профиля (остаётся, span → chain).
 - 
+traceblame_normalizer_dropped_large_values_total{sdk,attr} — неизвестные атрибуты GenAI-спанов со строковым значением длиннее max_unmapped_value_bytes (старт 256), отброшены: fail closed на неизвестный content (ADR-0002).
+- 
 traceblame_pipeline_lag_seconds (span end → blame written), histogram.
 - 
 traceblame_findings_total{detector,component}, traceblame_detector_duration_seconds.

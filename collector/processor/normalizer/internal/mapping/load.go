@@ -55,7 +55,7 @@ func Load(fsys fs.FS, p *profile.Profile) (*Registry, error) {
 	if len(tables) == 0 {
 		return nil, errors.New("mapping: no mapping tables")
 	}
-	return newRegistry(tables)
+	return newRegistry(tables, p)
 }
 
 func decode(raw []byte) (*Table, error) {
@@ -101,28 +101,52 @@ func (t *Table) check(p *profile.Profile, sdks map[string]bool) error {
 	if err := t.checkKind(p); err != nil {
 		return err
 	}
+	var err error
+	if t.content, err = compile("content", t.ContentAttrs, p); err != nil {
+		return err
+	}
+	if t.known, err = compile("known", t.KnownAttrs, p); err != nil {
+		return err
+	}
+	for name := range t.known {
+		if t.isContent(name) {
+			return fmt.Errorf("%s is both known and content", name)
+		}
+	}
 	for _, r := range t.Map {
 		if err := checkRule(r, p); err != nil {
 			return err
 		}
+		for _, s := range r.From {
+			// JSON sources may read named fields out of a content attribute; an attribute
+			// source would copy content into a profile attribute.
+			if s.Attr != "" && s.Attr != r.To && (t.isContent(s.Attr) || p.IsForbidden(s.Attr)) {
+				return fmt.Errorf("%s: source %s is content", r.To, s.Attr)
+			}
+		}
 	}
-	t.known = map[string]bool{}
-	for i := range t.KnownAttrs {
-		k := &t.KnownAttrs[i]
+	return nil
+}
+
+// compile prepares a known or content list: exact names into a set, patterns compiled.
+func compile(what string, entries []Known, p *profile.Profile) (map[string]bool, error) {
+	names := map[string]bool{}
+	for i := range entries {
+		k := &entries[i]
 		if k.Pattern != "" {
 			re, err := regexp.Compile(k.Pattern)
 			if err != nil {
-				return fmt.Errorf("known pattern %q: %w", k.Pattern, err)
+				return nil, fmt.Errorf("%s pattern %q: %w", what, k.Pattern, err)
 			}
 			k.re = re
 			continue
 		}
 		if _, ok := p.Attribute(k.Name); ok {
-			return fmt.Errorf("known %s is a profile attribute", k.Name)
+			return nil, fmt.Errorf("%s %s is a profile attribute", what, k.Name)
 		}
-		t.known[k.Name] = true
+		names[k.Name] = true
 	}
-	return nil
+	return names, nil
 }
 
 func (t *Table) checkKind(p *profile.Profile) error {

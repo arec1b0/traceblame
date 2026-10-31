@@ -23,9 +23,12 @@ type Table struct {
 	KindRule      *KindMap `yaml:"kind"`
 	Map           []Rule   `yaml:"map"`
 	KnownAttrs    []Known  `yaml:"known"`
+	// ContentAttrs are prompt/completion content: always dropped, never mapped (issue #9).
+	ContentAttrs []Known `yaml:"content"`
 
-	schema schemaVersion
-	known  map[string]bool
+	schema  schemaVersion
+	known   map[string]bool
+	content map[string]bool
 }
 
 // Match says which spans a table applies to: by instrumentation scope name, then by the
@@ -104,10 +107,18 @@ func (t *Table) ID() string {
 
 // Known reports whether the table passes name through without counting it.
 func (t *Table) Known(name string) bool {
-	if t.known[name] {
+	return matches(name, t.known, t.KnownAttrs)
+}
+
+func (t *Table) isContent(name string) bool {
+	return matches(name, t.content, t.ContentAttrs)
+}
+
+func matches(name string, names map[string]bool, entries []Known) bool {
+	if names[name] {
 		return true
 	}
-	for _, k := range t.KnownAttrs {
+	for _, k := range entries {
 		if k.re != nil && k.re.MatchString(name) {
 			return true
 		}

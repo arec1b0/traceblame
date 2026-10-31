@@ -26,9 +26,10 @@ type telemetry struct {
 	logger *zap.Logger
 	limit  int
 
-	unmapped    *capped
-	newerSchema *capped
-	invalid     *capped
+	unmapped     *capped
+	newerSchema  *capped
+	invalid      *capped
+	droppedLarge *capped
 }
 
 func newTelemetry(set component.TelemetrySettings, limit int) (*telemetry, error) {
@@ -49,6 +50,12 @@ func newTelemetry(set component.TelemetrySettings, limit int) (*telemetry, error
 		"Profile attributes the normalizer could not repair: mistyped or constraint-failing "+
 			"values (dropped), unknown aegis.* keys (dropped), operations outside the profile (kept).",
 		"attr", "invalid profile attribute"); err != nil {
+		return nil, err
+	}
+	if t.droppedLarge, err = t.counter(meter, "traceblame_normalizer_dropped_large_values_total", "{attribute}",
+		"Unmapped attributes dropped from GenAI spans because their value exceeds "+
+			"max_unmapped_value_bytes (fail closed on unknown content, ADR-0002).",
+		"attr", "large unmapped value dropped"); err != nil {
 		return nil, err
 	}
 	return t, nil

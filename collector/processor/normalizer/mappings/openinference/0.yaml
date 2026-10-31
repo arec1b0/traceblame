@@ -61,9 +61,27 @@ known:
   - openinference.span.kind
   - llm.token_count.total
   - llm.token_count.prompt_details.cache_read
-  - llm.invocation_parameters
-  - embedding.invocation_parameters
-  # Content attributes; the fixtures hold OpenInference's __REDACTED__ placeholder.
+  - input.mime_type
+  - output.mime_type
+
+# Prompt/completion content (issue #9): dropped on every span, never mapped. Names from
+# openinference-semantic-conventions 0.1.43 (SpanAttributes, MessageAttributes,
+# DocumentAttributes, RerankerAttributes, EmbeddingAttributes, ToolAttributes) and the
+# *_content fixtures. Content rules only remove, so they may list spec names no fixture
+# shows yet. Tool definitions are treated as content: app-authored text, often large.
+content:
   - input.value
   - output.value
-  - pattern: '^embedding\.embeddings\.\d+\.embedding\.(text|vector)$'
+  # Read by the json sources above first; may carry tools, user ids, response formats.
+  - llm.invocation_parameters
+  - embedding.invocation_parameters
+  - llm.function_call
+  - llm.prompt_template.template
+  - llm.prompt_template.variables
+  - tool.parameters
+  - reranker.query
+  - pattern: '^llm\.(input|output)_messages\.'
+  - pattern: '^llm\.(prompts|choices|tools)(\.|$)'
+  - pattern: '^embedding\.embeddings\.'
+  - pattern: '^(input|output)\.(documents|images)(\.|$)'
+  - pattern: '^(retrieval\.documents|reranker\.(input|output)_documents)\.\d+\.document\.(content|metadata)$'

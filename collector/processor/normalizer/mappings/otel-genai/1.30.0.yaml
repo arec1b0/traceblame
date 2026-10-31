@@ -20,3 +20,9 @@ known:
   - gen_ai.response.id
   - gen_ai.embeddings.dimension.count
   - server.port
+
+# Content (issue #9). The profile forbids gen_ai.input.messages, gen_ai.output.messages,
+# gen_ai.system_instructions and the other content attributes of semconv already; tool
+# definitions are app-authored text, dropped like the other SDKs' (semconv v1.41.1).
+content:
+  - gen_ai.tool.definitions

@@ -20,8 +20,9 @@ const (
 )
 
 // normalizerProcessor maps SDK spans to the profile (ADR-0001, adapter layer): detect the
-// SDK, map with its table, check every profile attribute, stamp the span. It never drops a
-// span and never guesses a rename: attributes nobody knows pass through and are counted.
+// SDK, map with its table, redact content (issue #9), check every profile attribute, stamp
+// the span. It never drops a span and never guesses a rename: attributes nobody knows pass
+// through and are counted, unless they are long strings on a GenAI span.
 type normalizerProcessor struct {
 	cfg     *Config
 	profile *profile.Profile
@@ -66,7 +67,7 @@ func (p *normalizerProcessor) normalizeResource(ctx context.Context, attrs pcomm
 		attrs.PutStr(tenantAttr, p.cfg.TenantID)
 	}
 	attrs.RemoveIf(func(name string, v pcommon.Value) bool {
-		return !p.keepAttribute(ctx, "resource", mapping.UnknownSDK, "", name, v)
+		return p.tables.IsContent(name) || !p.keepAttribute(ctx, "resource", mapping.UnknownSDK, "", name, v)
 	})
 }
 
@@ -75,6 +76,7 @@ func (p *normalizerProcessor) normalizeSpan(ctx context.Context, scope mapping.S
 	traceID := span.TraceID().String()
 	sel := p.tables.Select(scope, attrs)
 	sdk := sel.SDK()
+	genAI := isGenAI(sel.Table != nil, attrs)
 	if sel.Newer {
 		p.tel.newerSchema.add(ctx, sdk, sel.NewerSchemaURL, traceID)
 	}
@@ -84,17 +86,29 @@ func (p *normalizerProcessor) normalizeSpan(ctx context.Context, scope mapping.S
 		kind, operation, _ = sel.Table.Kind(span)
 		sel.Table.Apply(span)
 	}
+	p.redact(span, genAI)
 	if _, ok := attrs.Get(operationAttr); !ok && operation != "" {
 		attrs.PutStr(operationAttr, operation)
 	}
 	kind = p.resolveKind(ctx, kind, attrs, sdk, traceID)
 
 	attrs.RemoveIf(func(name string, v pcommon.Value) bool {
-		keep := p.keepAttribute(ctx, "span", sdk, traceID, name, v)
-		if keep && sel.Table != nil && !p.isProfileAttr(name) && !sel.Table.Known(name) {
+		if !p.keepAttribute(ctx, "span", sdk, traceID, name, v) {
+			return true
+		}
+		if p.isProfileAttr(name) || (sel.Table != nil && sel.Table.Known(name)) {
+			return false
+		}
+		// Neither the profile nor the table knows it: unknown content must not ride
+		// through on a GenAI span (ADR-0002), anything else passes and is counted.
+		if genAI && valueBytes(v) > p.cfg.MaxUnmappedValueBytes {
+			p.tel.droppedLarge.add(ctx, sdk, attrLabel(name), traceID)
+			return true
+		}
+		if sel.Table != nil {
 			p.tel.unmapped.add(ctx, sdk, attrLabel(name), traceID)
 		}
-		return !keep
+		return false
 	})
 	p.emit.emit(attrs, kind, sdk)
 }

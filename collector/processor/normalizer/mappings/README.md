@@ -5,9 +5,9 @@ files are data: changing a mapping never needs a code change. They are embedded 
 binary, loaded strictly (unknown keys fail), and checked against the profile at startup and
 in the tests.
 
-**Rows exist only for what a golden fixture shows.** To map a new attribute, first capture a
-fixture that carries it (`make fixtures`, see `collector/testdata/fixtures/README.md`), then
-add the row and the fixture's expectation in `processor_test.go`. Bump `Version` in
+**Mapping rows exist only for what a golden fixture shows.** To map a new attribute, first
+capture a fixture that carries it (`make fixtures`, see `collector/testdata/fixtures/README.md`),
+then add the row and the fixture's expectation in `processor_test.go`. Bump `Version` in
 `embed.go`.
 
 ## Format
@@ -51,7 +51,11 @@ map:                           # profile attribute <- ordered sources; the first
 
 known:                         # passed through, not counted as unmapped
   - llm.token_count.total
-  - pattern: '^embedding\.embeddings\.\d+\.embedding\.(text|vector)$'
+  - pattern: '^llm\.cost\.'
+
+content:                       # prompt/completion content: dropped on EVERY span (issue #9)
+  - input.value
+  - pattern: '^llm\.(input|output)_messages\.'
 ```
 
 Semantics:
@@ -59,4 +63,12 @@ Semantics:
   consumed. The exception is a rule whose source is the target itself.
 - **Types.** The processor coerces every mapped value to its profile type afterwards, so
   tables never convert types.
-- **Profile names are always known.** Listing them in `known` is an error.
+- **Profile names are always known.** Listing them in `known` or `content` is an error.
+- **Content.**
+  - `content` lists apply to every span, whatever the table that matched; the profile's
+    forbidden list is always content too.
+  - An entry may be both known and content only by mistake, so the loader rejects it.
+  - An `attr` source may not be content; a `json` source may read one field out of a
+    content attribute before it is dropped.
+  - Content rules only remove, so they may name attributes from an SDK's published
+    conventions before a fixture shows them; say where each comes from.
