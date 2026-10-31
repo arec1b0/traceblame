@@ -31,8 +31,9 @@ make kind-down
 - **Eval and fault-injection traces (#36, ADR-0005).** The gateway keeps every trace that
   carries `aegis.eval.run.id` or `aegis.fault.injection.id`. Both normalizer passes keep a
   marker only for tenants in `eval_tenants`, and drop and count the rest in
-  `traceblame_normalizer_eval_marker_rejected_total`. kind allowlists no tenant. To allow
-  one, set e.g. `TRACEBLAME_EVAL_TENANTS=[tenant-b]` in `collector/eval-tenants.env` and run
+  `traceblame_normalizer_eval_marker_rejected_total`. kind allowlists only `tenant-eval`,
+  the tenant of eval runs (`make fixtures-agentic-rag`, #12); `tenant-a` and `tenant-b` may not
+  mark traces. To change the list, edit `collector/eval-tenants.env` and run
   `make kind-deploy`, which restarts the agents and the gateways together. The shims and
   `faults/` set the markers (#12, #13, #14).
 - **No NATS.** `natsexporter` v0.164.1 cannot publish to JetStream. The gateway exports to
@@ -47,7 +48,9 @@ make kind-down
   exporter flushes (10 s). `terminationGracePeriodSeconds` 75 s covers all three.
 - **Credentials.** `make kind-up` generates them as Secrets and none is committed:
   - the CA and the agent and gateway certificates (valid 30 days);
-  - the tenants' htpasswd and their plaintext passwords, used by the bench;
+  - the tenants' htpasswd (`tenant-a`, `tenant-b`, `tenant-eval`) and their plaintext
+    passwords, used by the bench and the agentic-rag capture. `make kind-up` regenerates both
+    when a tenant is missing from them;
   - the ClickHouse password.
 
 ## Known limitations
