@@ -42,12 +42,18 @@ map:                           # profile attribute <- ordered sources; the first
   - to: server.address
     from:
       - attr: gen_ai.openai.api_base
-        convert: url_host      # the only converter: host of a URL
+        convert: url_host      # host of a URL; also http_status, class_name (a.b.C -> C)
         keep: true             # do not consume the source
   - to: gen_ai.response.finish_reasons
     from:
       - attr: gen_ai.response.finish_reasons   # a source may be the target: rewrite values
         values: {tool_call: tool_calls}
+  - to: http.response.status_code
+    from:
+      - status_message: true   # the span's status message
+        on_error: true         # only on spans with status ERROR (any source kind)
+        match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)'
+        convert: http_status   # exactly 3 digits, 100-599, as an int; else nothing
 
 known:                         # passed through, not counted as unmapped
   - llm.token_count.total
@@ -63,6 +69,9 @@ Semantics:
   consumed. The exception is a rule whose source is the target itself.
 - **Types.** The processor coerces every mapped value to its profile type afterwards, so
   tables never convert types.
+- **`match`.** A regular expression with exactly one capture group, applied to a string
+  source; the source yields the group, or nothing. It reads a fact out of a message that is
+  dropped afterwards (e.g. the HTTP status, #29), so keep it anchored and narrow.
 - **Profile names are always known.** Listing them in `known` or `content` is an error.
 - **Content.**
   - `content` lists apply to every span, whatever the table that matched; the profile's

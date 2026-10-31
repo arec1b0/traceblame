@@ -60,16 +60,22 @@ type Rule struct {
 }
 
 // Source is one place a value can come from: a span attribute, a field of a JSON object
-// held in a span attribute, or an attribute of a span event.
+// held in a span attribute, an attribute of a span event, or the span's status message.
 type Source struct {
-	Attr    string            `yaml:"attr"`
-	JSON    string            `yaml:"json"`
-	Event   string            `yaml:"event"`
-	Field   string            `yaml:"field"`
-	Keep    bool              `yaml:"keep"`
-	OnError bool              `yaml:"on_error"`
+	Attr          string `yaml:"attr"`
+	JSON          string `yaml:"json"`
+	Event         string `yaml:"event"`
+	StatusMessage bool   `yaml:"status_message"`
+	Field         string `yaml:"field"`
+	Keep          bool   `yaml:"keep"`
+	OnError       bool   `yaml:"on_error"`
+	// Match is a regular expression with exactly one capture group; the source yields the
+	// group, or nothing when the value does not match.
+	Match   string            `yaml:"match"`
 	Convert string            `yaml:"convert"`
 	Values  map[string]string `yaml:"values"`
+
+	re *regexp.Regexp
 }
 
 // Known is an attribute the table passes through without counting it as unmapped: an exact

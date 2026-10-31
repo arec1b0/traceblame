@@ -17,7 +17,7 @@
 #   events (issue #7).
 profile: aegis-telemetry
 major: 1
-revision: 1.2.0
+revision: 1.3.0
 
 semconv:
   repository: open-telemetry/semantic-conventions
@@ -179,6 +179,15 @@ attributes:
     requirement: {all: conditionally_required}
     condition: when the span status is ERROR
     brief: Class of error the operation ended with.
+  - name: http.response.status_code
+    scope: span
+    type: int
+    source: {semconv: http.response.status_code}
+    requirement: {llm: recommended, embedding: recommended}
+    brief: >-
+      HTTP status of the provider's answer when the call failed with one. No captured SDK
+      reports it, so the normalizer reads it from the client's error message
+      ("Error code: 429 - …") before dropping the message. Successful calls do not carry it.
 
   # Tools
   - name: gen_ai.tool.name

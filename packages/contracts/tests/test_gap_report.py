@@ -54,6 +54,26 @@ def test_error_type_is_missing_only_on_error_spans(
     ]
 
 
+_HTTP_STATUS = {
+    "name": "http.response.status_code",
+    "scope": "span",
+    "type": "int",
+    "source": {"semconv": "http.response.status_code"},
+    "requirement": {"llm": "recommended"},
+    "brief": "HTTP status of a failed call.",
+}
+
+
+def test_http_status_is_missing_only_on_error_spans(
+    minimal_profile: dict[str, Any], llm_span: dict[str, Any]
+) -> None:
+    profile = _profile(minimal_profile, [_HTTP_STATUS])
+    llm_span["attributes"]["gen_ai.usage.input_tokens"] = 3
+    assert missing_attributes(llm_span, profile) == []
+    llm_span["status"] = {"code": "STATUS_CODE_ERROR"}
+    assert missing_attributes(llm_span, profile) == ["http.response.status_code (recommended)"]
+
+
 def _export(span: dict[str, Any]) -> dict[str, Any]:
     def kv(attrs: dict[str, Any]) -> list[dict[str, Any]]:
         return [{"key": k, "value": {"stringValue": v}} for k, v in attrs.items()]

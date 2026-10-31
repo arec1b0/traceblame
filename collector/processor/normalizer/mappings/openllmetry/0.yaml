@@ -24,6 +24,13 @@ map:
         convert: url_host
         keep: true
 
+  # The OpenAI client's errors read "Error code: NNN - <body>" (#29). Only that prefix is
+  # read, and only a 100-599 status; the rest of the message is dropped as before (#9).
+  - to: http.response.status_code
+    from:
+      - {status_message: true, on_error: true, match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)', convert: http_status}
+      - {event: exception, field: exception.message, on_error: true, match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)', convert: http_status}
+
 known:
   - gen_ai.request.temperature
   - gen_ai.response.id
