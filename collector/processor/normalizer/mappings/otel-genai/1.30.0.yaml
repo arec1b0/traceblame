@@ -1,0 +1,22 @@
+# Mapping table: OTel GenAI semconv 1.30.0 -> aegis-telemetry/1 (ADR-0001).
+# Format: ../README.md. Rows exist only for what a golden fixture shows.
+sdk: otel-genai
+version: 1.30.0
+schema_version: 1.30.0
+source: >-
+  opentelemetry-instrumentation-openai-v2 2.4b0, default semconv mode
+  (collector/testdata/fixtures/otel-genai/)
+match:
+  scopes: [opentelemetry.instrumentation.openai_v2, opentelemetry.util.genai.handler]
+
+map:
+  - to: gen_ai.provider.name
+    from:
+      - attr: gen_ai.system
+
+known:
+  - gen_ai.request.temperature
+  - gen_ai.request.seed
+  - gen_ai.response.id
+  - gen_ai.embeddings.dimension.count
+  - server.port

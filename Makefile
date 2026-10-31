@@ -23,6 +23,8 @@ KIND_CLUSTER := traceblame
 # Collector distribution (collector/builder-config.yaml, ocb from tools/versions.env).
 COLLECTOR_BUILD := collector/_build
 OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
+# The normalizer as a CLI (collector/cmd/normalize): the contract stage runs fixtures through it.
+export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
 .PHONY: help bootstrap lint test contract security fixtures kind-up kind-down \
 	collector collector-smoke collector-image
@@ -47,8 +49,10 @@ test: ## Unit tests: pytest with coverage gates, go test -race
 	  bash scripts/go-coverage-gate.sh "$${gate%%:*}" "$${gate#*:}" $(COV_MIN); \
 	done
 
-contract: ## Contract tests: profile <-> JSON Schema sync, semconv pin, golden fixtures
+contract: ## Contract tests: profile/schema sync, semconv pin, fixtures through the normalizer; gap report in .contract/
+	cd collector && go build -o "$(TRACEBLAME_NORMALIZE_BIN)" ./cmd/normalize
 	$(UV_RUN) traceblame-contracts gen-schema --check
+	$(UV_RUN) traceblame-contracts gap-report
 	$(UV_RUN) pytest -m contract -rxX
 
 security: ## gitleaks (full history), Syft SBOM, Grype gate; digest-pinned images (needs Docker)

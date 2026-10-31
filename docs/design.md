@@ -404,6 +404,8 @@ traceblame_normalizer_unmapped_attrs_total{sdk,attr} — ранний сигна
 - 
 traceblame_normalizer_newer_schema_spans_total{sdk,schema_url} — спаны со schema_url новее известных mapping tables (map + pass-through, ADR-0001).
 - 
+traceblame_normalizer_invalid_attrs_total{sdk,attr} — атрибуты профиля, которые normalizer не смог починить: неверный тип или нарушение pattern/enum/const (drop), неизвестные aegis.* (drop), gen_ai.operation.name вне профиля (остаётся, span → chain).
+- 
 traceblame_pipeline_lag_seconds (span end → blame written), histogram.
 - 
 traceblame_findings_total{detector,component}, traceblame_detector_duration_seconds.
