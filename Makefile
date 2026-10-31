@@ -37,7 +37,7 @@ export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-n
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-16s %s\n", $$1, $$2 }'
 
-bootstrap: ## Install pinned tools, sync Python and Go deps, prepare pre-commit hooks
+bootstrap: ## Install pinned tools, sync Python and Go deps, pre-commit envs and the pre-push hook
 	@bash scripts/bootstrap.sh
 
 lint: ## Run every linter over all tracked files (pre-commit)

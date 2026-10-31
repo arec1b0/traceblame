@@ -18,8 +18,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.integration
 
-# Start value of the trace-assembler's grace (ADR-0003), as in contract/trace_roots_read.sql.
+# The trace-assembler's watermark scan (ADR-0003). It reads trace_arrivals, new in this schema,
+# so it is not a contract statement yet: code N must run on schema N-1. The assembler (#35)
+# moves it into contract/.
+SCAN = (Path(__file__).parent / "trace_arrivals_scan.sql").read_text(encoding="utf-8")
+# Its grace (start value) and its lower bound, the watermark.
 WATERMARK_GRACE_S = 5
+SCAN_WATERMARK = "toDateTime64('2026-10-30 23:59:00.000', 3)"
 
 ENGINES = {
     "spans": "MergeTree",
@@ -27,6 +32,8 @@ ENGINES = {
     "spans_from_otel": "MaterializedView",
     "trace_roots": "MergeTree",
     "trace_roots_from_otel": "MaterializedView",
+    "trace_arrivals": "MergeTree",
+    "trace_arrivals_from_otel": "MaterializedView",
     "findings": "ReplacingMergeTree",
     "blame": "ReplacingMergeTree",
     "injections": "MergeTree",
@@ -37,7 +44,7 @@ ENGINES = {
 def test_migrate_creates_every_table_once(clickhouse: ClickHouseServer, database: str) -> None:
     client = clickhouse.client(database)
     try:
-        assert [m.version for m in migrate(client, packaged())] == [1, 2, 3, 4, 5, 6, 7, 8]
+        assert [m.version for m in migrate(client, packaged())] == list(range(1, 11))
         assert migrate(client, packaged()) == [], "a second run applies nothing"
         rows = client.query_rows(
             f"SELECT name, engine FROM system.tables WHERE database = '{database}'"  # noqa: S608
@@ -72,11 +79,6 @@ def test_the_contract_statements_run_on_the_schema(
                 client.command(sql)
             else:
                 results[name] = client.query_rows(sql)
-        # The watermark scan sees a root only once it is older than the grace (ADR-0003).
-        deadline = time.monotonic() + WATERMARK_GRACE_S + 10
-        while not results["trace_roots_read.sql"] and time.monotonic() < deadline:
-            time.sleep(0.5)
-            results["trace_roots_read.sql"] = client.query_rows(_statement("trace_roots_read.sql"))
         (span,) = results["spans_read.sql"]
         cols = [
             "trace_id",
@@ -124,9 +126,6 @@ def test_the_contract_statements_run_on_the_schema(
         assert len(results["findings_read.sql"]) == 1
         assert len(results["blame_read.sql"]) == 1
         assert len(results["injections_read.sql"]) == 1
-        (root,) = results["trace_roots_read.sql"]
-        assert root[1] == b"0af7651916cd43dd8448eb211c80319c"
-        assert root[2] == b"b7ad6b7169203331"
     finally:
         client.close()
 
@@ -142,22 +141,62 @@ def _index_section(plan: str, index: str) -> str:
     return plan.split(index, 1)[1].split("Granules", 1)[0]
 
 
-def test_the_watermark_query_reads_by_primary_key(
+def _scan_sql(watermark: str) -> str:
+    """The watermark scan (trace_arrivals_scan.sql), after another watermark."""
+    assert SCAN.count(SCAN_WATERMARK) == 1
+    return SCAN.replace(SCAN_WATERMARK, watermark)
+
+
+def _scan(client: Any, watermark: str) -> list[tuple[Any, ...]]:
+    """The scan once its window holds rows: arrivals show only once older than the grace."""
+    deadline = time.monotonic() + WATERMARK_GRACE_S + 10
+    rows = client.query_rows(_scan_sql(watermark))
+    while not rows and time.monotonic() < deadline:
+        time.sleep(0.5)
+        rows = client.query_rows(_scan_sql(watermark))
+    return rows
+
+
+def _late_child_write() -> str:
+    """spans_write.sql as a child of its own span, exported in a later insert."""
+    sql = _statement("spans_write.sql")
+    root = "'b7ad6b7169203331', ''"
+    assert sql.count(root) == 1
+    return sql.replace(root, "'c0ffee00c0ffee00', 'b7ad6b7169203331'")
+
+
+def test_the_watermark_scan_finds_root_and_late_arrivals_by_primary_key(
     clickhouse: ClickHouseServer, database: str
 ) -> None:
-    """The assembler's scan (ADR-0003) prunes partitions and granules on ingested_at."""
+    """ADR-0003: one scan over (watermark, now - grace]; a root arrival is assembled, a later
+    non-root arrival re-assembles; the scan prunes on ingested_at, never a full scan."""
+    trace = b"0af7651916cd43dd8448eb211c80319c"
     client = clickhouse.client(database)
     try:
         migrate(client, packaged())
-        for name, statement in contract.packaged():
-            if name.endswith("_write.sql"):
-                client.command(statement)  # an empty table has no parts to read an index of
-        sql = _statement("trace_roots_read.sql")
-        plan = "\n".join(str(r[0]) for r in client.query_rows(f"EXPLAIN indexes = 1 {sql}"))
+        client.command(_statement("spans_write.sql"))
+        (first,) = _scan(client, SCAN_WATERMARK)
+        assert first[:4] == (trace, True, ["contract-check"], ["contract"]), "root: assemble"
+        watermark = f"toDateTime64('{first[4].isoformat(sep=' ', timespec='milliseconds')}', 3)"
+
+        client.command(_late_child_write())
+        (late,) = _scan(client, watermark)
+        assert late[:2] == (trace, False), (
+            "late non-root arrival of an assembled trace: re-assemble"
+        )
+        assert late[4] > first[4], "a later revision"
+        (whole,) = _scan(client, SCAN_WATERMARK)
+        assert whole[:2] == (trace, True)
+
+        plan = "\n".join(
+            str(r[0]) for r in client.query_rows(f"EXPLAIN indexes = 1 {_scan_sql(watermark)}")
+        )
+        minmax = _index_section(plan, "Min-Max")
+        assert "ingested_at" in minmax, plan
+        assert "Parts: 1/2" in minmax, "the root's part is before the watermark: pruned"
         primary = _index_section(plan, "PrimaryKey")
         assert "ingested_at" in primary, plan
         assert "Condition: true" not in primary, plan
-        assert "ingested_at" in _index_section(plan, "Min-Max"), plan
     finally:
         client.close()
 

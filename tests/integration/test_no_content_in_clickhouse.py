@@ -5,6 +5,7 @@ Every golden fixture, content-on ones included, goes through the built collector
 row of every table, in every column, is searched for the capture's text.
 """
 
+import copy
 import json
 import signal
 import socket
@@ -29,7 +30,21 @@ FIXTURES = discover_fixtures(ROOT / "collector" / "testdata" / "fixtures")
 # The capture's prompts and answers (tools/fixtures/capture.py), and what the captured errors
 # carry: tracebacks with local paths and the server's message that echoes the request.
 NEEDLES = ("France", "Paris", "weather", "Traceback", "/home/", "too short")
-TABLES = ("spans", "trace_roots", "findings", "blame", "injections", "schema_migrations")
+# trace_roots goes in the contract phase after #39.
+TABLES = (
+    "spans",
+    "trace_roots",
+    "trace_arrivals",
+    "findings",
+    "blame",
+    "injections",
+    "schema_migrations",
+)
+# Tenant variants of one fixture, with fresh trace ids: the shim sets aegis.tenant.id on the
+# resource (config mode keeps it), or on span attributes (the wrong scope: dropped, and config
+# mode fills the resource).
+SHIM_TRACE = "7e5a0000000000000000000000000001"
+SPAN_ATTR_TRACE = "7e5a0000000000000000000000000002"
 
 CONFIG = """
 receivers:
@@ -41,6 +56,9 @@ processors:
   normalizer:
     tenant_id: integration
 exporters:
+  file:
+    path: {normalized}
+    format: json
   clickhouse:
     endpoint: tcp://{host}:{native_port}?dial_timeout=10s
     database: {database}
@@ -63,8 +81,38 @@ service:
     traces:
       receivers: [otlp]
       processors: [normalizer]
-      exporters: [clickhouse]
+      exporters: [clickhouse, file]
 """
+
+
+def _tenant_variants() -> list[dict[str, Any]]:
+    base = next(
+        f for f in FIXTURES if f.id.startswith("otel-genai/") and f.id.endswith("/chat_basic")
+    )
+    out: list[dict[str, Any]] = []
+    for trace_id, on_resource, tenant in (
+        (SHIM_TRACE, True, "tenant-shim"),
+        (SPAN_ATTR_TRACE, False, "tenant-span"),
+    ):
+        doc = copy.deepcopy(base.load())
+        attr = {"key": "aegis.tenant.id", "value": {"stringValue": tenant}}
+        for rs in doc["resourceSpans"]:
+            if on_resource:
+                rs["resource"].setdefault("attributes", []).append(attr)
+            for ss in rs["scopeSpans"]:
+                for span in ss["spans"]:
+                    span["traceId"] = trace_id
+                    if not on_resource:
+                        span.setdefault("attributes", []).append(attr)
+        out.append(doc)
+    return out
+
+
+def _posted() -> list[bytes]:
+    """What the run sends: every fixture as captured, then the tenant variants."""
+    return [fx.path.read_bytes() for fx in FIXTURES] + [
+        json.dumps(doc).encode() for doc in _tenant_variants()
+    ]
 
 
 def _free_port() -> int:
@@ -92,6 +140,7 @@ def loaded(
             user=clickhouse.user,
             password=clickhouse.password,
             log=log,
+            normalized=tmp_path / "normalized.jsonl",
         ),
         encoding="utf-8",
     )
@@ -105,8 +154,7 @@ def loaded(
                 )
             time.sleep(0.2)
         expected = 0
-        for fx in FIXTURES:
-            body = fx.path.read_bytes()
+        for body in _posted():
             expected += len(flatten_otlp_json(json.loads(body)))
             req = urllib.request.Request(
                 f"http://127.0.0.1:{otlp_port}/v1/traces",
@@ -201,13 +249,64 @@ def test_spans_carry_the_normalized_fields(loaded: tuple[ClickHouseServer, str, 
 
 
 def test_trace_roots_hold_one_row_per_root_span(loaded: tuple[ClickHouseServer, str, str]) -> None:
+    """Until the contract phase after #39 drops trace_roots, it keeps being fed."""
     clickhouse, database, _ = loaded
     roots = {
         s["trace_id"]
-        for fx in FIXTURES
-        for s in flatten_otlp_json(fx.load())
+        for body in _posted()
+        for s in flatten_otlp_json(json.loads(body))
         if not s["parent_span_id"]
     }
     rows = _rows(clickhouse, database, "trace_roots")
     assert {r["trace_id"] for r in rows} == roots
     assert all(r["end_ts"] >= r["start_ts"] for r in rows)
+
+
+def test_trace_arrivals_mark_every_trace_and_its_root(
+    loaded: tuple[ClickHouseServer, str, str],
+) -> None:
+    clickhouse, database, _ = loaded
+    spans = [s for body in _posted() for s in flatten_otlp_json(json.loads(body))]
+    rows = _rows(clickhouse, database, "trace_arrivals")
+    assert {r["trace_id"] for r in rows} == {s["trace_id"] for s in spans}
+    assert {r["trace_id"] for r in rows if r["is_root"]} == {
+        s["trace_id"] for s in spans if not s["parent_span_id"]
+    }
+    assert all(
+        set(r) == {"trace_id", "ingested_at", "is_root", "service", "tenant_id"} for r in rows
+    ), "minimal columns, nothing else of a span"
+
+
+def _normalized_tenants(path: Path) -> dict[tuple[str, str], set[str]]:
+    """aegis.tenant.id per (trace, service) in the normalizer's output (the file exporter)."""
+    out: dict[tuple[str, str], set[str]] = {}
+    for line in path.read_text("utf-8").splitlines():
+        for rs in json.loads(line)["resourceSpans"]:
+            res = {a["key"]: a["value"] for a in rs["resource"].get("attributes", [])}
+            service = res["service.name"]["stringValue"]
+            tenant = res.get("aegis.tenant.id", {}).get("stringValue", "")
+            for ss in rs["scopeSpans"]:
+                for span in ss["spans"]:
+                    keys = {a["key"] for a in span.get("attributes", [])}
+                    assert "aegis.tenant.id" not in keys, "the tenant is a resource attribute"
+                    out.setdefault((span["traceId"], service), set()).add(tenant)
+    return out
+
+
+def test_trace_arrivals_carry_the_normalized_tenant(
+    loaded: tuple[ClickHouseServer, str, str], tmp_path: Path
+) -> None:
+    """Single-tenant (config mode) run: every arrival's tenant_id is non-empty and is its spans'
+    normalized aegis.tenant.id, whether config mode filled it or the shim set it."""
+    clickhouse, database, _ = loaded
+    normalized = _normalized_tenants(tmp_path / "normalized.jsonl")
+    rows = _rows(clickhouse, database, "trace_arrivals")
+    assert {(r["trace_id"], r["service"]) for r in rows} == set(normalized)
+    for r in rows:
+        assert r["tenant_id"], r
+        assert {r["tenant_id"]} == normalized[(r["trace_id"], r["service"])], r
+    tenants = {r["trace_id"]: r["tenant_id"] for r in rows}
+    assert tenants[SHIM_TRACE] == "tenant-shim", "config mode keeps the shim's resource tenant"
+    assert tenants[SPAN_ATTR_TRACE] == "integration", "a span-level tenant is dropped and filled"
+    fixture_traces = {s["trace_id"] for fx in FIXTURES for s in flatten_otlp_json(fx.load())}
+    assert {tenants[t] for t in fixture_traces} == {"integration"}, "filled from config"

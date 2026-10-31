@@ -9,6 +9,8 @@ Add the statement here when a service starts to read or write a column.
   list, one normalized span)
 - `*_read.sql` / `*_write.sql`: what the detectors, the attributor and the fault injector
   will read and write (design §1.1)
-- `trace_roots_read.sql`: the trace-assembler's watermark scan, root spans by arrival time
-  in keyset order `(ingested_at, trace_id)`, older than the grace (ADR-0003, ADR-0004
-  section 4)
+
+The trace-assembler's watermark scan (ADR-0003) is not here yet. It reads `trace_arrivals`,
+which is new in this schema, so as a contract statement it would fail on schema N-1. It
+lives in `tests/integration/trace_arrivals_scan.sql`, and the assembler (#35) moves it here
+once the table is on main.
