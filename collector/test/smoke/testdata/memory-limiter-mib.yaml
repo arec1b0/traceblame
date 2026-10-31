@@ -1,0 +1,9 @@
+# Local runs on WSL2 only (#10): memory_limiter percentage limits cannot read the cgroup
+# there, so the smoke tests merge this over the cluster configs. The cluster keeps the
+# percentage limits of deploy/kind/collector/*.yaml.
+processors:
+  memory_limiter:
+    limit_percentage: 0
+    spike_limit_percentage: 0
+    limit_mib: 512
+    spike_limit_mib: 128
