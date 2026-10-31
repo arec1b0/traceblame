@@ -3,6 +3,10 @@
 # tree, Grype on the SBOM. Scanners run as container images pinned by digest
 # (tools/versions.env). Reports go to .security/. The gate: 0 critical findings without a
 # waiver in .grype.yaml.
+#
+# Usage: scripts/security.sh                       source tree: gitleaks, SBOM, Grype
+#        scripts/security.sh image ARCHIVE NAME    a `docker save` archive: SBOM, Grype;
+#                                                  reports in .security/NAME/
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,6 +44,40 @@ mkdir -p "${OUT}" "${CACHE}"
 # as root 0755, and a plain tmpfs inherits that mode, so set mode=1777 explicitly.
 run() { docker run --rm --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,mode=1777 -e HOME=/tmp "$@"; }
 
+# grype_gate SBOM_IN_OUT REPORT_DIR_IN_OUT: Grype on an SBOM under /out, fail on critical.
+# Mount the repo directory, not the single .grype.yaml file. On WSL2, Docker Desktop keeps a
+# helper mount per bind source, and a file-level one stops git in WSL from recreating
+# .grype.yaml after a branch switch deletes it.
+grype_gate() {
+  local sbom="$1" dir="$2" status
+  run -v "${ROOT}:/repo:ro" -v "${OUT}:/out" -v "${CACHE}:/cache" \
+    -e GRYPE_DB_CACHE_DIR=/cache/grype-db -e XDG_CACHE_HOME=/tmp \
+    "${GRYPE_IMAGE}" "sbom:${sbom}" --config /repo/.grype.yaml \
+    --fail-on critical -o "table=${dir}/grype.txt" -o "json=${dir}/grype.json" || {
+    status=$?
+    cat "${OUT}${dir#/out}/grype.txt" >&2 || true
+    echo "security: grype gate failed (exit ${status})" >&2
+    exit 1
+  }
+  cat "${OUT}${dir#/out}/grype.txt"
+}
+
+if [[ "${1:-}" == "image" ]]; then
+  archive="${2:?usage: security.sh image ARCHIVE NAME}"
+  name="${3:?usage: security.sh image ARCHIVE NAME}"
+  [[ "${name}" =~ ^[a-z0-9._-]+$ ]] || { echo "security: bad report name ${name}" >&2; exit 1; }
+  archive="$(cd "$(dirname "${archive}")" && pwd)/$(basename "${archive}")"
+  mkdir -p "${OUT}/${name}"
+  echo "==> syft: SBOM of ${archive#"${ROOT}/"}"
+  run -v "${archive}:/in/image.tar:ro" -v "${OUT}:/out" -e XDG_CACHE_HOME=/tmp \
+    "${SYFT_IMAGE}" scan docker-archive:/in/image.tar --source-name "${name}" \
+    -o "spdx-json=/out/${name}/sbom.spdx.json" -o "cyclonedx-json=/out/${name}/sbom.cdx.json"
+  echo "==> grype: vulnerabilities in the image SBOM (fail on critical)"
+  grype_gate "/out/${name}/sbom.spdx.json" "/out/${name}"
+  echo "security: image ok (reports in .security/${name}/)"
+  exit 0
+fi
+
 echo "==> gitleaks: full git history"
 # safe.directory via environment only: the mounted repo has a different owner in the container.
 run -v "${ROOT}:/repo:ro" \
@@ -54,20 +92,9 @@ echo "==> syft: SBOM of the source tree"
 run -v "${ROOT}:/repo:ro" -v "${OUT}:/out" -e XDG_CACHE_HOME=/tmp \
   "${SYFT_IMAGE}" scan dir:/repo --source-name traceblame \
   --exclude './.venv/**' --exclude './.tools/**' --exclude './.git/**' \
+  --exclude './collector/_build/**' \
   -o spdx-json=/out/sbom.spdx.json -o cyclonedx-json=/out/sbom.cdx.json
 
 echo "==> grype: vulnerabilities in the SBOM (fail on critical)"
-# Mount the repo directory, not the single .grype.yaml file. On WSL2, Docker Desktop keeps a
-# helper mount per bind source, and a file-level one stops git in WSL from recreating
-# .grype.yaml after a branch switch deletes it.
-run -v "${ROOT}:/repo:ro" -v "${OUT}:/out" -v "${CACHE}:/cache" \
-  -e GRYPE_DB_CACHE_DIR=/cache/grype-db -e XDG_CACHE_HOME=/tmp \
-  "${GRYPE_IMAGE}" sbom:/out/sbom.spdx.json --config /repo/.grype.yaml \
-  --fail-on critical -o table=/out/grype.txt -o json=/out/grype.json || {
-  status=$?
-  cat "${OUT}/grype.txt" >&2 || true
-  echo "security: grype gate failed (exit ${status})" >&2
-  exit 1
-}
-cat "${OUT}/grype.txt"
+grype_gate /out/sbom.spdx.json /out
 echo "security: ok (reports in .security/)"

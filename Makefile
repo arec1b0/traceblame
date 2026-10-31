@@ -15,13 +15,20 @@ UV_RUN := uv run --frozen
 # Line-coverage gate for analysis packages (design §1.4). A starting value, kept in config.
 COV_MIN ?= 80
 COV_GATED := services/detectors services/attributor
+# Go packages under the same gate, as MODULE_DIR:PACKAGES.
+GO_COV_GATED := collector:./processor/normalizer/...
 
 KIND_CLUSTER := traceblame
 
-.PHONY: help bootstrap lint test contract security fixtures kind-up kind-down
+# Collector distribution (collector/builder-config.yaml, ocb from tools/versions.env).
+COLLECTOR_BUILD := collector/_build
+OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
+
+.PHONY: help bootstrap lint test contract security fixtures kind-up kind-down \
+	collector collector-smoke collector-image
 
 help: ## List targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-10s %s\n", $$1, $$2 }'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-16s %s\n", $$1, $$2 }'
 
 bootstrap: ## Install pinned tools, sync Python and Go deps, prepare pre-commit hooks
 	@bash scripts/bootstrap.sh
@@ -35,7 +42,10 @@ test: ## Unit tests: pytest with coverage gates, go test -race
 	  echo "coverage gate: $$pkg >= $(COV_MIN)%"; \
 	  $(UV_RUN) coverage report --include="$$pkg/src/*" --fail-under=$(COV_MIN); \
 	done
-	bash scripts/go-each-module.sh go test -race ./...
+	bash scripts/go-each-module.sh go test -race -count=1 ./...
+	@for gate in $(GO_COV_GATED); do \
+	  bash scripts/go-coverage-gate.sh "$${gate%%:*}" "$${gate#*:}" $(COV_MIN); \
+	done
 
 contract: ## Contract tests: profile <-> JSON Schema sync, semconv pin, golden fixtures
 	$(UV_RUN) traceblame-contracts gen-schema --check
@@ -43,6 +53,17 @@ contract: ## Contract tests: profile <-> JSON Schema sync, semconv pin, golden f
 
 security: ## gitleaks (full history), Syft SBOM, Grype gate; digest-pinned images (needs Docker)
 	@bash scripts/security.sh
+
+collector: ## Build the collector distribution with ocb (collector/_build/otelcol)
+	mkdir -p $(COLLECTOR_BUILD)
+	cd collector && GOWORK=off CGO_ENABLED=0 ocb --config builder-config.yaml
+
+collector-smoke: ## End-to-end tests of a built collector (OTELCOL_BIN=..., default: make collector)
+	@test -x "$(OTELCOL_BIN)" || { echo "no collector at $(OTELCOL_BIN): run make collector" >&2; exit 1; }
+	cd collector && OTELCOL_BIN="$(OTELCOL_BIN)" go test -race -count=1 ./test/smoke/
+
+collector-image: ## Build and smoke-test the collector image, SBOM + Grype gate (needs Docker)
+	@bash scripts/collector-image.sh
 
 fixtures: ## Re-capture golden span fixtures from Ollama (OLLAMA_URL=...; see collector/testdata/fixtures)
 	bash scripts/install-tools.sh otelcol-contrib

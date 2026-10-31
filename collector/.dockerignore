@@ -1,0 +1,5 @@
+# Build context of collector/Dockerfile (collector/): send only what ocb builds from.
+_build/
+test/
+testdata/
+**/*_test.go

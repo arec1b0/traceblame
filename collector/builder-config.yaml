@@ -1,0 +1,41 @@
+# ocb manifest of the TraceBlame collector distribution (issue #7, design §1.2).
+#
+# Every component comes from one upstream release line: the module set that upstream's
+# otelcol-contrib 0.164.0 distribution ships, i.e. core beta modules v0.164.0, core stable
+# modules v1.70.0 and contrib v0.164.1 (v0.164.0 of contrib requires a nonexistent
+# pkg/ottl v1.2.0, contrib#52356). The versions live in tools/versions.env;
+# builder_config_test.go fails if this file or go.mod drifts from them, and ocb's strict
+# versioning check fails the build if a component pulls in another core minor.
+#
+# Build: `make collector` (from WSL2/Linux) or `make collector-image`.
+dist:
+  module: github.com/arec1b0/traceblame/otelcol-traceblame
+  name: otelcol-traceblame
+  description: TraceBlame OpenTelemetry Collector distribution
+  version: 0.1.0
+  output_path: ./_build/otelcol
+  # Same as upstream's distributions: drop golang.org/x/net/trace from gRPC.
+  build_tags: grpcnotrace
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.164.0
+
+processors:
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.164.0
+  - gomod: github.com/arec1b0/traceblame/collector v0.0.0
+    import: github.com/arec1b0/traceblame/collector/processor/normalizer
+    path: ./
+
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.164.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.164.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.164.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.164.1
+
+extensions:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.164.1
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.70.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.70.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.70.0

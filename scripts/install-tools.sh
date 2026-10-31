@@ -102,6 +102,12 @@ install_kubectl() {
   install -m 0755 "${WORK}/${name}" "${BIN}/kubectl"
 }
 
+install_ocb() {
+  local name="ocb_$1_linux_amd64"
+  fetch "${name}" "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2Fv$1/${name}"
+  install -m 0755 "${WORK}/${name}" "${BIN}/ocb"
+}
+
 install_otelcol_contrib() {
   local name="otelcol-contrib_$1_linux_amd64.tar.gz"
   fetch "${name}" "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v$1/${name}"
@@ -119,9 +125,10 @@ declare -A TOOLSET=(
   [actionlint]="${ACTIONLINT_VERSION} install_actionlint"
   [kind]="${KIND_VERSION} install_kind"
   [kubectl]="${KUBECTL_VERSION} install_kubectl"
+  [ocb]="${OCB_VERSION} install_ocb"
   [otelcol-contrib]="${OTELCOL_CONTRIB_VERSION} install_otelcol_contrib"
 )
-DEFAULT_TOOLS=(uv go golangci-lint hadolint gitleaks actionlint kind kubectl)
+DEFAULT_TOOLS=(uv go golangci-lint hadolint gitleaks actionlint kind kubectl ocb)
 
 for tool in "${@:-${DEFAULT_TOOLS[@]}}"; do
   if [[ -z "${TOOLSET[${tool}]:-}" ]]; then
