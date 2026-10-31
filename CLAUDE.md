@@ -72,5 +72,10 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
 - `make collector-smoke`: end-to-end tests of the built collector (`OTELCOL_BIN=...` to override)
 - `make collector-image`: collector image build + image smoke + end-to-end tests on the image's
   binary + Syft SBOM + Grype gate (needs Docker)
-- `make kind-up` / `make kind-down`: local kind cluster `traceblame`
+- `make kind-up` / `make kind-down`: local kind cluster `traceblame` (kind-up also generates
+  the TLS, htpasswd and ClickHouse Secrets; never committed)
+- `make kind-deploy`: images, ClickHouse via the Altinity operator, migrations, agent DaemonSet
+  and gateway Deployment into kind (deploy/kind/README.md)
+- `make bench-scaling`: gateway 2 -> 4 -> 2 under steady load; span loss / split-trace report
+  into evals/reports/ (RATE, LOAD, UP_AT, DOWN_AT override the defaults)
 - `make demo`: M3

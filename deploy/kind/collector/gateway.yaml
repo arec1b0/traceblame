@@ -1,0 +1,118 @@
+# otel-gateway (Deployment, design §1.1 component 4). Accepts only agents (mTLS client
+# certificates of the agents' CA, plus a NetworkPolicy), keeps the agent-stamped tenant,
+# tail-samples whole traces and writes them to ClickHouse through the stock exporter
+# (ADR-0004). No NATS export: natsexporter v0.164.1 cannot publish to JetStream (ADR-0003
+# draft: the trace-assembler reads a ClickHouse watermark instead).
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        tls:
+          cert_file: /etc/otelcol/tls/tls.crt
+          key_file: /etc/otelcol/tls/tls.key
+          client_ca_file: /etc/otelcol/tls/ca.crt
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  # Second pass, idempotent (#10 comment): the agent already normalized and set the tenant.
+  normalizer:
+    tenant_source: config
+  # Design §1.1: all errors, latency > p95, 10% of the rest. The latency thresholds come
+  # from deploy/kind/collector/latency-thresholds.env (per service, documented there). The
+  # low-eval-score policy is left out: no profile attribute carries an eval score, and judge
+  # scores arrive after ingest. Eval and injected-fault traces are not yet kept at 100%: the
+  # profile has no attribute that marks them.
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 200000
+    expected_new_traces_per_sec: 500
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: slow-bench-openinference
+        type: and
+        and:
+          and_sub_policy:
+            - name: service
+              type: string_attribute
+              string_attribute: {key: service.name, values: [bench-openinference]}
+            - name: latency
+              type: latency
+              latency:
+                threshold_ms: ${env:LATENCY_P95_MS_BENCH_OPENINFERENCE}
+      - name: slow-bench-openllmetry
+        type: and
+        and:
+          and_sub_policy:
+            - name: service
+              type: string_attribute
+              string_attribute: {key: service.name, values: [bench-openllmetry]}
+            - name: latency
+              type: latency
+              latency:
+                threshold_ms: ${env:LATENCY_P95_MS_BENCH_OPENLLMETRY}
+      - name: slow-bench-otel-genai
+        type: and
+        and:
+          and_sub_policy:
+            - name: service
+              type: string_attribute
+              string_attribute: {key: service.name, values: [bench-otel-genai]}
+            - name: latency
+              type: latency
+              latency:
+                threshold_ms: ${env:LATENCY_P95_MS_BENCH_OTEL_GENAI}
+      - name: slow-default
+        type: latency
+        latency:
+          threshold_ms: ${env:LATENCY_P95_MS_DEFAULT}
+      - name: baseline
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+          hash_salt: traceblame
+
+exporters:
+  clickhouse:
+    endpoint: tcp://clickhouse-traceblame.observability.svc:9000?dial_timeout=10s
+    database: traceblame
+    username: ${env:CLICKHOUSE_USER}
+    password: ${env:CLICKHOUSE_PASSWORD}
+    create_schema: false
+    traces_table_name: otel_traces_ingest
+    async_insert: true
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      queue_size: 100000
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, normalizer, tail_sampling]
+      exporters: [clickhouse]

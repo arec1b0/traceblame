@@ -15,6 +15,8 @@ repos:
       - id: check-json
       - id: check-toml
       - id: check-yaml
+        # Kubernetes manifests hold several objects per file.
+        args: [--allow-multiple-documents]
       - id: end-of-file-fixer
       - id: mixed-line-ending
         args: [--fix=lf]
@@ -55,6 +57,12 @@ repos:
         language: unsupported
         pass_filenames: false
         always_run: true
+      - id: kubeconform
+        name: kubeconform
+        # Kubernetes objects of the kind cluster; CRDs (ClickHouseInstallation) have no schema.
+        entry: .tools/bin/kubeconform -strict -summary -kubernetes-version 1.37.0 -ignore-missing-schemas
+        language: unsupported
+        files: ^deploy/kind/manifests/.*\.yaml$
       - id: actionlint
         name: actionlint
         entry: .tools/bin/actionlint

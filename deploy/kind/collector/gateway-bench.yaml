@@ -1,0 +1,13 @@
+# Bench overlay, merged over gateway.yaml (`--config gateway.yaml --config gateway-bench.yaml`)
+# by bench/gateway-scaling: stamps each span with the gateway pod that processed it, so the
+# report can tell split traces apart. Never part of a normal deployment.
+processors:
+  resource/bench:
+    attributes:
+      - key: traceblame.bench.gateway
+        value: ${env:POD_NAME}
+        action: upsert
+service:
+  pipelines:
+    traces:
+      processors: [memory_limiter, normalizer, tail_sampling, resource/bench]
