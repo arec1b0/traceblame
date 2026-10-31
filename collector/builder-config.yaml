@@ -39,3 +39,12 @@ providers:
   - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.70.0
   - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.70.0
   - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.70.0
+
+# Security overrides of transitive dependencies, never of collector modules
+# (builder_config_test.go checks that). Drop each once the pinned collector release ships
+# the fixed version.
+replaces:
+  # GO-2026-6866 (CVE-2026-97045) and GO-2026-6860 (CVE-2026-78661), both in x/net/html,
+  # fixed in v0.62.0. govulncheck (source mode) finds neither reachable: x/net/html is not
+  # in the build, but the image SBOM lists the module, so bump rather than waive.
+  - golang.org/x/net => golang.org/x/net v0.62.0

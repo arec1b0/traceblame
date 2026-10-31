@@ -88,10 +88,13 @@ var fixtureWants = map[string]want{
 	"openinference/openinference-instrumentation-openai-0.1.68/chat_tool_call": {
 		sdk: "openinference", kind: "llm", attrs: llm("qwen2.5:7b", chatToolCall),
 	},
+	// A failed OpenInference call has no llm.model_name (it comes from the response): the
+	// request model is read out of llm.invocation_parameters, which is then dropped as
+	// content. provider_degradation needs the model on exactly these spans.
 	"openinference/openinference-instrumentation-openai-0.1.68/chat_error": {
 		sdk: "openinference", kind: "llm",
 		attrs:  llm("qwen2.5:7b", map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "openai.BadRequestError"}),
-		absent: []string{"gen_ai.response.model", "gen_ai.usage.input_tokens"},
+		absent: []string{"gen_ai.response.model", "gen_ai.usage.input_tokens", "llm.invocation_parameters", "llm.model_name"},
 	},
 	"openinference/openinference-instrumentation-openai-0.1.68/embeddings_basic": {
 		sdk: "openinference", kind: "embedding", attrs: embedding(nil),

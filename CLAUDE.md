@@ -37,6 +37,7 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 
 ## Workflow
 - One GitHub issue = one branch = one PR. Conventional Commits.
+- Before any push: gh pr view <branch> --json state; never push to a branch whose PR is merged or closed — branch from origin/main instead.
 - Before code for an issue: short plan (files, interfaces, tests), wait for my OK on anything
   that changes a contract (profile, JSON Schema, OpenAPI, ClickHouse schema).
 - Tests first for normalizer mappings, detectors, attributor. Coverage >= 80% there.

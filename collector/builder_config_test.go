@@ -26,6 +26,7 @@ type manifestModule struct {
 }
 
 type manifest struct {
+	Replaces   []string         `yaml:"replaces"`
 	Receivers  []manifestModule `yaml:"receivers"`
 	Processors []manifestModule `yaml:"processors"`
 	Exporters  []manifestModule `yaml:"exporters"`
@@ -94,6 +95,22 @@ func TestBuilderConfigPinsOneCollectorRelease(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, local, "the normalizer processor must be in the manifest")
+}
+
+func TestReplacesNeverOverrideCollectorModules(t *testing.T) {
+	raw, err := os.ReadFile("builder-config.yaml")
+	require.NoError(t, err)
+	var m manifest
+	require.NoError(t, yaml.Unmarshal(raw, &m))
+	for _, r := range m.Replaces {
+		from, to, ok := strings.Cut(r, "=>")
+		require.True(t, ok, "replace without =>: %q", r)
+		for _, side := range []string{from, to} {
+			path := strings.Fields(side)[0]
+			assert.False(t, strings.HasPrefix(path, coreModules) || strings.HasPrefix(path, contribModules),
+				"replaces may override transitive dependencies only, not the pinned release line: %q", r)
+		}
+	}
 }
 
 var requireLine = regexp.MustCompile(`^\s*(?:require\s+)?(\S+)\s+(v\S+)`)
