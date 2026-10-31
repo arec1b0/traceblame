@@ -91,7 +91,7 @@ func TestApplyReadsExceptionEventsOnlyOnErrors(t *testing.T) {
 	tb.Apply(s)
 	v, ok := s.Attributes().Get("error.type")
 	require.True(t, ok)
-	assert.Equal(t, "openai.BadRequestError", v.Str())
+	assert.Equal(t, "BadRequestError", v.Str(), "the class name alone (#29)")
 
 	s = withException(ptrace.StatusCodeOk)
 	tb.Apply(s)
@@ -161,4 +161,46 @@ func TestApplyIsDeterministic(t *testing.T) {
 		}
 		assert.Equal(t, first, keys)
 	}
+}
+
+func errorSpan(status string, code ptrace.StatusCode) ptrace.Span {
+	s := span(map[string]any{})
+	s.Status().SetCode(code)
+	s.Status().SetMessage(status)
+	return s
+}
+
+func TestApplyReadsTheHTTPStatusFromTheErrorMessage(t *testing.T) {
+	tb := table(t, "openinference/0")
+	s := errorSpan("BadRequestError: Error code: 400 - [] is too short - 'messages'", ptrace.StatusCodeError)
+	tb.Apply(s)
+	v, ok := s.Attributes().Get("http.response.status_code")
+	require.True(t, ok)
+	assert.Equal(t, pcommon.ValueTypeInt, v.Type())
+	assert.Equal(t, int64(400), v.Int())
+
+	s = errorSpan("Error code: 400 - looked like an error", ptrace.StatusCodeOk)
+	tb.Apply(s)
+	_, ok = s.Attributes().Get("http.response.status_code")
+	assert.False(t, ok, "only spans with status ERROR")
+
+	s = errorSpan("", ptrace.StatusCodeError)
+	ev := s.Events().AppendEmpty()
+	ev.SetName("exception")
+	ev.Attributes().PutStr("exception.message", "Error code: 429 - rate limited")
+	tb.Apply(s)
+	v, ok = s.Attributes().Get("http.response.status_code")
+	require.True(t, ok, "falls back to the exception message")
+	assert.Equal(t, int64(429), v.Int())
+}
+
+func TestApplyKeepsOnlyTheClassName(t *testing.T) {
+	s := errorSpan("", ptrace.StatusCodeError)
+	ev := s.Events().AppendEmpty()
+	ev.SetName("exception")
+	ev.Attributes().PutStr("exception.type", "openai.BadRequestError")
+	table(t, "openinference/0").Apply(s)
+	v, ok := s.Attributes().Get("error.type")
+	require.True(t, ok)
+	assert.Equal(t, "BadRequestError", v.Str())
 }

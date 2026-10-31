@@ -81,7 +81,7 @@ map:
 map:
   - to: gen_ai.request.model
     from: [{attr: x, json: y, field: z}]
-`}, "exactly one of attr, json, event"},
+`}, "exactly one of attr, json, event, status_message"},
 		{"json without field", map[string]string{"a/0.yaml": validTable + `
 map:
   - to: gen_ai.request.model
@@ -133,6 +133,26 @@ map:
     from: [{attr: input.value}]
 content: [input.value]
 `}, "input.value is content"},
+		{"bad match pattern", map[string]string{"a/0.yaml": validTable + `
+map:
+  - to: http.response.status_code
+    from: [{status_message: true, match: "(", convert: http_status}]
+`}, "match"},
+		{"match without a capture group", map[string]string{"a/0.yaml": validTable + `
+map:
+  - to: http.response.status_code
+    from: [{status_message: true, match: "Error code: [0-9]{3}", convert: http_status}]
+`}, "exactly one capture group"},
+		{"match with two capture groups", map[string]string{"a/0.yaml": validTable + `
+map:
+  - to: http.response.status_code
+    from: [{status_message: true, match: "(Error) code: ([0-9]{3})", convert: http_status}]
+`}, "exactly one capture group"},
+		{"status_message with an attr", map[string]string{"a/0.yaml": validTable + `
+map:
+  - to: http.response.status_code
+    from: [{status_message: true, attr: x}]
+`}, "exactly one of attr, json, event, status_message"},
 		{"forbidden attribute as an attr source", map[string]string{"a/0.yaml": validTable + `
 map:
   - to: gen_ai.request.model

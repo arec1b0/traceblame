@@ -93,7 +93,7 @@ var fixtureWants = map[string]want{
 	// content. provider_degradation needs the model on exactly these spans.
 	"openinference/openinference-instrumentation-openai-0.1.68/chat_error": {
 		sdk: "openinference", kind: "llm",
-		attrs:  llm("qwen2.5:7b", map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "openai.BadRequestError"}),
+		attrs:  llm("qwen2.5:7b", map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "BadRequestError", "http.response.status_code": int64(400)}),
 		absent: []string{"gen_ai.response.model", "gen_ai.usage.input_tokens", "llm.invocation_parameters", "llm.model_name"},
 	},
 	"openinference/openinference-instrumentation-openai-0.1.68/embeddings_basic": {
@@ -108,7 +108,7 @@ var fixtureWants = map[string]want{
 	},
 	"openllmetry/opentelemetry-instrumentation-openai-0.62.4/chat_error": {
 		sdk: "openllmetry", kind: "llm",
-		attrs: llm("qwen2.5:7b", merge(localhost, map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "BadRequestError"})),
+		attrs: llm("qwen2.5:7b", merge(localhost, map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "BadRequestError", "http.response.status_code": int64(400)})),
 	},
 	"openllmetry/opentelemetry-instrumentation-openai-0.62.4/embeddings_basic": {
 		sdk: "openllmetry", kind: "embedding", attrs: embedding(localhost),
@@ -123,7 +123,7 @@ var fixtureWants = map[string]want{
 	},
 	"otel-genai/opentelemetry-instrumentation-openai-v2-2.4b0/chat_error": {
 		sdk: "otel-genai", kind: "llm",
-		attrs:  llm("qwen2.5:7b", merge(localhost, map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "BadRequestError"})),
+		attrs:  llm("qwen2.5:7b", merge(localhost, map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "BadRequestError", "http.response.status_code": int64(400)})),
 		absent: []string{"gen_ai.system"},
 	},
 	"otel-genai/opentelemetry-instrumentation-openai-v2-2.4b0/embeddings_basic": {
@@ -137,7 +137,7 @@ var fixtureWants = map[string]want{
 	},
 	"otel-genai/opentelemetry-instrumentation-openai-v2-2.4b0/chat_error_latest_experimental": {
 		sdk: "otel-genai", kind: "llm",
-		attrs: llm("qwen2.5:7b", merge(localhost, map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "BadRequestError"})),
+		attrs: llm("qwen2.5:7b", merge(localhost, map[string]any{"gen_ai.request.max_tokens": int64(16), "error.type": "BadRequestError", "http.response.status_code": int64(400)})),
 	},
 	"otel-genai/opentelemetry-instrumentation-openai-v2-2.4b0/embeddings_basic_latest_experimental": {
 		sdk: "otel-genai", kind: "embedding", attrs: embedding(localhost),
