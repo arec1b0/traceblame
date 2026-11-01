@@ -3,10 +3,12 @@
 # create the namespaces and the generated Secrets (issue #10, ADR-0005). Secrets are made
 # here, in the cluster only, and never written into the repository:
 #   observability/agent-tls, gateway-tls   mTLS between agents and gateways (one local CA)
-#   observability/tenants-htpasswd         one basic-auth user per tenant (SHA-512 crypt)
-#   bench/tenant-credentials               the same passwords, for the load generators
+#   observability/tenants-htpasswd         one basic-auth user per tenant (SHA-512 crypt):
+#                                          tenant-a, tenant-b, and tenant-eval for eval runs (#12)
+#   bench/tenant-credentials               the same passwords, for the load generators and the
+#                                          agentic-rag capture
 #   observability/clickhouse-credentials   the ClickHouse user of the collector and migrations
-# Existing Secrets are kept.
+# Existing Secrets are kept, except the tenant ones when a tenant is missing from them.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -36,6 +38,7 @@ KCTL=(kubectl --context "kind-${CLUSTER}")
 "${KCTL[@]}" apply -f "${ROOT}/deploy/kind/manifests/00-namespaces.yaml"
 
 has_secret() { "${KCTL[@]}" -n "$1" get secret "$2" >/dev/null 2>&1; }
+has_key() { [[ -n "$("${KCTL[@]}" -n "$1" get secret "$2" -o "jsonpath={.data.$3}" 2>/dev/null)" ]]; }
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
@@ -59,17 +62,23 @@ if ! has_secret observability agent-tls || ! has_secret observability gateway-tl
     --from-file=ca.crt="${WORK}/ca.crt" --from-file=tls.crt="${WORK}/agent.crt" --from-file=tls.key="${WORK}/agent.key"
 fi
 
-if ! has_secret observability tenants-htpasswd || ! has_secret bench tenant-credentials; then
-  pa="$(openssl rand -hex 16)"
-  pb="$(openssl rand -hex 16)"
-  printf 'tenant-a:%s\ntenant-b:%s\n' \
-    "$(printf %s "${pa}" | openssl passwd -6 -stdin)" "$(printf %s "${pb}" | openssl passwd -6 -stdin)" \
-    >"${WORK}/htpasswd"
+TENANTS=(tenant-a tenant-b tenant-eval)
+tenants_complete() {
+  has_secret observability tenants-htpasswd || return 1
+  for t in "${TENANTS[@]}"; do has_key bench tenant-credentials "${t}" || return 1; done
+}
+if ! tenants_complete; then
+  : >"${WORK}/htpasswd"
+  literals=()
+  for t in "${TENANTS[@]}"; do
+    pw="$(openssl rand -hex 16)"
+    printf '%s:%s\n' "${t}" "$(printf %s "${pw}" | openssl passwd -6 -stdin)" >>"${WORK}/htpasswd"
+    literals+=("--from-literal=${t}=${pw}")
+  done
   "${KCTL[@]}" -n observability delete secret tenants-htpasswd --ignore-not-found >/dev/null
   "${KCTL[@]}" -n bench delete secret tenant-credentials --ignore-not-found >/dev/null
   "${KCTL[@]}" -n observability create secret generic tenants-htpasswd --from-file=htpasswd="${WORK}/htpasswd"
-  "${KCTL[@]}" -n bench create secret generic tenant-credentials \
-    --from-literal=tenant-a="${pa}" --from-literal=tenant-b="${pb}"
+  "${KCTL[@]}" -n bench create secret generic tenant-credentials "${literals[@]}"
 fi
 
 if ! has_secret observability clickhouse-credentials; then

@@ -14,7 +14,7 @@ import (
 )
 
 func TestRunNormalizesAnExport(t *testing.T) {
-	fx := fixtures.All(t)[0]
+	fx := fixtures.ByID(t, fixtures.OneSpan)
 	raw, err := os.ReadFile(fx.Path)
 	require.NoError(t, err)
 	cfg := filepath.Join(t.TempDir(), "normalizer.yaml")
@@ -33,7 +33,7 @@ func TestRunNormalizesAnExport(t *testing.T) {
 }
 
 func TestRunWithoutConfigUsesTheDefaults(t *testing.T) {
-	raw, err := os.ReadFile(fixtures.All(t)[0].Path)
+	raw, err := os.ReadFile(fixtures.ByID(t, fixtures.OneSpan).Path)
 	require.NoError(t, err)
 	var out bytes.Buffer
 	require.NoError(t, run(nil, bytes.NewReader(raw), &out))

@@ -318,7 +318,7 @@ M1
 feat(storage): ClickHouse migrations for spans, findings, blame, injections
 M1
 10
-feat(sdk-py): instrument LangGraph Agentic RAG with aegis.* attrs
+feat(sdk-py): instrument agentic-rag (custom ReAct loop over AsyncOpenAI) with aegis.* attrs
 M1
 11
 feat(sdk-ts): instrument runbook agent

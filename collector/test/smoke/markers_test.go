@@ -65,7 +65,7 @@ func TestTheAgentKeepsMarkersOnlyForTenantsInTheEnvAllowlist(t *testing.T) {
 	cfg := strings.ReplaceAll(markerAgentConfig, "__HASH__", shaPassword("secret"))
 	c, _ := startCustom(t, cfg)
 
-	td := fixtures.All(t)[0].Load(t)
+	td := fixtures.ByID(t, fixtures.OneSpan).Load(t)
 	td.ResourceSpans().At(0).Resource().Attributes().PutStr("aegis.eval.run.id", "run-smoke-1")
 	td.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0).Attributes().PutStr("aegis.fault.injection.id", "inj-smoke-1")
 	body, err := (&ptrace.JSONMarshaler{}).MarshalTraces(td)

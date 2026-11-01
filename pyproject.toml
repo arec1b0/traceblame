@@ -17,6 +17,7 @@ members = [
 [dependency-groups]
 dev = [
     "coverage==7.17.0",
+    "openai==3.41.0",
     "pre-commit==4.7.0",
     "pyright[nodejs]==1.1.414",
     "pytest==9.2.0",

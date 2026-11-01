@@ -1,9 +1,19 @@
 [project]
 name = "traceblame-py"
-version = "0.0.0"
+version = "0.1.0"
 description = "TraceBlame Python shim: adds aegis.* attributes on top of OpenInference/OpenLLMetry."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+# The OpenInference pins are exact: the export allowlist and the normalizer's openinference/v0
+# mapping table are written against what these versions emit (ADR-0006).
+dependencies = [
+    "jsonschema>=4.26,<5",
+    "openinference-instrumentation==0.1.74",
+    "openinference-instrumentation-openai==0.1.68",
+    "openinference-semantic-conventions==0.1.43",
+    "opentelemetry-api>=1.45.2,<1.46",
+    "opentelemetry-exporter-otlp-proto-http>=1.45.2,<1.46",
+    "opentelemetry-sdk>=1.45.2,<1.46",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14"]

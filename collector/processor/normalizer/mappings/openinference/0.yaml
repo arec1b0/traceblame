@@ -5,7 +5,8 @@ sdk: openinference
 version: "0"
 source: >-
   openinference-semantic-conventions 0.1.43 as emitted by openinference-instrumentation-openai
-  0.1.68 (collector/testdata/fixtures/openinference/)
+  0.1.68, and the traceblame-py agent, retriever and tool spans
+  (collector/testdata/fixtures/openinference/)
 match:
   scope_prefixes: [openinference.instrumentation.]
   markers: [openinference.span.kind]
@@ -64,6 +65,14 @@ map:
     from:
       - {status_message: true, on_error: true, match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)', convert: http_status}
       - {event: exception, field: exception.message, on_error: true, match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)', convert: http_status}
+  # traceblame-py tool helper (fixtures agentic_rag_cuad_*)
+  - to: gen_ai.tool.name
+    from:
+      - attr: tool.name
+  # traceblame-py agent helper
+  - to: gen_ai.agent.name
+    from:
+      - attr: agent.name
 
 known:
   - openinference.span.kind
@@ -71,6 +80,9 @@ known:
   - llm.token_count.prompt_details.cache_read
   - input.mime_type
   - output.mime_type
+  # Ids and scores of retrieved documents, never their text; the shim also sets
+  # aegis.retrieval.doc_ids/scores from them.
+  - pattern: '^retrieval\.documents\.\d+\.document\.(id|score)$'
 
 # Prompt/completion content (issue #9): dropped on every span, never mapped. Names from
 # openinference-semantic-conventions 0.1.43 (SpanAttributes, MessageAttributes,

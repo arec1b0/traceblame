@@ -24,6 +24,8 @@ CONTRACT_BASE_REF ?= origin/main
 export CONTRACT_BASE_REF
 
 KIND_CLUSTER := traceblame
+# The agentic-rag checkout that make fixtures-agentic-rag runs (#12).
+APP_DIR ?= $(CURDIR)/../agentic-rag
 
 # Collector distribution (collector/builder-config.yaml, ocb from tools/versions.env).
 COLLECTOR_BUILD := collector/_build
@@ -31,8 +33,8 @@ OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
 # The normalizer as a CLI (collector/cmd/normalize): the contract stage runs fixtures through it.
 export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
-.PHONY: help bootstrap lint test contract integration security fixtures kind-up kind-down \
-	kind-deploy bench-scaling collector collector-smoke collector-image
+.PHONY: help bootstrap lint test contract integration security fixtures fixtures-agentic-rag \
+	kind-up kind-down kind-deploy bench-scaling collector collector-smoke collector-image
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-16s %s\n", $$1, $$2 }'
@@ -83,6 +85,10 @@ collector-image: ## Build and smoke-test the collector image, SBOM + Grype gate 
 fixtures: ## Re-capture golden span fixtures from Ollama (OLLAMA_URL=...; see collector/testdata/fixtures)
 	bash scripts/install-tools.sh otelcol-contrib
 	uv run --locked --script tools/fixtures/capture.py $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
+
+fixtures-agentic-rag: ## Capture agentic-rag fixtures through kind (APP_DIR, OLLAMA_URL; needs kind-up, kind-deploy)
+	bash scripts/install-tools.sh otelcol-contrib
+	uv run --locked --script tools/fixtures/capture_agentic_rag.py --app-dir "$(APP_DIR)" $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
 
 kind-up: ## Create the local kind cluster, namespaces and generated Secrets (needs Docker in WSL)
 	@bash scripts/kind-up.sh

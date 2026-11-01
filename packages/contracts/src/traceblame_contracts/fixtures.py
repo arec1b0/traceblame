@@ -31,15 +31,56 @@ class ModelInfo(_Model):
     server_version: str
 
 
+class AppInfo(_Model):
+    """The application a capture ran (app captures only)."""
+
+    repository: str
+    commit: str = Field(pattern=r"^[0-9a-f]{40}$")
+
+
+class ShimInfo(_Model):
+    package: str
+    version: str
+    commit: str = Field(pattern=r"^[0-9a-f]{40}$")
+
+
+class DatasetInfo(_Model):
+    """Where an app capture's queries come from, and how they were sampled."""
+
+    name: str
+    source: str
+    archive_sha256: str = Field(pattern=_SHA256)
+    license: str
+    seed: int
+    n: int
+    ratio: float
+    stratum: Literal["all", "answerable", "unanswerable"]
+    qids: tuple[str, ...]
+
+
+class EmbeddingModelInfo(_Model):
+    name: str
+    revision: str
+
+
+class RunInfo(_Model):
+    script: str
+    script_sha256: str = Field(pattern=_SHA256)
+    outcomes: dict[str, int]
+    report: str
+
+
 class Provenance(_Model):
-    """How a fixture was captured. Written by tools/fixtures/capture.py, never by hand."""
+    """How a fixture was captured. Written by tools/fixtures/capture.py or, for real
+    application runs, tools/fixtures/capture_agentic_rag.py; never by hand."""
 
     sdk: Literal["openinference", "openllmetry", "otel-genai"]
     scenario: str
     captured_at: datetime
     capture_script: str
     capture_script_sha256: str = Field(pattern=_SHA256)
-    capture_common_sha256: str = Field(pattern=_SHA256)
+    # SDK captures share tools/fixtures/_capture_common.py; app captures have no such module.
+    capture_common_sha256: str | None = Field(default=None, pattern=_SHA256)
     python: str
     uv: str
     packages: dict[str, str]
@@ -47,10 +88,17 @@ class Provenance(_Model):
     # True only for *_content scenarios: content capture was on, so the export carries
     # prompt/completion text on purpose (the normalizer's redaction tests need it).
     content_capture: bool = False
+    # App captures: the capture checked that no query or document text was exported.
+    content_check: Literal["passed"] | None = None
     model: ModelInfo
     endpoint: str
     collector: str
     fixture_sha256: str = Field(pattern=_SHA256)
+    app: AppInfo | None = None
+    shim: ShimInfo | None = None
+    dataset: DatasetInfo | None = None
+    embedding_model: EmbeddingModelInfo | None = None
+    run: RunInfo | None = None
     notes: tuple[str, ...] = ()
 
 

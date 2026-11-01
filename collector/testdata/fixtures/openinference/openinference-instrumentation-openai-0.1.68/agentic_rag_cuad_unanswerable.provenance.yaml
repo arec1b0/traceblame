@@ -1,0 +1,88 @@
+sdk: openinference
+scenario: agentic_rag_cuad_unanswerable
+captured_at: '2026-10-31T17:35:47Z'
+capture_script: tools/fixtures/capture_agentic_rag.py
+capture_script_sha256: a036e191fca154af43fa7669fe9ee207ca7c7916905eb6f9f82509d9a5f8b626
+python: 3.12.15
+uv: 0.13.6
+packages:
+  openinference-instrumentation-openai: 0.1.68
+  openinference-instrumentation: 0.1.74
+  openinference-semantic-conventions: 0.1.43
+  openai: 3.41.0
+  opentelemetry-sdk: 1.45.2
+  opentelemetry-exporter-otlp-proto-http: 1.45.2
+  traceblame-py: 0.1.0
+  chromadb: 1.5.9
+  sentence-transformers: 6.2.0
+  torch: 2.15.0+cpu
+env:
+  ENABLE_QUERY_CACHE: 'false'
+  ENABLE_EMBEDDING_CACHE: 'false'
+  ENABLE_COST_TRACKING: 'false'
+  ANONYMIZED_TELEMETRY: 'False'
+  HF_HUB_OFFLINE: '1'
+  HF_HUB_DISABLE_TELEMETRY: '1'
+  TOKENIZERS_PARALLELISM: 'false'
+  TRACEBLAME_ENABLED: '1'
+  TRACEBLAME_TENANT_ID: tenant-eval
+  TRACEBLAME_EVAL_RUN_ID: rag-cuad-20261031-s7-3a8545b-b
+content_capture: false
+content_check: passed
+model:
+  name: qwen2.5:7b
+  digest: 845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e
+  server: ollama
+  server_version: 0.40.5
+endpoint: http://localhost:11434/v1
+collector: otelcol-contrib 0.164.0 (sha256 f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4)
+fixture_sha256: 6cd166da781d56e7ae189a418abac14825a4e0ae88e6162a3139a0b83861c93a
+app:
+  repository: https://github.com/arec1b0/agentic-rag
+  commit: 0e3780d1f4fa84a19b242a93c341ced1a31d148f
+shim:
+  package: traceblame-py
+  version: 0.1.0
+  commit: 3a8545b20db64ee005bf657f2ac65435c9341350
+dataset:
+  name: CUAD v1, official test split
+  source: https://raw.githubusercontent.com/TheAtticusProject/cuad/67faa0e6023b04fcaae6cc09497ab00e5d63a2a2/data.zip
+  archive_sha256: f8161d18bea4e9c05e78fa6dda61c19c846fb8087ea969c172753bc2f45b999a
+  license: CC BY 4.0
+  seed: 7
+  n: 24
+  ratio: 0.5
+  stratum: unanswerable
+  qids:
+  - XinhuaSportsEntertainmentLtd_20070221_F-1_EX-99.4_645553_EX-99.4_Content License Agreement__Price
+    Restrictions
+  - ONEMAINHOLDINGS,INC_02_20_2020-EX-99.D-JOINT FILING AGREEMENT__Price Restrictions
+  - OMINTO,INC_03_29_2004-EX-10-RESELLER AGREEMENT__Third Party Beneficiary
+  - PROFOUNDMEDICALCORP_08_29_2019-EX-4.5-SUPPLY AGREEMENT__Renewal Term
+  - TUNIUCORP_03_06_2014-EX-10-COOPERATION AGREEMENT__Minimum Commitment
+  - ACCELERATEDTECHNOLOGIESHOLDINGCORP_04_24_2003-EX-10.13-JOINT VENTURE AGREEMENT__Rofr/Rofo/Rofn
+  - RitterPharmaceuticalsInc_20200313_S-4A_EX-10.54_12055220_EX-10.54_Development Agreement__Irrevocable
+    Or Perpetual License
+  - NOVOINTEGRATEDSCIENCES,INC_12_23_2019-EX-10.1-JOINT VENTURE AGREEMENT__No-Solicit Of Customers
+  - PhotronicsInc_20171219_10-QA_EX-10.28_10982650_EX-10.28_Outsourcing Agreement__Revenue/Profit Sharing
+  - ArconicRolledProductsCorp_20191217_10-12B_EX-2.7_11923804_EX-2.7_Trademark License Agreement__Cap
+    On Liability
+  - PLAYAHOTELS_RESORTSNV_03_14_2017-EX-10.22-STRATEGIC ALLIANCE AGREEMENT (Hyatt Ziva Cancun)__Affiliate
+    License-Licensor
+  - WOMENSGOLFUNLIMITEDINC_03_29_2000-EX-10.13-ENDORSEMENT AGREEMENT__Audit Rights
+embedding_model:
+  name: sentence-transformers/all-MiniLM-L6-v2
+  revision: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+run:
+  script: tools/fixtures/agentic_rag/run.py
+  script_sha256: 46f77962e803da46c368f79851c9d57b2e8ac77ef4c19f3e04c209075b6774ac
+  outcomes:
+    answered: 12
+  report: evals/reports/sdk-py-kind-2026-10-31.md
+notes:
+- Real CUAD questions, verbatim, each over the contract it is about; the app's RAGAgent with its retriever,
+  summarizer and calculator tools, and its LLM judge.
+- 'Exported through traceblame-py: content stays in-process (ADR-0006). The file is what the pinned collector
+  received; the kind agent got the same requests.'
+- gen_ai.provider.name / server.address describe the OpenAI client talking to Ollama's OpenAI-compatible
+  API, not the OpenAI service.

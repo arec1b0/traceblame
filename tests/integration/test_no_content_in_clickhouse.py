@@ -292,5 +292,11 @@ def test_trace_arrivals_carry_the_normalized_tenant(
     tenants = {r["trace_id"]: r["tenant_id"] for r in rows}
     assert tenants[SHIM_TRACE] == "tenant-shim", "config mode keeps the shim's resource tenant"
     assert tenants[SPAN_ATTR_TRACE] == "integration", "a span-level tenant is dropped and filled"
-    fixture_traces = {s["trace_id"] for fx in FIXTURES for s in flatten_otlp_json(fx.load())}
-    assert {tenants[t] for t in fixture_traces} == {"integration"}, "filled from config"
+    # Config mode fills a missing tenant and keeps one a shim set (the agentic-rag runs, #12).
+    expected = {
+        s["trace_id"]: s["resource"].get("aegis.tenant.id", "integration")
+        for fx in FIXTURES
+        for s in flatten_otlp_json(fx.load())
+    }
+    assert {t: tenants[t] for t in expected} == expected, "filled from config, or the shim's"
+    assert "integration" in expected.values()

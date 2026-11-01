@@ -1,0 +1,27 @@
+# Environment of the agentic-rag capture (make fixtures-agentic-rag, #12).
+#
+# Only what arec1b0/agentic-rag's src/ imports at run time (loguru, openai, chromadb,
+# sentence_transformers, pydantic, pydantic_settings, prometheus_client, numpy), not its whole
+# requirements.txt, which also carries Jupyter, MLflow and dev tools. openai matches the
+# fixtures and the shim's tests. Then the shim's own dependencies (sdk/python/pyproject.toml);
+# the driver installs the shim and the app with --no-deps and runs `uv pip check`.
+#
+# Re-lock: uv pip compile tools/fixtures/agentic_rag/requirements.in --python-version 3.12 \
+#   --torch-backend cpu --generate-hashes -o tools/fixtures/agentic_rag/requirements.lock
+chromadb==1.5.9
+loguru==0.7.3
+numpy==2.5.4
+openai==3.41.0
+prometheus-client==0.26.0
+pydantic==2.14.2
+pydantic-settings==2.16.2
+sentence-transformers==6.2.0
+torch==2.15.0
+# traceblame-py
+jsonschema>=4.26,<5
+openinference-instrumentation==0.1.74
+openinference-instrumentation-openai==0.1.68
+openinference-semantic-conventions==0.1.43
+opentelemetry-api>=1.45.2,<1.46
+opentelemetry-exporter-otlp-proto-http>=1.45.2,<1.46
+opentelemetry-sdk>=1.45.2,<1.46
