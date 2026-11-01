@@ -10,3 +10,5 @@ f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4  otelcol-contri
 ce723e9cdd8e39293af49a2cfd11b22f9891401cb6da978db30188ca300a280f  ocb_0.164.0_linux_amd64
 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  kubeconform-0.8.0-linux-amd64.tar.gz
 ec58d6c9215d4c8a6edbd8d55e720d7a3eb9643d7eda6fca1c62df286a8856b3  clickhouse-operator-install-bundle-0.27.4.yaml
+1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce  node-v22.23.4-linux-x64.tar.xz
+3ec79240658f0ee4e8977f21ee2c598c7a8b8d06b86dc564f2ec6cb099fd8ac2  pnpm-10.34.9-linux-x64

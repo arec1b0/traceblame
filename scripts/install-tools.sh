@@ -122,6 +122,21 @@ install_otelcol_contrib() {
   install -m 0755 "${WORK}/otelcol-contrib" "${BIN}/"
 }
 
+install_node() {
+  local name="node-v$1-linux-x64.tar.xz"
+  fetch "${name}" "https://nodejs.org/dist/v$1/${name}"
+  rm -rf "${TOOLS}/node"
+  mkdir -p "${TOOLS}/node"
+  tar -xJf "${WORK}/${name}" -C "${TOOLS}/node" --strip-components=1
+  ln -sf ../node/bin/node "${BIN}/node"
+}
+
+install_pnpm() {
+  local name="pnpm-$1-linux-x64"
+  fetch "${name}" "https://github.com/pnpm/pnpm/releases/download/v$1/pnpm-linux-x64"
+  install -m 0755 "${WORK}/${name}" "${BIN}/pnpm"
+}
+
 # tool name -> "VERSION FUNC"
 declare -A TOOLSET=(
   [uv]="${UV_VERSION} install_uv"
@@ -135,8 +150,10 @@ declare -A TOOLSET=(
   [ocb]="${OCB_VERSION} install_ocb"
   [kubeconform]="${KUBECONFORM_VERSION} install_kubeconform"
   [otelcol-contrib]="${OTELCOL_CONTRIB_VERSION} install_otelcol_contrib"
+  [node]="${NODE_VERSION} install_node"
+  [pnpm]="${PNPM_VERSION} install_pnpm"
 )
-DEFAULT_TOOLS=(uv go golangci-lint hadolint gitleaks actionlint kind kubectl ocb kubeconform)
+DEFAULT_TOOLS=(uv go golangci-lint hadolint gitleaks actionlint kind kubectl ocb kubeconform node pnpm)
 
 for tool in "${@:-${DEFAULT_TOOLS[@]}}"; do
   if [[ -z "${TOOLSET[${tool}]:-}" ]]; then
