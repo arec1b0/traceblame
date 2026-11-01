@@ -15,5 +15,6 @@ export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
 bash scripts/install-tools.sh
 uv sync --all-packages --locked
 bash scripts/go-each-module.sh go mod download
+pnpm -C sdk/ts install --frozen-lockfile
 uv run --frozen pre-commit install-hooks
 uv run --frozen pre-commit install --hook-type pre-push

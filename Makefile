@@ -45,7 +45,7 @@ bootstrap: ## Install pinned tools, sync Python and Go deps, pre-commit envs and
 lint: ## Run every linter over all tracked files (pre-commit)
 	$(UV_RUN) pre-commit run --all-files --show-diff-on-failure
 
-test: ## Unit tests: pytest with coverage gates, go test -race
+test: ## Unit tests: pytest with coverage gates, go test -race, vitest (sdk/ts)
 	$(UV_RUN) pytest -m "not contract and not integration" --cov --cov-report=term
 	@for pkg in $(COV_GATED); do \
 	  echo "coverage gate: $$pkg >= $(COV_MIN)%"; \
@@ -55,6 +55,7 @@ test: ## Unit tests: pytest with coverage gates, go test -race
 	@for gate in $(GO_COV_GATED); do \
 	  bash scripts/go-coverage-gate.sh "$${gate%%:*}" "$${gate#*:}" $(COV_MIN); \
 	done
+	COV_MIN=$(COV_MIN) pnpm -C sdk/ts -s test
 
 contract: ## Contract tests: profile/schema sync, semconv pin, fixtures through the normalizer; gap report in .contract/
 	@if [ "$(origin CONTRACT_BASE_REF)" = file ]; then \
@@ -63,6 +64,7 @@ contract: ## Contract tests: profile/schema sync, semconv pin, fixtures through 
 	cd collector && go build -o "$(TRACEBLAME_NORMALIZE_BIN)" ./cmd/normalize
 	$(UV_RUN) traceblame-contracts gen-schema --check
 	$(UV_RUN) traceblame-contracts gap-report
+	pnpm -C sdk/ts -s build
 	$(UV_RUN) pytest -m contract -rxX
 
 integration: collector ## Integration: ClickHouse in a test container, migrations, the built collector (needs Docker)

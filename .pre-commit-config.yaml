@@ -48,6 +48,18 @@ repos:
         language: unsupported
         types_or: [python, pyi]
         pass_filenames: false
+      - id: sdk-ts-eslint
+        name: eslint (sdk/ts)
+        entry: .tools/bin/pnpm -C sdk/ts -s lint
+        language: unsupported
+        files: ^sdk/ts/
+        pass_filenames: false
+      - id: sdk-ts-tsc
+        name: tsc --noEmit (sdk/ts)
+        entry: .tools/bin/pnpm -C sdk/ts -s typecheck
+        language: unsupported
+        files: ^sdk/ts/
+        pass_filenames: false
       - id: golangci-lint
         name: golangci-lint
         entry: scripts/go-each-module.sh golangci-lint run ./...
