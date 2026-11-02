@@ -2,14 +2,13 @@
 // (ADR-0006 section 6). Never from message text.
 import { createOpenAI } from "@ai-sdk/openai";
 import { APICallError, RetryError, generateObject, wrapLanguageModel } from "ai";
-import { MockLanguageModelV1 } from "ai/test";
 import { expect, it } from "vitest";
 import { z } from "zod";
 import { DO_GENERATE, GENERATE } from "../src/features.js";
 import { statusMiddleware } from "../src/middleware.js";
 import { AI_SDK_TELEMETRY } from "../src/provider.js";
 import { toolSpan } from "../src/spans.js";
-import { byOperation, completion, exported, only, openaiFetch } from "./helpers.js";
+import { byOperation, completion, exported, mockModel, only, openaiFetch } from "./helpers.js";
 
 const STATUS = "http.response.status_code";
 const schema = z.object({ a: z.boolean() });
@@ -49,7 +48,7 @@ it("a success records no status", async () => {
 
 it("reads RetryError.lastError when a provider throws one from inside the attempt", async () => {
   const lastError = new APICallError({ message: "m", url: "u", requestBodyValues: {}, statusCode: 429, isRetryable: true });
-  const inner = new MockLanguageModelV1({
+  const inner = mockModel({
     defaultObjectGenerationMode: "json",
     doGenerate: () => Promise.reject(new RetryError({ message: "m", reason: "maxRetriesExceeded", errors: [lastError] })),
   });
@@ -61,10 +60,18 @@ it.each([
   ["a status below 400", 302],
   ["no status", undefined],
 ])("ignores %s", async (_name, statusCode) => {
-  const inner = new MockLanguageModelV1({
+  const inner = mockModel({
     defaultObjectGenerationMode: "json",
     doGenerate: () =>
-      Promise.reject(new APICallError({ message: "Error code: 500", url: "u", requestBodyValues: {}, statusCode, isRetryable: false })),
+      Promise.reject(
+        new APICallError({
+          message: "Error code: 500",
+          url: "u",
+          requestBodyValues: {},
+          ...(statusCode === undefined ? {} : { statusCode }),
+          isRetryable: false,
+        }),
+      ),
   });
   const { spans } = await exported(() => call(wrapLanguageModel({ model: inner, middleware: statusMiddleware })));
   // Never from the message, even one that reads like the OpenAI client's prefix.
@@ -78,7 +85,7 @@ it("with AI SDK telemetry off, the app's own active span is left alone", async (
 });
 
 it("streaming errors are recorded too", async () => {
-  const inner = new MockLanguageModelV1({
+  const inner = mockModel({
     doStream: () =>
       Promise.reject(new APICallError({ message: "m", url: "u", requestBodyValues: {}, statusCode: 401, isRetryable: false })),
   });

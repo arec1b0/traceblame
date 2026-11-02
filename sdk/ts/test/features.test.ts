@@ -1,20 +1,19 @@
 // aegis.output.parse_ok on AI SDK calls (ADR-0006 section 6), on the EXPORTED spans.
 import { SpanStatusCode, diag, trace } from "@opentelemetry/api";
 import type { ReadableSpan, SpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { APICallError, generateObject } from "ai";
-import { MockLanguageModelV1 } from "ai/test";
+import { APICallError, type LanguageModelV1, generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { DO_GENERATE, FeatureProcessor, FeatureValues, GENERATE, NO_OBJECT } from "../src/features.js";
 import { AI_SDK_TELEMETRY } from "../src/provider.js";
-import { BATCHING, byOperation, completion, exported, only, openaiFetch } from "./helpers.js";
+import { BATCHING, byOperation, completion, exported, mockModel, only, openaiFetch } from "./helpers.js";
 
 const PARSE_OK = "aegis.output.parse_ok";
 const schema = z.object({ apply: z.boolean(), runbookId: z.string().nullable() });
 
-function mock(text: string | undefined): MockLanguageModelV1 {
-  return new MockLanguageModelV1({
+function mock(text: string | undefined): LanguageModelV1 {
+  return mockModel({
     defaultObjectGenerationMode: "json",
     supportsStructuredOutputs: true,
     doGenerate: () =>
@@ -22,12 +21,12 @@ function mock(text: string | undefined): MockLanguageModelV1 {
         rawCall: { rawPrompt: null, rawSettings: {} },
         finishReason: "stop",
         usage: { promptTokens: 1, completionTokens: 1 },
-        text,
+        ...(text === undefined ? {} : { text }),
       }),
   });
 }
 
-async function call(model: MockLanguageModelV1 | ReturnType<ReturnType<typeof createOpenAI>>, maxRetries = 0) {
+async function call(model: LanguageModelV1, maxRetries = 0) {
   try {
     await generateObject({ model, schema, prompt: "p", maxRetries, experimental_telemetry: AI_SDK_TELEMETRY });
   } catch {
@@ -59,7 +58,7 @@ describe.each(BATCHING)("parse_ok with %s", (_name, batch) => {
   });
 
   it("an API error: no value", async () => {
-    const model = new MockLanguageModelV1({
+    const model = mockModel({
       defaultObjectGenerationMode: "json",
       doGenerate: () =>
         Promise.reject(new APICallError({ message: "m", url: "u", requestBodyValues: {}, statusCode: 500, isRetryable: false })),
@@ -91,7 +90,7 @@ describe.each(BATCHING)("parse_ok with %s", (_name, batch) => {
 
 it("parse_ok follows each retry attempt: only the attempt that answered gets a value", async () => {
   let calls = 0;
-  const model = new MockLanguageModelV1({
+  const model = mockModel({
     defaultObjectGenerationMode: "json",
     supportsStructuredOutputs: true,
     doGenerate: () =>

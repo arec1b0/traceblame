@@ -1,7 +1,30 @@
 import type { BufferConfig, ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
+import type { LanguageModelV1 } from "ai";
+import { MockLanguageModelV1 } from "ai/test";
 import { type ShimConfig, shimConfig } from "../src/config.js";
 import { type Shim, instrument } from "../src/provider.js";
+
+/**
+ * ai/test's MockLanguageModelV1 as the LanguageModelV1 it stands in for. The class (ai 4.3.19)
+ * always has supportsStructuredOutputs and supportsUrl, typed `T | undefined`, where the interface
+ * declares them optional; under exactOptionalPropertyTypes those differ. This delegates to the mock
+ * and copies only the members that are set, so no cast is needed.
+ */
+export function mockModel(options: ConstructorParameters<typeof MockLanguageModelV1>[0]): LanguageModelV1 {
+  const mock = new MockLanguageModelV1(options);
+  const { supportsStructuredOutputs, supportsUrl } = mock;
+  return {
+    specificationVersion: mock.specificationVersion,
+    provider: mock.provider,
+    modelId: mock.modelId,
+    defaultObjectGenerationMode: mock.defaultObjectGenerationMode,
+    ...(supportsStructuredOutputs === undefined ? {} : { supportsStructuredOutputs }),
+    ...(supportsUrl === undefined ? {} : { supportsUrl: (url: URL) => supportsUrl.call(mock, url) }),
+    doGenerate: (callOptions) => mock.doGenerate(callOptions),
+    doStream: (callOptions) => mock.doStream(callOptions),
+  };
+}
 
 export const BATCHING: [string, BufferConfig | undefined][] = [
   ["default batching", undefined],
