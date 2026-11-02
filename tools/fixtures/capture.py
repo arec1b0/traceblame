@@ -29,7 +29,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -398,7 +398,7 @@ def run_capture(capture: Capture, uv: str, ollama: str, workdir: Path) -> dict[s
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=cast("str", __doc__).splitlines()[0])
     parser.add_argument("--ollama-url", help="default: localhost, then the WSL2 host")
     parser.add_argument(
         "--only",

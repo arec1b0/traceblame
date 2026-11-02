@@ -33,7 +33,7 @@ import time
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -291,7 +291,7 @@ def check_eval_tenants() -> None:
         )
     except subprocess.CalledProcessError as exc:
         raise SystemExit("capture: no eval-tenants ConfigMap; run `make kind-deploy`") from exc
-    tenants = yaml.safe_load(value) or []
+    tenants: list[str] = yaml.safe_load(value) or []
     if RUN_B_TENANT not in tenants or RUN_A_TENANT in tenants:
         raise SystemExit(
             f"capture: eval_tenants is {tenants}; want {RUN_B_TENANT} and not {RUN_A_TENANT}"
@@ -356,7 +356,7 @@ def resource_marker(rs: dict[str, Any]) -> Any:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=cast("str", __doc__).splitlines()[0])
     parser.add_argument("--app-dir", type=Path, required=True)
     parser.add_argument("--ollama-url", help="default: localhost, then the WSL2 host")
     parser.add_argument("--seed", type=int, default=7)
@@ -548,7 +548,7 @@ def main() -> int:
         qids = sorted(
             {o["qid"] for o in outcomes_a} | {o["qid"] for _, outs in runs_b.values() for o in outs}
         )
-        files = []
+        files: list[str] = []
         for name, payload in (
             ("run_a", run_a),
             *((f"run_b_{k}", v[0]) for k, v in runs_b.items()),

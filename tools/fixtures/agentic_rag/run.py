@@ -22,7 +22,7 @@ import threading
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # Run with `python -I`, which ignores PYTHONPATH: the driver names the app checkout instead.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -222,11 +222,11 @@ def _strings(value: Any) -> Iterator[str]:
     if isinstance(value, str):
         yield value
     elif isinstance(value, dict):
-        for k, v in value.items():
+        for k, v in cast("dict[str, Any]", value).items():
             yield k
             yield from _strings(v)
     elif isinstance(value, list):
-        for v in value:
+        for v in cast("list[Any]", value):
             yield from _strings(v)
 
 
@@ -263,7 +263,7 @@ def _check_content(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=cast("str", __doc__).splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run")
     run.add_argument("--archive", required=True)

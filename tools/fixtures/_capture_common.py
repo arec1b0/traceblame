@@ -13,13 +13,17 @@ import os
 import platform
 from collections.abc import Callable
 from importlib.metadata import version
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from openai import BadRequestError, OpenAI
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+if TYPE_CHECKING:
+    # Typing only: the calls below take **params, which pyright cannot match to an overload.
+    from openai.types.chat import ChatCompletion
 
 _WEATHER_TOOL: Any = {
     "type": "function",
@@ -49,15 +53,21 @@ def _user(prompt: str) -> list[Any]:
 
 
 def _chat_basic(client: OpenAI) -> dict[str, Any]:
-    resp = client.chat.completions.create(
-        messages=_user(os.environ["CAPTURE_PROMPT"]), **_chat_params()
+    resp = cast(
+        "ChatCompletion",
+        client.chat.completions.create(
+            messages=_user(os.environ["CAPTURE_PROMPT"]), **_chat_params()
+        ),
     )
     return {"finish_reason": resp.choices[0].finish_reason}
 
 
 def _chat_tool_call(client: OpenAI) -> dict[str, Any]:
-    resp = client.chat.completions.create(
-        messages=_user(os.environ["CAPTURE_PROMPT"]), tools=[_WEATHER_TOOL], **_chat_params()
+    resp = cast(
+        "ChatCompletion",
+        client.chat.completions.create(
+            messages=_user(os.environ["CAPTURE_PROMPT"]), tools=[_WEATHER_TOOL], **_chat_params()
+        ),
     )
     calls = resp.choices[0].message.tool_calls or []
     return {

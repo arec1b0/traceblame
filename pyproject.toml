@@ -53,13 +53,35 @@ known-first-party = ["traceblame_*"]
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
-include = ["services", "packages", "sdk", "tests"]
+include = ["services", "packages", "sdk", "tests", "tools"]
 exclude = ["**/.venv", "**/__pycache__", ".tools"]
 venvPath = "."
 venv = ".venv"
 
+# tools/: the capture scripts run as `uv run --script` in their own environments and add
+# their sibling modules to sys.path at run time (cuad, rules, scenarios); extraPaths mirrors
+# that. tools/typings holds stubs for what exists only in those environments (the PEP 723
+# dependencies that conflict with the workspace's and the agentic-rag app); each says which
+# release or commit it mirrors, and tests/scripts/test_tool_stubs.py checks the pins.
+[[tool.pyright.executionEnvironments]]
+root = "tools"
+extraPaths = [
+    "tools/fixtures",
+    "tools/fixtures/agentic_rag",
+    "tools/fixtures/runbook_agent",
+    "tools/typings",
+]
+
+# The tests of those modules import them by their run-time names (pytest pythonpath below).
+[[tool.pyright.executionEnvironments]]
+root = "tests/scripts"
+extraPaths = ["tools/fixtures/agentic_rag", "tools/fixtures/runbook_agent"]
+
 [tool.pytest.ini_options]
 minversion = "9.0"
+# The capture drivers add these directories to sys.path at run time (rules, scenarios, cuad);
+# tests/scripts imports those modules by the same names, and pyright's extraPaths match.
+pythonpath = ["tools/fixtures/agentic_rag", "tools/fixtures/runbook_agent"]
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config", "-ra"]
 testpaths = ["services", "packages", "sdk", "tests"]
 xfail_strict = true
