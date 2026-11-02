@@ -55,9 +55,13 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows in this checkout.
 - `make bootstrap`: install pinned tools into `.tools/` (tools/versions.env + tools/checksums.txt),
   `uv sync --all-packages --locked`, Go module download, pre-commit hook environments, and the
-  pre-push hook (`pre-commit install --hook-type pre-push`: scripts/prepush-check.sh)
-- `make lint`: pre-commit over all tracked files (stage new files first)
-- `make test`: pytest with coverage gates (`COV_MIN`), `go test -race` per go.work module
+  pre-push hook (`pre-commit install --hook-type pre-push`: scripts/prepush-check.sh), and
+  `pnpm -C sdk/ts install --frozen-lockfile` (Node and pnpm pinned in tools/versions.env)
+- `make lint`: pre-commit over all tracked files (stage new files first); includes eslint and
+  `tsc --noEmit` for sdk/ts
+- `make test`: pytest with coverage gates (`COV_MIN`), `go test -race` per go.work module,
+  `vitest run --coverage` in sdk/ts (same `COV_MIN`)
+- `.tools/bin/pnpm -C sdk/ts build|test|lint|typecheck`: the TypeScript shim alone
 - `make contract`: builds `collector/cmd/normalize`, `traceblame-contracts gen-schema --check`
   (JSON Schema + the normalizer's profile copy), gap report in `.contract/`, `pytest -m contract`
   (profile <-> JSON Schema, semconv snapshot, golden fixtures through the Go normalizer)
@@ -71,6 +75,10 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   (`APP_DIR=../agentic-rag`, `OLLAMA_URL=...`; needs `make kind-up kind-deploy`): canary
   preflight, tenant/marker checks against ClickHouse, report in `evals/reports/sdk-py-kind-*`,
   fixtures `agentic_rag_cuad_*` with provenance
+- `make fixtures-runbook-agent`: real runbook-agent runs in the kind sandbox
+  (`RUNBOOK_APP_DIR=../runbook-agent`, `OLLAMA_URL=...`; needs `make kind-up kind-deploy
+  kind-runbook-up`; about 2 h): image with the packed shim, safety/network probes, canary,
+  24 seeded tasks + one HTTP 404 task, report `evals/reports/sdk-ts-kind-*`, fixtures `runbook_*`
 - `uv run traceblame-contracts gen-schema`: regenerate the JSON Schema and the normalizer's
   embedded profile copy after editing the profile
 - `make collector`: ocb build of the collector distribution into `collector/_build/otelcol`
@@ -82,6 +90,8 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   the TLS, htpasswd and ClickHouse Secrets; never committed)
 - `make kind-deploy`: images, ClickHouse via the Altinity operator, migrations, agent DaemonSet
   and gateway Deployment into kind (deploy/kind/README.md)
+- `make kind-runbook-up` / `make kind-runbook-down`: the runbook-agent sandbox and its
+  monitoring (namespace-only RBAC, derived NetworkPolicy addresses, pinned upstream rules)
 - `make bench-scaling`: gateway 2 -> 4 -> 2 under steady load; span loss / split-trace report
   into evals/reports/ (RATE, LOAD, UP_AT, DOWN_AT override the defaults)
 - `make demo`: M3

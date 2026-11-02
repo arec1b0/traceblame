@@ -64,7 +64,7 @@ UTF-8 cannot be expressed here; the normalizer's unit tests keep them.
 |---|---|---|
 | Normalizer (Go) | `collector/processor/normalizer/content_vectors_test.go`: `jcs.Canonicalize` and `argsHash`, directly and through the processor | done (#32) |
 | Python shim | `sdk/python/tests/test_args_hash_vectors.py`: `canonicalize` and `args_hash` of `traceblame_py`; `tests/contract/test_args_hash_parity.py` also compares generated arguments with the Go normalizer | done (#12) |
-| TypeScript shim | added by the shim's PR (#13) | to do |
+| TypeScript shim | `sdk/ts/test/argsHashVectors.test.ts`: `canonicalize` and `argsHash` of `traceblame-ts` over every file in `v1/`, failing on an `algorithm_version` other than the shim's; `tests/contract/test_args_hash_parity.py` also compares generated arguments with the Python shim and the Go normalizer | done (#13) |
 
 A shim PR must run every vector in `v1/aegis.tool.args_hash.json` through its own
 implementation and fail on any mismatch, and must not merge without it. Shims also check that

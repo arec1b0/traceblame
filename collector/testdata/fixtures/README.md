@@ -8,6 +8,9 @@ and version:
 <sdk>/<instrumentation-package>-<version>/<scenario>.provenance.yaml  how it was captured
 ```
 
+A scoped npm package (`@scope/name`) names its directory `scope-name-<version>`, e.g.
+`openllmetry/traceloop-node-server-sdk-0.27.0/`.
+
 Nothing here is written by hand. The provenance records `fixture_sha256`, so
 `make contract` fails if a fixture is edited after capture. Pre-commit does not touch this
 directory, for the same reason.
@@ -71,6 +74,34 @@ pin and the sampled question ids, the embedding model revision, and the run's re
 `evals/reports/`. The word list of `make contract` (the capture prompts' words) proves little
 for CUAD text, so the capture itself checked every question and every chunk of the queried
 contracts against the export and the stored rows (`content_check: passed`).
+
+## Real application runs (#13)
+
+`openllmetry/traceloop-node-server-sdk-0.27.0/runbook_{latency,oom,crash,pending,api_error}`
+are exports of the runbook agent ([arec1b0/runbook-agent](https://github.com/arec1b0/runbook-agent),
+TypeScript, Vercel AI SDK) instrumented with the TypeScript shim (`traceblame-ts`). It ran
+in-cluster in a kind sandbox and handled alerts that real faults fired through pinned upstream
+Prometheus rules ([deploy/kind/README.md](../../../deploy/kind/README.md#runbook-agent-sandbox-13)).
+Each file is one tee session: six seeded tasks of one scenario, or, for `runbook_api_error`, one
+task whose model the server lacked (a real HTTP 404).
+
+- **Mixed SDKs (ADR-0006 section 3).** The AI SDK's spans (the `generateObject` call, `chain`, and its
+  HTTP attempt, `llm`) reach the normalizer through OpenLLMetry-js, so they map with
+  `openllmetry/0`. The shim's agent and tool spans follow OpenInference conventions and map
+  with `openinference/0`. `aegis.source.sdk` names the emitter, not the app.
+- **No content in memory.** The AI SDK's `recordInputs`/`recordOutputs` stay off;
+  `aegis.output.parse_ok` comes from the SDK's own validation and sits on the `llm` span, and
+  `http.response.status_code` comes from the shim's model middleware (ADR-0006 section 6).
+- **Model behaviour.** Most triage calls answered `apply: false` with a runbook, which the
+  app treats as a decline, so few tasks ran a runbook and the approval gate was barely reached
+  (report: "Model behaviour"; arec1b0/runbook-agent#1).
+
+`make fixtures-runbook-agent` ([tools/fixtures/capture_runbook_agent.py](../../../tools/fixtures/capture_runbook_agent.py))
+builds the app image with the packed shim, runs the safety and network probes and a canary
+preflight against a stub LLM, then the tasks. It writes fixtures only when ClickHouse holds
+exactly the tee's spans, Alertmanager's webhook requests equal the tasks and no alert text is
+exported. Provenance adds the image, Node and pnpm, the rule pins and overrides, every task's
+seeded parameters and outcome, the scripted approver and the monitoring image digests.
 
 ## Re-capturing
 
