@@ -228,9 +228,20 @@ def build_image(
             str(context),
         ]
     )
-    # The Dockerfile downloads kubectl without a checksum: compare it with ours.
+    # The Dockerfile downloads kubectl without a checksum: compare it with ours. Its mode is 0711,
+    # so only root can read it; the check runs as root and only reads.
     image_kubectl = run(
-        ["docker", "run", "--rm", "--entrypoint", "sha256sum", tag, "/usr/local/bin/kubectl"]
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--user",
+            "0",
+            "--entrypoint",
+            "sha256sum",
+            tag,
+            "/usr/local/bin/kubectl",
+        ]
     ).stdout.split()[0]
     want = _checksum(f"kubectl-{kubectl_version}-linux-amd64")
     if image_kubectl != want:
