@@ -596,12 +596,22 @@ def last_incident() -> dict[str, Any]:
     return json.loads(lines[-1])
 
 
-def webhook_notifications() -> float:
-    total = 0.0
+def webhook_requests() -> tuple[float, float]:
+    """Alertmanager's webhook HTTP requests and failed ones. Not alertmanager_notifications_total:
+    that counts every flush of a group, including the resolved-only flushes that send nothing
+    when send_resolved is false (notify/retry_stage.go)."""
+    totals = {
+        "alertmanager_notification_requests_total": 0.0,
+        "alertmanager_notification_requests_failed_total": 0.0,
+    }
     for line in kubectl("get", "--raw", f"{AM}/metrics").splitlines():
-        if line.startswith("alertmanager_notifications_total{") and 'integration="webhook"' in line:
-            total += float(line.split()[-1])
-    return total
+        name = line.split("{", 1)[0]
+        if name in totals and 'integration="webhook"' in line:
+            totals[name] += float(line.split()[-1])
+    return (
+        totals["alertmanager_notification_requests_total"],
+        totals["alertmanager_notification_requests_failed_total"],
+    )
 
 
 def active_alerts(service: str) -> list[str]:
@@ -760,9 +770,9 @@ def check_api_error(otlp: dict[str, Any]) -> list[str]:
 
 def run_task(task: Any, agent: Agent, image: str, approval_timeout_s: float) -> dict[str, Any]:
     started = datetime.now(UTC)
-    received, notified, incidents = (
+    received, (requests, failed), incidents = (
         agent.alerts_received(),
-        webhook_notifications(),
+        webhook_requests(),
         agent.incidents(),
     )
     if task.scenario == "oom":
@@ -805,7 +815,7 @@ def run_task(task: Any, agent: Agent, image: str, approval_timeout_s: float) -> 
             raise SystemExit(f"capture: {task.name}: no incident recorded")
         time.sleep(1)
     incident = last_incident()
-    after_received, after_notified = agent.alerts_received(), webhook_notifications()
+    after_received, (after_requests, after_failed) = agent.alerts_received(), webhook_requests()
     for obj in reversed(scenarios.manifests(task, "unused")):
         kubectl(
             "-n",
@@ -830,7 +840,8 @@ def run_task(task: Any, agent: Agent, image: str, approval_timeout_s: float) -> 
         "approval_policy": task.approval,
         "approvals": approvals,
         "alerts_received": int(after_received - received),
-        "webhooks": int(after_notified - notified),
+        "webhooks": int(after_requests - requests),
+        "webhooks_failed": int(after_failed - failed),
         "started_at": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "_needles": sorted(alert_needles(incident)),
     }
@@ -1065,9 +1076,15 @@ def main() -> int:
             problems.append("a row without the eval run marker")
         webhooks = sum(r["webhooks"] for r in results)
         received = sum(r["alerts_received"] for r in results)
-        if not (webhooks == received == len(results) and all(r["webhooks"] == 1 for r in results)):
+        failed = sum(r["webhooks_failed"] for r in results)
+        if not (
+            webhooks == received == len(results)
+            and failed == 0
+            and all(r["webhooks"] == 1 for r in results)
+        ):
             problems.append(
-                f"{len(results)} tasks, {webhooks} webhooks, {received} alerts received"
+                f"{len(results)} tasks, {webhooks} webhook requests ({failed} failed), "
+                f"{received} alerts received"
             )
         needles = {n for r in results for n in r.pop("_needles")}
         found = leaks(needles, list(sessions.values()), rows)
@@ -1098,6 +1115,7 @@ def main() -> int:
         report["webhooks"] = {
             "tasks": len(results),
             "webhooks": webhooks,
+            "webhooks_failed": failed,
             "alerts_received": received,
         }
         report["spans"] = {"sent": len(sent), "stored": len(rows)}
