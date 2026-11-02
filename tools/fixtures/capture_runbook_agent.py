@@ -85,7 +85,9 @@ AM = f"/api/v1/namespaces/{MONITORING}/services/alertmanager:9093/proxy"
 SETTLE_SECONDS = 240
 # The shim's batch delay (5 s) and the tee's file flush, before a session's file is read.
 FLUSH_SECONDS = 15
-OLLAMA_IN_CLUSTER = "http://host.docker.internal:11434/v1"
+OLLAMA_HOST = "host.docker.internal"
+OLLAMA_PORT = 11434
+OLLAMA_IN_CLUSTER = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/v1"
 # A model Ollama does not have: the API-error task's triage call gets a real HTTP 404.
 MISSING_MODEL = "traceblame-missing-model:404"
 API_ERROR = "api_error"
@@ -109,6 +111,15 @@ CAN_I = [
     ("delete", "namespaces", None, None, False),
     ("list", "nodes", None, None, False),
 ]
+
+# Outside the agent's egress: the tier it must reach only through the tee.
+CLICKHOUSE_IN_CLUSTER = "http://clickhouse-traceblame.observability.svc:8123/ping"
+# Run with the app image's own Node: exit 0 when the URL answers, 1 otherwise (5 s timeout).
+_REACH_JS = (
+    "fetch(process.argv[1],{signal:AbortSignal.timeout(5000)})"
+    ".then(()=>process.exit(0),()=>process.exit(1))"
+)
+_RESOLVE_JS = "require('node:dns').lookup(process.argv[1],{family:4},(e,a)=>{console.log(a||'');})"
 
 TEE_CONFIG = """\
 extensions:
@@ -375,6 +386,76 @@ def safety_probes() -> list[dict[str, Any]]:
             check=False,
         )
 
+    # The egress the network policy allows, as applied, against the cluster as it is now:
+    # kind-runbook-up resolved the addresses, and a recreated cluster can move them.
+    policy = json.loads(
+        kubectl("-n", SANDBOX, "get", "networkpolicy", "runbook-agent", "-o", "json")
+    )
+    allowed = {
+        (block["ipBlock"]["cidr"], port["port"])
+        for rule in policy["spec"]["egress"]
+        for block in rule.get("to", [])
+        if "ipBlock" in block
+        for port in rule.get("ports", [])
+    }
+    slice_ = json.loads(
+        kubectl(
+            "-n",
+            "default",
+            "get",
+            "endpointslice",
+            "-l",
+            "kubernetes.io/service-name=kubernetes",
+            "-o",
+            "json",
+        )
+    )["items"][0]
+    api = {
+        (f"{address}/32", port["port"])
+        for endpoint in slice_["endpoints"]
+        for address in endpoint["addresses"]
+        for port in slice_["ports"]
+        if port.get("name") == "https"
+    }
+    out.append(
+        {
+            "check": "network policy: API server egress is the live EndpointSlice",
+            "allowed": api <= allowed,
+            "ok": bool(api) and api <= allowed,
+        }
+    )
+    resolved = in_pod("node", "-e", _RESOLVE_JS, OLLAMA_HOST).stdout.strip()
+    out.append(
+        {
+            "check": f"network policy: Ollama egress is {OLLAMA_HOST} as resolved in the pod",
+            "allowed": (f"{resolved}/32", OLLAMA_PORT) in allowed,
+            "ok": bool(resolved) and (f"{resolved}/32", OLLAMA_PORT) in allowed,
+        }
+    )
+    version = in_pod("kubectl", "get", "--raw", "/version", "--request-timeout=10s")
+    out.append(
+        {
+            "check": "in pod: API server reachable (GET /version)",
+            "allowed": version.returncode == 0,
+            "ok": version.returncode == 0,
+        }
+    )
+    ollama = in_pod("node", "-e", _REACH_JS, f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/version")
+    out.append(
+        {
+            "check": "in pod: Ollama reachable",
+            "allowed": ollama.returncode == 0,
+            "ok": ollama.returncode == 0,
+        }
+    )
+    clickhouse = in_pod("node", "-e", _REACH_JS, CLICKHOUSE_IN_CLUSTER)
+    out.append(
+        {
+            "check": "in pod: ClickHouse unreachable (egress outside the policy)",
+            "allowed": clickhouse.returncode == 0,
+            "ok": clickhouse.returncode != 0,
+        }
+    )
     monitoring = in_pod("kubectl", "get", "pods", "-n", MONITORING)
     out.append(
         {
