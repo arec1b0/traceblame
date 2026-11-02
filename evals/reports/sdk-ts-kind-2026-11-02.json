@@ -1,0 +1,1342 @@
+{
+  "captured_at": "2026-11-02T09:35:30Z",
+  "traceblame_commit": "9560a8792fa0be95d97cbcf83d559a18e1e13824",
+  "app": {
+    "repository": "https://github.com/arec1b0/runbook-agent",
+    "commit": "374edce639d34b8e25a3bc1c5355b94653fefe44"
+  },
+  "eval_run_id": "rb-20261102-s7-9560a87",
+  "tenant": "tenant-eval",
+  "problems": [],
+  "build": {
+    "image": "runbook-agent:374edce-tb9560a87",
+    "image_id": "sha256:e44e2314bdc2951fc2465c9c8de8c4479fb6560d34d3edeb553367285d32f985",
+    "node": "v22.23.4",
+    "kubectl": {
+      "version": "1.37.2",
+      "sha256": "c04487523e7aa7d1493f7808174c899db93d7a9cf57531420cd76b9bd415f8f4"
+    },
+    "shim_tarball_sha256": "5c7b5d1503758b5ca24a435fb6da165d19ba9ebab7e4045827d7a5a86cf6cf9b",
+    "dockerfile_patch": {
+      "original": "COPY package.json pnpm-lock.yaml ./",
+      "used": "COPY package.json pnpm-lock.yaml traceblame-ts-0.1.0.tgz ./"
+    },
+    "user": {
+      "uid": 100,
+      "gid": 101
+    },
+    "packages": {
+      "ai": "4.3.19",
+      "@ai-sdk/openai": "1.3.24",
+      "traceblame-ts": "0.1.0",
+      "@traceloop/node-server-sdk": "0.27.0",
+      "@opentelemetry/sdk-trace-base": "2.0.1",
+      "@opentelemetry/api": "1.9.0"
+    }
+  },
+  "safety": [
+    {
+      "check": "get pods in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "get pods/log in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "list events in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "patch deployments in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "update deployments/scale in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "get pods in runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "patch deployments in runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get pods in observability",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get pods in kube-system",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get secrets in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete pods in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete deployments in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "create pods/exec in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete namespaces in cluster",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "list nodes in cluster",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "network policy: API server egress is the live EndpointSlice",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "network policy: Ollama egress is host.docker.internal as resolved in the pod",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: API server reachable (GET /version)",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: Ollama reachable",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: ClickHouse unreachable (egress outside the policy)",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubectl get pods -n runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubectl get pods -n runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubeconfig contexts",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubeconfig files",
+      "allowed": false,
+      "ok": true
+    }
+  ],
+  "canary": {
+    "spans": 11,
+    "problems": []
+  },
+  "safety_after_restart": [
+    {
+      "check": "get pods in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "get pods/log in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "list events in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "patch deployments in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "update deployments/scale in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "get pods in runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "patch deployments in runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get pods in observability",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get pods in kube-system",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get secrets in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete pods in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete deployments in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "create pods/exec in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete namespaces in cluster",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "list nodes in cluster",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "network policy: API server egress is the live EndpointSlice",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "network policy: Ollama egress is host.docker.internal as resolved in the pod",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: API server reachable (GET /version)",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: Ollama reachable",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: ClickHouse unreachable (egress outside the policy)",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubectl get pods -n runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubectl get pods -n runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubeconfig contexts",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubeconfig files",
+      "allowed": false,
+      "ok": true
+    }
+  ],
+  "model_behaviour": {
+    "model": "qwen2.5:7b",
+    "repeats": 3,
+    "probe": [
+      {
+        "scenario": "latency",
+        "alert": "HighRequestLatency",
+        "candidates": [
+          "investigate-unknown",
+          "high-load-scale-up"
+        ],
+        "decisions": [
+          {
+            "model": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            }
+          },
+          {
+            "model": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            }
+          },
+          {
+            "model": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            }
+          }
+        ]
+      },
+      {
+        "scenario": "oom",
+        "alert": "OOMKilled",
+        "candidates": [
+          "investigate-unknown",
+          "oom-restart"
+        ],
+        "decisions": [
+          {
+            "model": {
+              "apply": true,
+              "runbookId": "oom-restart"
+            },
+            "app": {
+              "apply": true,
+              "runbookId": "oom-restart"
+            }
+          },
+          {
+            "model": {
+              "apply": true,
+              "runbookId": "oom-restart"
+            },
+            "app": {
+              "apply": true,
+              "runbookId": "oom-restart"
+            }
+          },
+          {
+            "model": {
+              "apply": true,
+              "runbookId": "oom-restart"
+            },
+            "app": {
+              "apply": true,
+              "runbookId": "oom-restart"
+            }
+          }
+        ]
+      },
+      {
+        "scenario": "crash",
+        "alert": "KubernetesPodCrashLooping",
+        "candidates": [
+          "investigate-unknown"
+        ],
+        "decisions": [
+          {
+            "model": {
+              "apply": true,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": true,
+              "runbookId": "investigate-unknown"
+            }
+          },
+          {
+            "model": {
+              "apply": true,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": true,
+              "runbookId": "investigate-unknown"
+            }
+          },
+          {
+            "model": {
+              "apply": true,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": true,
+              "runbookId": "investigate-unknown"
+            }
+          }
+        ]
+      },
+      {
+        "scenario": "pending",
+        "alert": "KubernetesPodNotHealthy",
+        "candidates": [
+          "investigate-unknown"
+        ],
+        "decisions": [
+          {
+            "model": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            }
+          },
+          {
+            "model": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            }
+          },
+          {
+            "model": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            },
+            "app": {
+              "apply": false,
+              "runbookId": "investigate-unknown"
+            }
+          }
+        ]
+      }
+    ],
+    "declines_naming_a_candidate": {
+      "decisions": 12,
+      "count": 6
+    },
+    "app_source": {
+      "decline": {
+        "file": "src/pipeline/alert.pipeline.ts",
+        "text": "if (!decision.apply || decision.runbookId === null)"
+      },
+      "prompt_rule": {
+        "file": "src/agent/prompts/triage.prompt.ts",
+        "text": "Prefer declining (\"apply\": false) over guessing."
+      }
+    },
+    "approvals": {
+      "approve": {
+        "planned": 8,
+        "reached_gate": 1
+      },
+      "reject": {
+        "planned": 2,
+        "reached_gate": 0
+      },
+      "timeout": {
+        "planned": 2,
+        "reached_gate": 0
+      }
+    },
+    "unreached_runbooks": {
+      "none": 11
+    },
+    "notes": [
+      "gemma4:12b, the same triage probe run locally on 2026-11-02 and stopped on request: no alert type completed its three decisions in about ten minutes, so there is no result for it."
+    ]
+  },
+  "safety_api_error": [
+    {
+      "check": "get pods in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "get pods/log in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "list events in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "patch deployments in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "update deployments/scale in runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "get pods in runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "patch deployments in runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get pods in observability",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get pods in kube-system",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "get secrets in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete pods in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete deployments in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "create pods/exec in runbook-sandbox",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "delete namespaces in cluster",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "list nodes in cluster",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "network policy: API server egress is the live EndpointSlice",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "network policy: Ollama egress is host.docker.internal as resolved in the pod",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: API server reachable (GET /version)",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: Ollama reachable",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: ClickHouse unreachable (egress outside the policy)",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubectl get pods -n runbook-monitoring",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubectl get pods -n runbook-sandbox",
+      "allowed": true,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubeconfig contexts",
+      "allowed": false,
+      "ok": true
+    },
+    {
+      "check": "in pod: kubeconfig files",
+      "allowed": false,
+      "ok": true
+    }
+  ],
+  "api_error": {
+    "model": "traceblame-missing-model:404",
+    "problems": []
+  },
+  "content_check": {
+    "needles": 76,
+    "found": 0
+  },
+  "scenarios": {
+    "latency": {
+      "tasks": 6,
+      "expected_runbook": "high-load-scale-up",
+      "runbooks": {
+        "none": 6
+      },
+      "statuses": {
+        "no-runbook": 6
+      },
+      "spans": 18,
+      "traces": 6
+    },
+    "oom": {
+      "tasks": 6,
+      "expected_runbook": "oom-restart",
+      "runbooks": {
+        "oom-restart": 1,
+        "none": 5
+      },
+      "statuses": {
+        "remediated": 1,
+        "no-runbook": 5
+      },
+      "spans": 20,
+      "traces": 6
+    },
+    "crash": {
+      "tasks": 6,
+      "expected_runbook": "investigate-unknown",
+      "runbooks": {
+        "investigate-unknown": 1,
+        "none": 5
+      },
+      "statuses": {
+        "diagnostics-only": 1,
+        "no-runbook": 5
+      },
+      "spans": 19,
+      "traces": 6
+    },
+    "pending": {
+      "tasks": 6,
+      "expected_runbook": "investigate-unknown",
+      "runbooks": {
+        "none": 6
+      },
+      "statuses": {
+        "no-runbook": 6
+      },
+      "spans": 18,
+      "traces": 6
+    },
+    "api_error": {
+      "tasks": 1,
+      "expected_runbook": "none",
+      "runbooks": {
+        "none": 1
+      },
+      "statuses": {
+        "no-runbook": 1
+      },
+      "spans": 3,
+      "traces": 1
+    }
+  },
+  "runbooks": {
+    "none": 23,
+    "oom-restart": 1,
+    "investigate-unknown": 1
+  },
+  "missed_runbook": [
+    {
+      "task": "latency-4",
+      "expected": "high-load-scale-up",
+      "got": "none"
+    },
+    {
+      "task": "latency-5",
+      "expected": "high-load-scale-up",
+      "got": "none"
+    },
+    {
+      "task": "latency-1",
+      "expected": "high-load-scale-up",
+      "got": "none"
+    },
+    {
+      "task": "latency-2",
+      "expected": "high-load-scale-up",
+      "got": "none"
+    },
+    {
+      "task": "latency-0",
+      "expected": "high-load-scale-up",
+      "got": "none"
+    },
+    {
+      "task": "latency-3",
+      "expected": "high-load-scale-up",
+      "got": "none"
+    },
+    {
+      "task": "oom-2",
+      "expected": "oom-restart",
+      "got": "none"
+    },
+    {
+      "task": "oom-4",
+      "expected": "oom-restart",
+      "got": "none"
+    },
+    {
+      "task": "oom-0",
+      "expected": "oom-restart",
+      "got": "none"
+    },
+    {
+      "task": "oom-1",
+      "expected": "oom-restart",
+      "got": "none"
+    },
+    {
+      "task": "oom-3",
+      "expected": "oom-restart",
+      "got": "none"
+    },
+    {
+      "task": "crash-5",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "crash-0",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "crash-4",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "crash-1",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "crash-2",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "pending-1",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "pending-5",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "pending-3",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "pending-4",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "pending-0",
+      "expected": "investigate-unknown",
+      "got": "none"
+    },
+    {
+      "task": "pending-2",
+      "expected": "investigate-unknown",
+      "got": "none"
+    }
+  ],
+  "tasks": [
+    {
+      "task": "latency-4",
+      "scenario": "latency",
+      "order": 0,
+      "params": {
+        "delay_s": 2.3,
+        "load_rps": 1
+      },
+      "alert": "HighRequestLatency",
+      "expected_runbook": "high-load-scale-up",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "timeout",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:38:33Z",
+      "session": "latency"
+    },
+    {
+      "task": "latency-5",
+      "scenario": "latency",
+      "order": 1,
+      "params": {
+        "delay_s": 1.6,
+        "load_rps": 2
+      },
+      "alert": "HighRequestLatency",
+      "expected_runbook": "high-load-scale-up",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "timeout",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:40:10Z",
+      "session": "latency"
+    },
+    {
+      "task": "latency-1",
+      "scenario": "latency",
+      "order": 2,
+      "params": {
+        "delay_s": 2.8,
+        "load_rps": 4
+      },
+      "alert": "HighRequestLatency",
+      "expected_runbook": "high-load-scale-up",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "reject",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:41:43Z",
+      "session": "latency"
+    },
+    {
+      "task": "latency-2",
+      "scenario": "latency",
+      "order": 3,
+      "params": {
+        "delay_s": 2.3,
+        "load_rps": 1
+      },
+      "alert": "HighRequestLatency",
+      "expected_runbook": "high-load-scale-up",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "approve",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:43:23Z",
+      "session": "latency"
+    },
+    {
+      "task": "latency-0",
+      "scenario": "latency",
+      "order": 4,
+      "params": {
+        "delay_s": 1.9,
+        "load_rps": 1
+      },
+      "alert": "HighRequestLatency",
+      "expected_runbook": "high-load-scale-up",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "approve",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:44:41Z",
+      "session": "latency"
+    },
+    {
+      "task": "latency-3",
+      "scenario": "latency",
+      "order": 5,
+      "params": {
+        "delay_s": 2.4,
+        "load_rps": 2
+      },
+      "alert": "HighRequestLatency",
+      "expected_runbook": "high-load-scale-up",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "approve",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:46:02Z",
+      "session": "latency"
+    },
+    {
+      "task": "oom-5",
+      "scenario": "oom",
+      "order": 6,
+      "params": {
+        "memory_limit_mi": 64,
+        "alloc_mib_per_s": 10
+      },
+      "alert": "OOMKilled",
+      "expected_runbook": "oom-restart",
+      "runbook": "oom-restart",
+      "status": "remediated",
+      "steps": [
+        {
+          "action": "collect-diagnostics",
+          "status": "executed"
+        },
+        {
+          "action": "restart-service",
+          "status": "executed"
+        }
+      ],
+      "approval_policy": "approve",
+      "approvals": [
+        {
+          "action": "restart-service",
+          "decision": "approve"
+        }
+      ],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:48:07Z",
+      "session": "oom"
+    },
+    {
+      "task": "oom-2",
+      "scenario": "oom",
+      "order": 7,
+      "params": {
+        "memory_limit_mi": 64,
+        "alloc_mib_per_s": 21
+      },
+      "alert": "OOMKilled",
+      "expected_runbook": "oom-restart",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "approve",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:50:34Z",
+      "session": "oom"
+    },
+    {
+      "task": "oom-4",
+      "scenario": "oom",
+      "order": 8,
+      "params": {
+        "memory_limit_mi": 80,
+        "alloc_mib_per_s": 17
+      },
+      "alert": "OOMKilled",
+      "expected_runbook": "oom-restart",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "approve",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:51:32Z",
+      "session": "oom"
+    },
+    {
+      "task": "oom-0",
+      "scenario": "oom",
+      "order": 9,
+      "params": {
+        "memory_limit_mi": 96,
+        "alloc_mib_per_s": 28
+      },
+      "alert": "OOMKilled",
+      "expected_runbook": "oom-restart",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "reject",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:52:33Z",
+      "session": "oom"
+    },
+    {
+      "task": "oom-1",
+      "scenario": "oom",
+      "order": 10,
+      "params": {
+        "memory_limit_mi": 96,
+        "alloc_mib_per_s": 20
+      },
+      "alert": "OOMKilled",
+      "expected_runbook": "oom-restart",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "approve",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:53:34Z",
+      "session": "oom"
+    },
+    {
+      "task": "oom-3",
+      "scenario": "oom",
+      "order": 11,
+      "params": {
+        "memory_limit_mi": 96,
+        "alloc_mib_per_s": 31
+      },
+      "alert": "OOMKilled",
+      "expected_runbook": "oom-restart",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": "approve",
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:54:31Z",
+      "session": "oom"
+    },
+    {
+      "task": "crash-3",
+      "scenario": "crash",
+      "order": 12,
+      "params": {
+        "cause": "exit_code",
+        "exit_code": 3
+      },
+      "alert": "KubernetesPodCrashLooping",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "investigate-unknown",
+      "status": "diagnostics-only",
+      "steps": [
+        {
+          "action": "collect-diagnostics",
+          "status": "executed"
+        }
+      ],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T09:55:52Z",
+      "session": "crash"
+    },
+    {
+      "task": "crash-5",
+      "scenario": "crash",
+      "order": 13,
+      "params": {
+        "cause": "failing_liveness"
+      },
+      "alert": "KubernetesPodCrashLooping",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:06:54Z",
+      "session": "crash"
+    },
+    {
+      "task": "crash-0",
+      "scenario": "crash",
+      "order": 14,
+      "params": {
+        "cause": "exit_code",
+        "exit_code": 3
+      },
+      "alert": "KubernetesPodCrashLooping",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:13:32Z",
+      "session": "crash"
+    },
+    {
+      "task": "crash-4",
+      "scenario": "crash",
+      "order": 15,
+      "params": {
+        "cause": "missing_config"
+      },
+      "alert": "KubernetesPodCrashLooping",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:21:51Z",
+      "session": "crash"
+    },
+    {
+      "task": "crash-1",
+      "scenario": "crash",
+      "order": 16,
+      "params": {
+        "cause": "missing_config"
+      },
+      "alert": "KubernetesPodCrashLooping",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:32:32Z",
+      "session": "crash"
+    },
+    {
+      "task": "crash-2",
+      "scenario": "crash",
+      "order": 17,
+      "params": {
+        "cause": "failing_liveness"
+      },
+      "alert": "KubernetesPodCrashLooping",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:40:25Z",
+      "session": "crash"
+    },
+    {
+      "task": "pending-1",
+      "scenario": "pending",
+      "order": 18,
+      "params": {
+        "cause": "missing_pvc"
+      },
+      "alert": "KubernetesPodNotHealthy",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:47:19Z",
+      "session": "pending"
+    },
+    {
+      "task": "pending-5",
+      "scenario": "pending",
+      "order": 19,
+      "params": {
+        "cause": "node_selector"
+      },
+      "alert": "KubernetesPodNotHealthy",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:49:12Z",
+      "session": "pending"
+    },
+    {
+      "task": "pending-3",
+      "scenario": "pending",
+      "order": 20,
+      "params": {
+        "cause": "unsatisfiable_cpu"
+      },
+      "alert": "KubernetesPodNotHealthy",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:51:05Z",
+      "session": "pending"
+    },
+    {
+      "task": "pending-4",
+      "scenario": "pending",
+      "order": 21,
+      "params": {
+        "cause": "missing_pvc"
+      },
+      "alert": "KubernetesPodNotHealthy",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:52:54Z",
+      "session": "pending"
+    },
+    {
+      "task": "pending-0",
+      "scenario": "pending",
+      "order": 22,
+      "params": {
+        "cause": "unsatisfiable_cpu"
+      },
+      "alert": "KubernetesPodNotHealthy",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:54:51Z",
+      "session": "pending"
+    },
+    {
+      "task": "pending-2",
+      "scenario": "pending",
+      "order": 23,
+      "params": {
+        "cause": "node_selector"
+      },
+      "alert": "KubernetesPodNotHealthy",
+      "expected_runbook": "investigate-unknown",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T10:56:41Z",
+      "session": "pending"
+    },
+    {
+      "task": "crash-6",
+      "scenario": "crash",
+      "order": 24,
+      "params": {
+        "cause": "exit_code",
+        "exit_code": 2
+      },
+      "alert": "KubernetesPodCrashLooping",
+      "expected_runbook": "none",
+      "runbook": "none",
+      "status": "no-runbook",
+      "steps": [],
+      "approval_policy": null,
+      "approvals": [],
+      "alerts_received": 1,
+      "webhooks": 1,
+      "webhooks_failed": 0,
+      "started_at": "2026-11-02T11:00:37Z",
+      "session": "api_error"
+    }
+  ],
+  "webhooks": {
+    "tasks": 25,
+    "webhooks": 25,
+    "webhooks_failed": 0,
+    "alerts_received": 25
+  },
+  "spans": {
+    "sent": 78,
+    "stored": 78
+  }
+}

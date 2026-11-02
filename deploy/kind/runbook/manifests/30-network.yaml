@@ -1,0 +1,105 @@
+# Network policy of the sandbox (#13). The agent pod takes webhooks only from Alertmanager and
+# talks only to DNS, the API server, the tee collector and the host's Ollama (or, in the
+# canary preflight, the stub LLM). The tee takes
+# OTLP only from the agent and forwards only to the observability tier's otel-agent.
+# ${APISERVER_IP}, ${APISERVER_PORT} and ${OLLAMA_IP} are resolved by scripts/kind-runbook.sh at
+# deploy time; the capture fails if they no longer match the cluster or the agent cannot reach them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: runbook-agent
+  namespace: runbook-sandbox
+spec:
+  podSelector:
+    matchLabels: {app: runbook-agent}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: runbook-monitoring}
+          podSelector:
+            matchLabels: {app: alertmanager}
+      ports:
+        - {protocol: TCP, port: 3000}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: "${APISERVER_IP}/32"}
+      ports:
+        # Block style and unquoted: valid YAML before envsubst, an integer port after it.
+        - protocol: TCP
+          port: ${APISERVER_PORT}
+    - to:
+        - podSelector:
+            matchLabels: {app: tee}
+      ports:
+        - {protocol: TCP, port: 4318}
+    - to:
+        - ipBlock: {cidr: "${OLLAMA_IP}/32"}
+      ports:
+        - {protocol: TCP, port: 11434}
+    # The capture's canary preflight points the agent at a stub LLM pod instead of Ollama.
+    - to:
+        - podSelector:
+            matchLabels: {app: stub-llm}
+      ports:
+        - {protocol: TCP, port: 8080}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tee
+  namespace: runbook-sandbox
+spec:
+  podSelector:
+    matchLabels: {app: tee}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: runbook-agent}
+      ports:
+        - {protocol: TCP, port: 4318}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: observability}
+          podSelector:
+            matchLabels: {app: otel-agent}
+      ports:
+        - {protocol: TCP, port: 4318}
+---
+# Workloads need no network but the blackbox probe of the slow service.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: workloads
+  namespace: runbook-sandbox
+spec:
+  podSelector:
+    matchLabels: {traceblame.io/role: workload}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: runbook-monitoring}
+          podSelector:
+            matchLabels: {app: blackbox-exporter}
+      ports:
+        - {protocol: TCP, port: 8080}
+  egress: []

@@ -1,0 +1,19 @@
+# Alertmanager of the runbook sandbox (#13): one webhook per task. Each task's workload has its
+# own deployment name, so its alerts form their own group; a group notifies once
+# (group_interval and repeat_interval outlast a task), and resolved alerts are not sent.
+route:
+  receiver: runbook-agent
+  group_by: [alertname, namespace, service]
+  group_wait: 15s
+  group_interval: 1h
+  repeat_interval: 24h
+receivers:
+  - name: runbook-agent
+    webhook_configs:
+      - url: http://runbook-agent.runbook-sandbox.svc:3000/webhook/alertmanager
+        send_resolved: false
+inhibit_rules:
+  # An OOM-killed container also crash-loops; the OOM alert is the one its task is about.
+  - source_matchers: [alertname="OOMKilled"]
+    target_matchers: [alertname="KubernetesPodCrashLooping"]
+    equal: [namespace, service]

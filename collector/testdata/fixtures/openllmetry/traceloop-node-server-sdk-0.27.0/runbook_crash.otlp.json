@@ -1,0 +1,2558 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "bb48b7966876a9c7de34621ae4cb9ca5",
+              "spanId": "7f62b9dac94b3781",
+              "parentSpanId": "e4a3b7bc76bb40ed",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793613685456000000",
+              "endTimeUnixNano": "1793613708240709603",
+              "attributes": [
+                {
+                  "key": "aegis.output.parse_ok",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.mode",
+                  "value": {
+                    "stringValue": "json"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-c635f1d5b5fbdd60"
+                  }
+                },
+                {
+                  "key": "ai.response.timestamp",
+                  "value": {
+                    "stringValue": "2026-11-02T10:01:48.000Z"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-801"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.prompt_tokens",
+                  "value": {
+                    "intValue": "489"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.completion_tokens",
+                  "value": {
+                    "intValue": "54"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "489"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "54"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "543"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "bb48b7966876a9c7de34621ae4cb9ca5",
+              "spanId": "e4a3b7bc76bb40ed",
+              "parentSpanId": "40b221c530c8fc93",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793613685456000000",
+              "endTimeUnixNano": "1793613708241352565",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.output",
+                  "value": {
+                    "stringValue": "object"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-c635f1d5b5fbdd60"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "489"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "54"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "543"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "traceblame_ts",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "bb48b7966876a9c7de34621ae4cb9ca5",
+              "spanId": "d8f21de350cafd26",
+              "parentSpanId": "40b221c530c8fc93",
+              "name": "collect-diagnostics",
+              "kind": 1,
+              "startTimeUnixNano": "1793613708248000000",
+              "endTimeUnixNano": "1793613708551038440",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "tool.name",
+                  "value": {
+                    "stringValue": "collect-diagnostics"
+                  }
+                },
+                {
+                  "key": "aegis.tool.args_hash",
+                  "value": {
+                    "stringValue": "31d8ccbef449bd95"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-c635f1d5b5fbdd60"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "traceblame_ts",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "bb48b7966876a9c7de34621ae4cb9ca5",
+              "spanId": "40b221c530c8fc93",
+              "name": "runbook-agent",
+              "kind": 1,
+              "startTimeUnixNano": "1793613685455000000",
+              "endTimeUnixNano": "1793613708548626992",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "agent.name",
+                  "value": {
+                    "stringValue": "runbook-agent"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-c635f1d5b5fbdd60"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "584b399901bbe44797ee1f27fc544975",
+              "spanId": "d7957cadaf7d994e",
+              "parentSpanId": "5edc1a6adfc4b8fa",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793614085568000000",
+              "endTimeUnixNano": "1793614116831781907",
+              "attributes": [
+                {
+                  "key": "aegis.output.parse_ok",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.mode",
+                  "value": {
+                    "stringValue": "json"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-b913578242d8daec"
+                  }
+                },
+                {
+                  "key": "ai.response.timestamp",
+                  "value": {
+                    "stringValue": "2026-11-02T10:08:36.000Z"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-104"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.prompt_tokens",
+                  "value": {
+                    "intValue": "542"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.completion_tokens",
+                  "value": {
+                    "intValue": "88"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "542"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "88"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "630"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "584b399901bbe44797ee1f27fc544975",
+              "spanId": "5edc1a6adfc4b8fa",
+              "parentSpanId": "eedac7d17a726d46",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793614085567000000",
+              "endTimeUnixNano": "1793614116832050249",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.output",
+                  "value": {
+                    "stringValue": "object"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-b913578242d8daec"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "542"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "88"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "630"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "traceblame_ts",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "584b399901bbe44797ee1f27fc544975",
+              "spanId": "eedac7d17a726d46",
+              "name": "runbook-agent",
+              "kind": 1,
+              "startTimeUnixNano": "1793614085565000000",
+              "endTimeUnixNano": "1793614116834871225",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "agent.name",
+                  "value": {
+                    "stringValue": "runbook-agent"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-b913578242d8daec"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "b6f6cd9aa4baef0736f8cc4903848f23",
+              "spanId": "6bb06f21facad31e",
+              "parentSpanId": "e556ffa01e55ebf1",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793614645609000000",
+              "endTimeUnixNano": "1793614666743639266",
+              "attributes": [
+                {
+                  "key": "aegis.output.parse_ok",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.mode",
+                  "value": {
+                    "stringValue": "json"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-494c35dfafee07be"
+                  }
+                },
+                {
+                  "key": "ai.response.timestamp",
+                  "value": {
+                    "stringValue": "2026-11-02T10:17:46.000Z"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-475"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.prompt_tokens",
+                  "value": {
+                    "intValue": "605"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.completion_tokens",
+                  "value": {
+                    "intValue": "73"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "605"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "73"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "678"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "b6f6cd9aa4baef0736f8cc4903848f23",
+              "spanId": "e556ffa01e55ebf1",
+              "parentSpanId": "ea4c1fdd919b3286",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793614645608000000",
+              "endTimeUnixNano": "1793614666743634515",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.output",
+                  "value": {
+                    "stringValue": "object"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-494c35dfafee07be"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "605"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "73"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "678"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "traceblame_ts",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "b6f6cd9aa4baef0736f8cc4903848f23",
+              "spanId": "ea4c1fdd919b3286",
+              "name": "runbook-agent",
+              "kind": 1,
+              "startTimeUnixNano": "1793614645606000000",
+              "endTimeUnixNano": "1793614666747976123",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "agent.name",
+                  "value": {
+                    "stringValue": "runbook-agent"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-494c35dfafee07be"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "38a87146ab6f83954dc321bc25331187",
+              "spanId": "de39fb2f2afb8702",
+              "parentSpanId": "3c556ea9759e50d9",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793615225693000000",
+              "endTimeUnixNano": "1793615247559502750",
+              "attributes": [
+                {
+                  "key": "aegis.output.parse_ok",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.mode",
+                  "value": {
+                    "stringValue": "json"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-c1272f592422d7f2"
+                  }
+                },
+                {
+                  "key": "ai.response.timestamp",
+                  "value": {
+                    "stringValue": "2026-11-02T10:27:27.000Z"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-431"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.prompt_tokens",
+                  "value": {
+                    "intValue": "660"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.completion_tokens",
+                  "value": {
+                    "intValue": "72"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "660"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "72"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "732"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "38a87146ab6f83954dc321bc25331187",
+              "spanId": "3c556ea9759e50d9",
+              "parentSpanId": "c2e992fb59316754",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793615225692000000",
+              "endTimeUnixNano": "1793615247559685738",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.output",
+                  "value": {
+                    "stringValue": "object"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-c1272f592422d7f2"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "660"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "72"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "732"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "traceblame_ts",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "38a87146ab6f83954dc321bc25331187",
+              "spanId": "c2e992fb59316754",
+              "name": "runbook-agent",
+              "kind": 1,
+              "startTimeUnixNano": "1793615225689000000",
+              "endTimeUnixNano": "1793615247568009501",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "agent.name",
+                  "value": {
+                    "stringValue": "runbook-agent"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-c1272f592422d7f2"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "87f10bdf6c4101db9114fcf57ff7c105",
+              "spanId": "86719f10fa2ccb85",
+              "parentSpanId": "b0ba14bcbeffa0e3",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793615765726000000",
+              "endTimeUnixNano": "1793615785946230523",
+              "attributes": [
+                {
+                  "key": "aegis.output.parse_ok",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.mode",
+                  "value": {
+                    "stringValue": "json"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-4562af3d055878cc"
+                  }
+                },
+                {
+                  "key": "ai.response.timestamp",
+                  "value": {
+                    "stringValue": "2026-11-02T10:36:25.000Z"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-745"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.prompt_tokens",
+                  "value": {
+                    "intValue": "717"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.completion_tokens",
+                  "value": {
+                    "intValue": "66"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "717"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "66"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "783"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "87f10bdf6c4101db9114fcf57ff7c105",
+              "spanId": "b0ba14bcbeffa0e3",
+              "parentSpanId": "6e4ca7e1064a7cff",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793615765725000000",
+              "endTimeUnixNano": "1793615785946124358",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.output",
+                  "value": {
+                    "stringValue": "object"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-4562af3d055878cc"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "717"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "66"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "783"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "traceblame_ts",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "87f10bdf6c4101db9114fcf57ff7c105",
+              "spanId": "6e4ca7e1064a7cff",
+              "name": "runbook-agent",
+              "kind": 1,
+              "startTimeUnixNano": "1793615765724000000",
+              "endTimeUnixNano": "1793615785948697683",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "agent.name",
+                  "value": {
+                    "stringValue": "runbook-agent"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-4562af3d055878cc"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "69e594c5442182646897bc8a18d02068",
+              "spanId": "aacbc4a548e281e2",
+              "parentSpanId": "eb2fa5361368a7c1",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793616095755000000",
+              "endTimeUnixNano": "1793616116191207251",
+              "attributes": [
+                {
+                  "key": "aegis.output.parse_ok",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.mode",
+                  "value": {
+                    "stringValue": "json"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-7c500fc8706769a4"
+                  }
+                },
+                {
+                  "key": "ai.response.timestamp",
+                  "value": {
+                    "stringValue": "2026-11-02T10:41:56.000Z"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-203"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.prompt_tokens",
+                  "value": {
+                    "intValue": "779"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.completion_tokens",
+                  "value": {
+                    "intValue": "65"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "779"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "65"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "844"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "69e594c5442182646897bc8a18d02068",
+              "spanId": "eb2fa5361368a7c1",
+              "parentSpanId": "1482e4cd1f9f85c0",
+              "name": "chat qwen2.5:7b",
+              "kind": 1,
+              "startTimeUnixNano": "1793616095754000000",
+              "endTimeUnixNano": "1793616116190907501",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateObject"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "ai.settings.output",
+                  "value": {
+                    "stringValue": "object"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-7c500fc8706769a4"
+                  }
+                },
+                {
+                  "key": "ai.sdk.version",
+                  "value": {
+                    "stringValue": "4.3.19"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "qwen2.5:7b"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "779"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "65"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": "844"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "runbook-agent"
+            }
+          },
+          {
+            "key": "aegis.tenant.id",
+            "value": {
+              "stringValue": "tenant-eval"
+            }
+          },
+          {
+            "key": "aegis.eval.run.id",
+            "value": {
+              "stringValue": "rb-20261102-s7-9560a87"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.0.1"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "traceblame_ts",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "69e594c5442182646897bc8a18d02068",
+              "spanId": "1482e4cd1f9f85c0",
+              "name": "runbook-agent",
+              "kind": 1,
+              "startTimeUnixNano": "1793616095747000000",
+              "endTimeUnixNano": "1793616116196619490",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "agent.name",
+                  "value": {
+                    "stringValue": "runbook-agent"
+                  }
+                },
+                {
+                  "key": "aegis.session.id",
+                  "value": {
+                    "stringValue": "s-7c500fc8706769a4"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

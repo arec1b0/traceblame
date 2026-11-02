@@ -1,6 +1,8 @@
-"""The Python shim's export allowlist and aegis.* table agree with the profile and the
-normalizer's mapping tables (ADR-0006 sections 3 and 5)."""
+"""The shims' export allowlists and aegis.* tables agree with the profile and the
+normalizer's mapping tables (ADR-0006 sections 3, 5 and 6): traceblame-py's in Python,
+traceblame-ts's in sdk/ts/src/contract.json."""
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,8 @@ from traceblame_py import _allowlist, _attributes
 ROOT = Path(__file__).resolve().parents[2]
 MAPPINGS = ROOT / "collector" / "processor" / "normalizer" / "mappings"
 OPENINFERENCE = MAPPINGS / "openinference" / "0.yaml"
+OPENLLMETRY = MAPPINGS / "openllmetry" / "0.yaml"
+TS_CONTRACT = ROOT / "sdk" / "ts" / "src" / "contract.json"
 
 pytestmark = pytest.mark.contract
 
@@ -37,8 +41,13 @@ def _load(path: Path) -> dict[str, Any]:
 
 def _openinference_keys() -> tuple[set[str], set[str]]:
     """Names and patterns the OpenInference table reads (kind.from, attr sources) or knows."""
-    table = _load(OPENINFERENCE)
-    names = {table["kind"]["from"]}
+    return _table_keys(OPENINFERENCE)
+
+
+def _table_keys(path: Path) -> tuple[set[str], set[str]]:
+    """Names and patterns a mapping table reads (kind.from, attr sources) or knows."""
+    table = _load(path)
+    names: set[str] = {str(table["kind"]["from"])} if "kind" in table else set()
     for row in table["map"]:
         names |= {src["attr"] for src in row["from"] if "attr" in src}
     patterns: set[str] = set()
@@ -140,3 +149,61 @@ def test_shim_scopes_and_patterns_are_the_profiles(profile: Profile) -> None:
         assert spec.pattern == pattern, name
     patterned = {a.name for a in profile.attributes if a.pattern and a.name in _attributes.SCOPES}
     assert patterned == set(_attributes.PATTERNS)
+
+
+# traceblame-ts (sdk/ts/src/contract.json, the shim's allowlist and aegis.* table).
+
+
+def _ts() -> dict[str, Any]:
+    contract: dict[str, Any] = json.loads(TS_CONTRACT.read_text(encoding="utf-8"))
+    return contract
+
+
+def test_ts_span_allowlist_is_profile_or_its_tables(profile: Profile) -> None:
+    # Helper spans follow OpenInference conventions; the AI SDK's spans reach the normalizer
+    # through OpenLLMetry-js (ADR-0006 sections 3 and 6).
+    span_attrs = {a.name for a in profile.scoped("span")}
+    names: set[str] = set()
+    for table in (OPENINFERENCE, OPENLLMETRY):
+        names |= _table_keys(table)[0]
+    keys = set(_ts()["span_keys"])
+    assert sorted(k for k in keys if k not in span_attrs and k not in names) == []
+    assert not NORMALIZER_OWNED & keys
+
+
+def test_ts_span_allowlist_is_not_content(profile: Profile) -> None:
+    names, patterns = _content_rules(profile)
+    keys = [*_ts()["span_keys"], *_ts()["exception_keys"]]
+    assert [k for k in keys if k in names or any(p.search(k) for p in patterns)] == []
+    assert _ts()["exception_keys"] == ["exception.type"]
+
+
+def test_ts_resource_allowlist(profile: Profile, snapshot: Snapshot) -> None:
+    resource_attrs = {a.name for a in profile.scoped("resource")}
+    keys = _ts()["resource_keys"]
+    stray = sorted(
+        k
+        for k in keys
+        if k not in resource_attrs
+        and k not in SDK_RESOURCE
+        and (k not in snapshot.attributes or snapshot.attributes[k].deprecated)
+    )
+    assert stray == []
+    names, patterns = _content_rules(profile)
+    assert not [k for k in keys if k in names or any(p.search(k) for p in patterns)]
+
+
+def test_ts_shim_scopes_and_patterns_are_the_profiles(profile: Profile) -> None:
+    contract = _ts()
+    for name, scope in contract["scopes"].items():
+        spec = profile.attribute(name)
+        assert spec is not None, name
+        assert spec.scope == scope, name
+        exported = contract["span_keys"] if scope == "span" else contract["resource_keys"]
+        assert name in exported, name
+    for name, pattern in contract["patterns"].items():
+        spec = profile.attribute(name)
+        assert spec is not None, name
+        assert spec.pattern == pattern, name
+    patterned = {a.name for a in profile.attributes if a.pattern and a.name in contract["scopes"]}
+    assert patterned == set(contract["patterns"])

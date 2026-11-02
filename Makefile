@@ -26,6 +26,8 @@ export CONTRACT_BASE_REF
 KIND_CLUSTER := traceblame
 # The agentic-rag checkout that make fixtures-agentic-rag runs (#12).
 APP_DIR ?= $(CURDIR)/../agentic-rag
+# The runbook-agent checkout that make fixtures-runbook-agent runs (#13).
+RUNBOOK_APP_DIR ?= $(CURDIR)/../runbook-agent
 
 # Collector distribution (collector/builder-config.yaml, ocb from tools/versions.env).
 COLLECTOR_BUILD := collector/_build
@@ -34,7 +36,8 @@ OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
 export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
 .PHONY: help bootstrap lint test contract integration security fixtures fixtures-agentic-rag \
-	kind-up kind-down kind-deploy bench-scaling collector collector-smoke collector-image
+	fixtures-runbook-agent kind-up kind-down kind-deploy kind-runbook-up kind-runbook-down \
+	bench-scaling collector collector-smoke collector-image
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-16s %s\n", $$1, $$2 }'
@@ -45,7 +48,7 @@ bootstrap: ## Install pinned tools, sync Python and Go deps, pre-commit envs and
 lint: ## Run every linter over all tracked files (pre-commit)
 	$(UV_RUN) pre-commit run --all-files --show-diff-on-failure
 
-test: ## Unit tests: pytest with coverage gates, go test -race
+test: ## Unit tests: pytest with coverage gates, go test -race, vitest (sdk/ts)
 	$(UV_RUN) pytest -m "not contract and not integration" --cov --cov-report=term
 	@for pkg in $(COV_GATED); do \
 	  echo "coverage gate: $$pkg >= $(COV_MIN)%"; \
@@ -55,6 +58,7 @@ test: ## Unit tests: pytest with coverage gates, go test -race
 	@for gate in $(GO_COV_GATED); do \
 	  bash scripts/go-coverage-gate.sh "$${gate%%:*}" "$${gate#*:}" $(COV_MIN); \
 	done
+	COV_MIN=$(COV_MIN) pnpm -C sdk/ts -s test
 
 contract: ## Contract tests: profile/schema sync, semconv pin, fixtures through the normalizer; gap report in .contract/
 	@if [ "$(origin CONTRACT_BASE_REF)" = file ]; then \
@@ -63,6 +67,7 @@ contract: ## Contract tests: profile/schema sync, semconv pin, fixtures through 
 	cd collector && go build -o "$(TRACEBLAME_NORMALIZE_BIN)" ./cmd/normalize
 	$(UV_RUN) traceblame-contracts gen-schema --check
 	$(UV_RUN) traceblame-contracts gap-report
+	pnpm -C sdk/ts -s build
 	$(UV_RUN) pytest -m contract -rxX
 
 integration: collector ## Integration: ClickHouse in a test container, migrations, the built collector (needs Docker)
@@ -90,6 +95,9 @@ fixtures-agentic-rag: ## Capture agentic-rag fixtures through kind (APP_DIR, OLL
 	bash scripts/install-tools.sh otelcol-contrib
 	uv run --locked --script tools/fixtures/capture_agentic_rag.py --app-dir "$(APP_DIR)" $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
 
+fixtures-runbook-agent: ## Capture runbook-agent fixtures in the kind sandbox (RUNBOOK_APP_DIR, OLLAMA_URL; needs kind-runbook-up)
+	uv run --locked --script tools/fixtures/capture_runbook_agent.py --app-dir "$(RUNBOOK_APP_DIR)" $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
+
 kind-up: ## Create the local kind cluster, namespaces and generated Secrets (needs Docker in WSL)
 	@bash scripts/kind-up.sh
 
@@ -101,3 +109,9 @@ bench-scaling: ## Measure span loss and split traces while scaling the gateway 2
 
 kind-down: ## Delete the local kind cluster
 	kind delete cluster --name $(KIND_CLUSTER)
+
+kind-runbook-up: ## Runbook-agent sandbox: namespace-only RBAC, network policies, monitoring (needs kind-deploy)
+	bash scripts/kind-runbook.sh up
+
+kind-runbook-down: ## Delete the runbook-agent sandbox and its monitoring
+	bash scripts/kind-runbook.sh down

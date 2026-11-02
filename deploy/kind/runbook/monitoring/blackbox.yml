@@ -1,0 +1,7 @@
+# blackbox_exporter modules of the runbook sandbox (#13).
+modules:
+  http_2xx:
+    prober: http
+    timeout: 7s
+    http:
+      preferred_ip_protocol: ip4

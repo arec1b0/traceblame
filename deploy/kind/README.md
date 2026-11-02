@@ -32,7 +32,7 @@ make kind-down
   carries `aegis.eval.run.id` or `aegis.fault.injection.id`. Both normalizer passes keep a
   marker only for tenants in `eval_tenants`, and drop and count the rest in
   `traceblame_normalizer_eval_marker_rejected_total`. kind allowlists only `tenant-eval`,
-  the tenant of eval runs (`make fixtures-agentic-rag`, #12); `tenant-a` and `tenant-b` may not
+  the tenant of eval runs (`make fixtures-agentic-rag`, #12; `make fixtures-runbook-agent`, #13); `tenant-a` and `tenant-b` may not
   mark traces. To change the list, edit `collector/eval-tenants.env` and run
   `make kind-deploy`, which restarts the agents and the gateways together. The shims and
   `faults/` set the markers (#12, #13, #14).
@@ -52,6 +52,34 @@ make kind-down
     passwords, used by the bench and the agentic-rag capture. `make kind-up` regenerates both
     when a tenant is missing from them;
   - the ClickHouse password.
+
+## Runbook-agent sandbox (#13)
+
+`make kind-runbook-up` (after `make kind-deploy`) adds two namespaces for the runbook-agent
+capture; `make kind-runbook-down` deletes them. The capture applies the agent and the tee
+collector itself, with the image it built.
+
+| Path | What |
+|---|---|
+| `runbook/manifests/10-rbac.yaml` | The agent's ServiceAccount and a Role in `runbook-sandbox` only: the verbs of its actions (pods, events, logs, deployments, `deployments/scale`). No ClusterRole; no delete, exec or Secrets. |
+| `runbook/manifests/20-monitoring.yaml` | `runbook-monitoring`: kube-state-metrics (sandbox only), Prometheus, Alertmanager and blackbox_exporter, pinned by digest in tools/versions.env. |
+| `runbook/manifests/30-network.yaml` | The agent takes webhooks only from Alertmanager and reaches only DNS, the API server, the tee and the host's Ollama (or the canary's stub LLM). The tee forwards only to `observability/otel-agent`. |
+| `runbook/monitoring/rules.yml` | Four alert rules, expressions and annotations verbatim from samber/awesome-prometheus-alerts at the pinned commit (vendored under tools/fixtures/runbook_agent/upstream/); only names, labels and `for:` are overridden. |
+| `runbook/sandbox/` | Templates of the agent Deployment and the tee collector, applied by the capture. |
+
+- **Derived addresses.** `kind-runbook-up` reads the API server's address and port from the
+  `kubernetes` EndpointSlice (exactly one address) and resolves `host.docker.internal`
+  inside the cluster. Nothing is fixed in the manifests. Before any task, the capture fails
+  unless the applied policy still matches the live endpoint and that address, the agent
+  reaches the API server and Ollama, and it cannot reach ClickHouse.
+- **One webhook per task.** Alertmanager groups by alert, namespace and service, waits 15 s,
+  never repeats within a run and does not send resolved alerts; an inhibit rule keeps the OOM
+  pod's crash-loop alert quiet. The capture counts Alertmanager's webhook requests
+  (`alertmanager_notification_requests_total`, not `notifications_total`, which also counts
+  resolved-only flushes that send nothing).
+- **Slow rules.** The OOM rule compares restarts with 10 minutes ago, so OOM workloads start at
+  the beginning of a run and are triggered later. The crash-loop rule looks back 5 minutes, so
+  each crash task waits about that long for its alert to clear.
 
 ## Known limitations
 

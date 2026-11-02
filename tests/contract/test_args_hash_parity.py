@@ -1,13 +1,18 @@
-"""aegis.tool.args_hash: the Python shim and the Go normalizer agree on generated arguments.
+"""aegis.tool.args_hash: both shims and the Go normalizer agree on generated arguments.
 
 The golden vectors pin chosen cases; this compares many generated ones, valid and not
 I-JSON, from a fixed seed. All go through the normalizer in one OTLP request, as tool spans
-carrying gen_ai.tool.call.arguments, which it hashes when no hash is set (ADR-0002 section 2).
+carrying gen_ai.tool.call.arguments, which it hashes when no hash is set (ADR-0002 section 2),
+and through traceblame-ts's CLI (sdk/ts/src/cli/argsHash.ts, built by `make contract`).
+Decoded arguments (objects) are compared between the shims only: the normalizer sees text.
 """
 
 import json
+import math
 import os
 import random
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +30,7 @@ from traceblame_py import args_hash
 from traceblame_py._jcs import NotIJSONError, canonicalize
 
 ROOT = Path(__file__).resolve().parents[2]
+TS_CLI = Path(os.environ.get("TRACEBLAME_TS_ARGS_HASH_CLI", ROOT / "sdk/ts/dist/cli/argsHash.js"))
 pytestmark = pytest.mark.contract
 
 SEED = 12
@@ -141,3 +147,81 @@ def test_python_and_go_hash_generated_arguments_alike() -> None:
 
     valid = sum(_ijson(a) for a in args)
     assert CASES * 0.5 < valid < CASES
+
+
+def _ts(items: list[dict[str, Any]]) -> list[str]:
+    """Hashes from traceblame-ts, one per item ({"text": ...} or {"object": ...})."""
+    node = shutil.which("node")
+    if node is None or not TS_CLI.is_file():
+        pytest.fail(f"node and {TS_CLI} are needed: build sdk/ts first (make contract does)")
+    lines = "".join(json.dumps(item) + "\n" for item in items)
+    out = subprocess.run(  # noqa: S603 - our own CLI, fixed arguments
+        [node, str(TS_CLI)], input=lines, capture_output=True, text=True, check=True
+    ).stdout
+    return out.splitlines()
+
+
+def test_typescript_hashes_generated_arguments_like_python_and_go() -> None:
+    # The same seeded texts as the Go comparison above, which pins Python = Go on them.
+    rng = random.Random(SEED)  # noqa: S311 - reproducible test inputs, not secrets
+    args = [_text(rng) for _ in range(CASES)]
+    got = _ts([{"text": a} for a in args])
+    assert len(got) == CASES
+    assert [(a, h) for a, h in zip(args, got, strict=True) if h != args_hash(a)] == []
+
+
+_SPECIAL = {"__NaN__": math.nan, "__Infinity__": math.inf, "__-Infinity__": -math.inf}
+_SAFE = 2**53 - 1
+
+
+def _object_value(rng: random.Random, depth: int) -> Any:
+    """A decoded value both languages hold alike: JavaScript has one number type, so integral
+    values are Python ints within the safe range, and other numbers are floats. Keys never look
+    like array indices, which a JavaScript object would move to the front."""
+    kind = rng.randrange(9 if depth < 3 else 6)
+    if kind == 0:
+        return rng.choice([None, True, False])
+    if kind == 1:
+        return rng.randint(-_SAFE, _SAFE)
+    if kind == 2:
+        value = rng.uniform(-1e6, 1e6) * 10 ** rng.randint(-30, 30)
+        return int(value) if value.is_integer() and abs(value) <= _SAFE else value
+    if kind == 3:
+        return rng.choice([*_STRINGS, "\ud83d", "x\ude00y", "caf\u00e9"])
+    if kind == 4:
+        return rng.choice(list(_SPECIAL))
+    if kind == 5:
+        return rng.choice([1e300, -2.5e-8, 1e16, 5e-324])
+    if kind in (6, 7):
+        keys = [k for k in _KEYS if not k.isdigit()]
+        return {rng.choice(keys): _object_value(rng, depth + 1) for _ in range(rng.randrange(4))}
+    return [_object_value(rng, depth + 1) for _ in range(rng.randrange(4))]
+
+
+def _python(value: Any) -> Any:
+    if isinstance(value, str) and value in _SPECIAL:
+        return _SPECIAL[value]
+    if isinstance(value, dict):
+        return {k: _python(v) for k, v in value.items()}  # pyright: ignore[reportUnknownVariableType]
+    if isinstance(value, list):
+        return [_python(v) for v in value]  # pyright: ignore[reportUnknownVariableType]
+    return value
+
+
+def test_typescript_hashes_decoded_arguments_like_python() -> None:
+    rng = random.Random(SEED + 1)  # noqa: S311 - reproducible test inputs, not secrets
+    objects = [{"a": _object_value(rng, 0), "b": _object_value(rng, 0)} for _ in range(CASES)]
+    got = _ts([{"object": o} for o in objects])
+    want = [args_hash(_python(o)) for o in objects]
+    assert [(o, g, w) for o, g, w in zip(objects, got, want, strict=True) if g != w] == []
+
+    # Both paths again: the special values and lone surrogates force the raw-bytes fallback.
+    def _ijson(o: Any) -> bool:
+        try:
+            canonicalize(json.dumps(_python(o)))
+        except (NotIJSONError, ValueError):
+            return False
+        return True
+
+    valid = sum(_ijson(o) for o in objects)
+    assert CASES * 0.2 < valid < CASES * 0.9

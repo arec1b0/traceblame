@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-31
-- **Issue:** #12 (design issue #10); applies to the TypeScript shim (#13) as well
+- **Issue:** #12 (design issue #10); the TypeScript shim (#13) follows it, with section 6
 - **Decider:** Daniil Krizhanovskyi
 
 ## Context
@@ -63,7 +63,7 @@ Anything not listed is dropped, in every place a span can carry data:
 
 | Place | Kept |
 |---|---|
-| Span attributes | profile attributes, and the OpenInference table's `kind.from`, `map` sources and `known` keys (`collector/processor/normalizer/mappings/openinference/`) |
+| Span attributes | profile attributes, and the `kind.from`, `map` sources and `known` keys of the tables that map the shim's spans (`collector/processor/normalizer/mappings/`): OpenInference for traceblame-py and for both shims' helper spans, OpenLLMetry for the AI SDK spans of traceblame-ts |
 | Resource attributes | profile resource attributes, and the OTel SDK's `telemetry.sdk.*` and `service.instance.id` |
 | Events | `exception` only, with `exception.type` only |
 | Links | the linked context; attributes by the span attribute rule |
@@ -80,7 +80,9 @@ would be lost with the parameters.
 
 ### 4. Feature definitions
 
-Both shims implement these rules exactly.
+Both shims implement these rules exactly. They set the output features only on spans that the
+normalizer classifies as `aegis.span.kind=llm`. A feature computed from another span's outcome
+is written onto the LLM span.
 
 **`aegis.tool.args_hash`.** As profile `source.algorithm` (`algorithm_version: 1`). The
 arguments are hashed as text; a shim that holds them as an object serializes them with ASCII
@@ -123,6 +125,58 @@ exported gets no value, never a wrong one.
 - Values are checked against the profile patterns when they are given, and a bad one raises:
   a marker that the normalizer would drop is a harness bug, not something to discover in
   ClickHouse.
+
+### 6. TypeScript shim (traceblame-ts, #13)
+
+The target app calls models through the Vercel AI SDK (`ai` 4.3.19). OpenLLMetry-js
+(`@traceloop/node-server-sdk` 0.27.0) has no instrumentation for it. The LLM spans are the
+AI SDK's own telemetry: an outer `ai.generateObject` span (kind `chain`) and one
+`ai.generateObject.doGenerate` span per HTTP attempt (kind `llm`). OpenLLMetry-js's span
+processor rewrites them when they end.
+
+- **Pipeline.** OTel JS takes the processor list only at construction, so the shim builds it
+  and nothing can be added. The order is: context processor → feature processor →
+  OpenLLMetry-js span processor (which owns the batch processor) → sanitizing exporter → OTLP
+  exporter.
+- **Nothing to hide in memory.** The shim's AI SDK settings are
+  `{isEnabled: true, recordInputs: false, recordOutputs: false}`, so prompts, schemas and
+  outputs are never set on a span. The status description and the exception message still
+  carry the server's error text; the allowlist drops both.
+- **`aegis.output.parse_ok`.** The AI SDK validates the output against the app's schema
+  itself, after the `doGenerate` span has ended, and raises `AI_NoObjectGeneratedError` on the
+  outer span. The feature processor parks every ended `doGenerate` span under its parent and
+  passes it on only when the parent ends. Then, for each parked span:
+  - **true:** the span ended OK and the parent ended OK;
+  - **false:** the span ended OK and the parent ended with `AI_NoObjectGeneratedError` (no
+    parse, or no schema match); or the span itself ended with it (no response, the
+    equivalent of "no output message on a successful call");
+  - **no value:** the span ended with any other error.
+
+  The value is kept in a shim-private map and read when the export copy is built, so the
+  ended span is never mutated. The value is fixed before the span reaches the batch
+  processor, so a batch boundary between parent and child changes nothing.
+- **Degradation is counted, never guessed.** A parked span is passed on without a value in
+  three cases:
+  - when the cap is reached, oldest first (`max_traces`, default 1024, hard rule 8);
+  - when its parent has not ended within the hold limit (default 60 s, in config);
+  - at `forceFlush` or `shutdown`.
+
+  The shim counts each case (`cap`, `parent_timeout`, `flush`) and exposes the counts, never
+  ids or content. It logs them through OTel's diagnostic logger at shutdown.
+- **`http.response.status_code`.** The AI SDK's error text does not carry the status (a real
+  404 from Ollama reads `model '…' not found`), so the normalizer cannot read it (#29).
+  - The shim exports a language-model middleware, which the app adds with
+    `wrapLanguageModel`. It runs inside each attempt's `doGenerate` span.
+  - It sets the attribute on that span from `AI_APICallError.statusCode`, or from
+    `AI_RetryError.lastError`, only for 400 or above, and never from message text.
+  - Each attempt is its own span and gets its own code. The retry loop raises
+    `AI_RetryError` outside the attempt spans, and its last error is already on the last
+    attempt's span.
+- **`aegis.output.cited_doc_ids`** is not implemented in TypeScript yet: the target app has no
+  retrieval. The rule in section 4 applies unchanged to the first TypeScript app that has.
+- **`aegis.tool.args_hash`.** An object is serialized like Python's
+  `json.dumps(ensure_ascii=True)` (`", "` and `": "` separators, `\uXXXX` for non-ASCII),
+  so the raw-bytes fallback hashes the same bytes in both shims.
 
 ## Alternatives considered
 

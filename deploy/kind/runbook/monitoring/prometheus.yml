@@ -1,0 +1,38 @@
+# Prometheus of the runbook sandbox (#13): kube-state-metrics and blackbox probes of the
+# sandbox's slow services, evaluated often enough for one task to fire within a minute.
+global:
+  scrape_interval: 10s
+  scrape_timeout: 8s
+  evaluation_interval: 10s
+rule_files:
+  - /etc/prometheus/rules/rules.yml
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager.runbook-monitoring.svc:9093]
+scrape_configs:
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets: [kube-state-metrics.runbook-monitoring.svc:8080]
+  # Services labelled traceblame.io/probe=http are probed through the blackbox exporter.
+  # `instance` is the service name, which is the deployment name: the HighRequestLatency
+  # rule takes the agent's `service` label from it.
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    kubernetes_sd_configs:
+      - role: service
+        namespaces:
+          names: [runbook-sandbox]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_label_traceblame_io_probe]
+        regex: http
+        action: keep
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: __param_target
+        replacement: http://$1.runbook-sandbox.svc:8080/
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter.runbook-monitoring.svc:9115

@@ -4,13 +4,22 @@ sdk: openllmetry
 version: "0"
 source: >-
   opentelemetry-instrumentation-openai 0.62.4 with opentelemetry-semantic-conventions-ai 0.5.1
-  (collector/testdata/fixtures/openllmetry/)
+  (collector/testdata/fixtures/openllmetry/); @traceloop/node-server-sdk 0.27.0 span processor
+  over ai 4.3.19 telemetry (scope `ai`, the traceblame-ts shim)
 match:
   # OpenLLMetry scopes share the opentelemetry.instrumentation. prefix with upstream
   # instrumentations, so only exact names are matched.
-  scopes: [opentelemetry.instrumentation.openai.v1]
+  scopes: [opentelemetry.instrumentation.openai.v1, ai]
 
-# No kind rule: OpenLLMetry 0.62 sets gen_ai.operation.name, which the profile maps to a kind.
+# AI SDK spans: OpenLLMetry-js renames both the call and its HTTP attempt to "chat <model>"
+# and sets no gen_ai.operation.name, so the AI SDK's own operation id names the kind. Python
+# OpenLLMetry spans carry no ai.operationId and keep the profile's operation-based kind
+# (OpenLLMetry 0.62 sets gen_ai.operation.name).
+kind:
+  from: ai.operationId
+  values:
+    ai.generateObject.doGenerate: {kind: llm, operation: chat}
+  default: {kind: chain}
 
 map:
   - to: gen_ai.response.finish_reasons
@@ -31,6 +40,13 @@ map:
       - {status_message: true, on_error: true, match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)', convert: http_status}
       - {event: exception, field: exception.message, on_error: true, match: '^(?:[A-Za-z_][A-Za-z0-9_.]*: )?Error code: ([0-9]{3})(?: - |$)', convert: http_status}
 
+  # AI SDK errors are an exception event only (fixture runbook_api_error). The type is the
+  # error's name (AI_APICallError, AI_NoObjectGeneratedError), without a module, so it needs
+  # no class_name conversion (#29). Python OpenLLMetry sets error.type itself, which wins.
+  - to: error.type
+    from:
+      - {event: exception, field: exception.type, on_error: true}
+
 known:
   - gen_ai.request.temperature
   - gen_ai.response.id
@@ -39,6 +55,17 @@ known:
   - gen_ai.openai.api_base
   - gen_ai.openai.response.system_fingerprint
   - gen_ai.usage.total_tokens
+  # traceloop-node-server-sdk 0.27.0 over ai 4.3.19 (fixtures runbook_*)
+  - ai.operationId
+  - operation.name
+  - ai.sdk.version
+  - ai.response.timestamp
+  - ai.settings.maxRetries
+  - ai.settings.mode
+  - ai.settings.output
+  - gen_ai.system                      # deprecated; gen_ai.provider.name is set too
+  - gen_ai.usage.prompt_tokens         # deprecated names the AI SDK sets in json mode;
+  - gen_ai.usage.completion_tokens     # gen_ai.usage.input/output_tokens are set too
 
 # Prompt/completion content (issue #9): dropped on every span, never mapped. Names from
 # opentelemetry-semantic-conventions-ai 0.5.1 (SpanAttributes) and the *_content fixtures;
@@ -55,3 +82,24 @@ content:
   - gen_ai.task.output
   - pattern: '^gen_ai\.(prompt|completion)\.'
   - pattern: '^llm\.request\.functions(\.|$)'
+  # ai 4.3.19: everything gated by recordInputs/recordOutputs, plus app-authored text and
+  # headers that are not gated.
+  - ai.prompt
+  - ai.prompt.format
+  - ai.prompt.messages
+  - ai.prompt.tools
+  - ai.prompt.toolChoice
+  - ai.schema
+  - ai.schema.description
+  - ai.response.object
+  - ai.response.text
+  - ai.response.toolCalls
+  - ai.toolCall.args
+  - ai.toolCall.result
+  - ai.value
+  - ai.values
+  - ai.embedding
+  - ai.embeddings
+  - pattern: '^ai\.request\.headers\.'
+  - pattern: '^ai\.telemetry\.metadata\.'
+  - pattern: '^traceloop\.association\.properties\.'

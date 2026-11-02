@@ -1,0 +1,60 @@
+# Alert rules of the runbook sandbox (#13).
+#
+# Every `expr`, and every annotation, is verbatim from samber/awesome-prometheus-alerts at
+# commit 736370e922cee74db497391c825a7a6bd3d48f17 (dist/rules/kubernetes/kubestate-exporter.yml,
+# dist/rules/blackbox/blackbox-exporter.yml; sha256 in tools/checksums.txt), CC BY 4.0.
+# What differs is listed in OVERRIDES below and recorded in every fixture's provenance; the
+# test tests/scripts/test_runbook_rules.py checks this file against the upstream text:
+# - `for:` shortened so that a task fires within a run;
+# - `alert:` renamed to the runbook-agent runbook that handles it, and `labels:` that give the
+#   agent the deployment (`service`) and namespace it acts on.
+#
+# OVERRIDES (rule: field original -> used)
+#   OOMKilled (KubernetesContainerOomKiller): alert KubernetesContainerOomKiller -> OOMKilled;
+#     labels.service (none) -> {{ $labels.container }}
+#   HighRequestLatency (BlackboxProbeSlowHttp): alert BlackboxProbeSlowHttp -> HighRequestLatency;
+#     for 1m -> 30s; labels.severity warning -> critical; labels.service (none) ->
+#     {{ $labels.instance }}; labels.namespace (none) -> runbook-sandbox
+#   KubernetesPodCrashLooping: for 2m -> 30s; labels.service (none) -> {{ $labels.container }}
+#   KubernetesPodNotHealthy: for 15m -> 1m; labels.service (none) -> the pod name without its
+#     ReplicaSet and pod suffixes
+groups:
+  - name: runbook-sandbox
+    rules:
+      - alert: OOMKilled
+        expr: '(kube_pod_container_status_restarts_total - kube_pod_container_status_restarts_total offset 10m >= 1) and ignoring (reason) min_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[10m]) == 1'
+        for: 0m
+        labels:
+          severity: warning
+          service: '{{ $labels.container }}'
+        annotations:
+          summary: Kubernetes Container oom killer (instance {{ $labels.instance }})
+          description: "Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} has been OOMKilled {{ $value }} times in the last 10 minutes.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: HighRequestLatency
+        expr: 'sum by (instance) (probe_http_duration_seconds) > 1'
+        for: 30s
+        labels:
+          severity: critical
+          service: '{{ $labels.instance }}'
+          namespace: runbook-sandbox
+        annotations:
+          summary: Blackbox probe slow HTTP (instance {{ $labels.instance }})
+          description: "HTTP request took more than 1s\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: KubernetesPodCrashLooping
+        expr: 'max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}[5m]) >= 1'
+        for: 30s
+        labels:
+          severity: warning
+          service: '{{ $labels.container }}'
+        annotations:
+          summary: Kubernetes pod crash looping (instance {{ $labels.instance }})
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: KubernetesPodNotHealthy
+        expr: 'sum by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"}) > 0'
+        for: 1m
+        labels:
+          severity: critical
+          service: '{{ reReplaceAll "-[a-z0-9]+-[a-z0-9]+$" "" $labels.pod }}'
+        annotations:
+          summary: Kubernetes Pod not healthy (instance {{ $labels.instance }})
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-running state for longer than 15 minutes.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"

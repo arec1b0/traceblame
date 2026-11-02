@@ -321,7 +321,7 @@ M1
 feat(sdk-py): instrument agentic-rag (custom ReAct loop over AsyncOpenAI) with aegis.* attrs
 M1
 11
-feat(sdk-ts): instrument runbook agent
+feat(sdk-ts): instrument runbook-agent (Vercel AI SDK telemetry via OpenLLMetry-js) with aegis.* attrs
 M1
 12
 feat(faults): six fault kinds with ground-truth labels and seeds
