@@ -37,12 +37,18 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 
 ## Workflow
 - One GitHub issue = one branch = one PR. Conventional Commits.
-- pre-push hook enforces the PR-state rule; never bypass with --no-verify.
+- pre-push hook enforces the PR-state rule and the attribution rule; never bypass with
+  --no-verify. CI repeats the attribution check (job "attribution (no AI trailers or
+  phrases)") on the PR's commits, title and body.
 - One ref per git push (the pre-push hook checks only the first ref).
 - Before code for an issue: short plan (files, interfaces, tests), wait for my OK on anything
   that changes a contract (profile, JSON Schema, OpenAPI, ClickHouse schema).
 - Tests first for normalizer mappings, detectors, attributor. Coverage >= 80% there.
 - Do not create git commits with Co-Authored-By or any AI attribution trailers.
+  scripts/attribution-check.sh enforces it (`make attribution`; the hook and CI run it), so
+  there is no manual grep. It also rejects, in a commit body, PR title or PR body, a line that
+  starts with the tool's footer phrase (after optional indentation and the robot emoji) and
+  the robot emoji anywhere. The phrase in the middle of a sentence is fine.
   Commits are GPG-signed with my key: never pass --no-gpg-sign, never change git config.
 - Do not push, tag or release without explicit request.
 - Dev env: repo lives in WSL ext4 (~/src/traceblame), never /mnt/c; Windows 11 host; Go/ocb/kind/make run in WSL2 (Ubuntu) or Docker. Scripts must work there.
@@ -92,6 +98,8 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   and gateway Deployment into kind (deploy/kind/README.md)
 - `make kind-runbook-up` / `make kind-runbook-down`: the runbook-agent sandbox and its
   monitoring (namespace-only RBAC, derived NetworkPolicy addresses, pinned upstream rules)
+- `make attribution`: no AI attribution trailers or footer phrases in origin/main..HEAD
+  (scripts/attribution-check.sh [RANGE]; PR_TITLE and PR_BODY in the environment add the PR text)
 - `make bench-scaling`: gateway 2 -> 4 -> 2 under steady load; span loss / split-trace report
   into evals/reports/ (RATE, LOAD, UP_AT, DOWN_AT override the defaults)
 - `make demo`: M3

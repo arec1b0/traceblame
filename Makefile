@@ -35,7 +35,7 @@ OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
 # The normalizer as a CLI (collector/cmd/normalize): the contract stage runs fixtures through it.
 export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
-.PHONY: help bootstrap lint test contract integration security fixtures fixtures-agentic-rag \
+.PHONY: help bootstrap lint test contract integration security attribution fixtures fixtures-agentic-rag \
 	fixtures-runbook-agent kind-up kind-down kind-deploy kind-runbook-up kind-runbook-down \
 	bench-scaling collector collector-smoke collector-image
 
@@ -97,6 +97,9 @@ fixtures-agentic-rag: ## Capture agentic-rag fixtures through kind (APP_DIR, OLL
 
 fixtures-runbook-agent: ## Capture runbook-agent fixtures in the kind sandbox (RUNBOOK_APP_DIR, OLLAMA_URL; needs kind-runbook-up)
 	uv run --locked --script tools/fixtures/capture_runbook_agent.py --app-dir "$(RUNBOOK_APP_DIR)" $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
+
+attribution: ## No AI attribution in the commits of this branch (origin/main..HEAD); the pre-push hook and CI run the same script
+	@bash scripts/attribution-check.sh origin/main..HEAD
 
 kind-up: ## Create the local kind cluster, namespaces and generated Secrets (needs Docker in WSL)
 	@bash scripts/kind-up.sh

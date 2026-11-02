@@ -1,0 +1,39 @@
+# Attribution rule: no AI attribution trailers or phrases in the commits of a pull request, nor
+# in its title or body. The pre-push hook runs the same script on the commits only, offline,
+# and can be bypassed with --no-verify; this job cannot be. Required status check:
+# "attribution (no AI trailers or phrases)".
+#
+# The workflow reruns when the title or body is edited, because a plain pull_request trigger
+# does not. A merge group has no PR text, so only its commits are checked. The title and body
+# reach the script through the environment, never through the shell command line.
+name: attribution
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: attribution-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  attribution:
+    name: attribution (no AI trailers or phrases)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the range is base..head
+      - name: Check the commits and the PR title and body
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: scripts/attribution-check.sh "${BASE_SHA}..${HEAD_SHA}"
