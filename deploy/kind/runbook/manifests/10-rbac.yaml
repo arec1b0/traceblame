@@ -1,0 +1,113 @@
+# The agent's identity: a ServiceAccount whose Role covers runbook-sandbox only. kubectl in the
+# agent's pod uses in-cluster config; there is no kubeconfig and no other context to reach.
+# Verbs are what the runbook actions run (src/runbooks/actions/ of the app):
+#   collect-diagnostics: get pods, get events, logs deployment/<d>
+#   restart-service:     rollout restart deployment/<d>  (a patch)
+#   scale-deployment:    get deployment, scale deployment/<d>
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: runbook-agent
+  namespace: runbook-sandbox
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: runbook-agent
+  namespace: runbook-sandbox
+rules:
+  - apiGroups: [""]
+    resources: [pods, events]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [patch]
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    verbs: [get, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: runbook-agent
+  namespace: runbook-sandbox
+subjects:
+  - kind: ServiceAccount
+    name: runbook-agent
+    namespace: runbook-sandbox
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: runbook-agent
+---
+# The sandbox's other pods (workloads, tee collector) get no API access.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workload
+  namespace: runbook-sandbox
+automountServiceAccountToken: false
+---
+# Monitoring reads the sandbox, read-only: kube-state-metrics its pods and deployments,
+# Prometheus its services (blackbox probe targets).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-state-metrics
+  namespace: runbook-monitoring
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: runbook-monitoring
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alertmanager
+  namespace: runbook-monitoring
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: blackbox-exporter
+  namespace: runbook-monitoring
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sandbox-read
+  namespace: runbook-sandbox
+rules:
+  - apiGroups: [""]
+    resources: [pods, services]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sandbox-read
+  namespace: runbook-sandbox
+subjects:
+  - kind: ServiceAccount
+    name: kube-state-metrics
+    namespace: runbook-monitoring
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: runbook-monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sandbox-read

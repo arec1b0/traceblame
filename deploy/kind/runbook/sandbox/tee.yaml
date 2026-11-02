@@ -1,0 +1,73 @@
+# The capture's tee collector (#13): writes every OTLP request it receives to a file and
+# forwards it unchanged to the observability tier's otel-agent, authenticated as the run's
+# tenant (ADR-0005). No processors: the file is what the agent receives. Applied by
+# tools/fixtures/capture_runbook_agent.py, which owns the tee-config ConfigMap and the
+# tee-tenant Secret (never committed); ${OTELCOL_CONTRIB_IMAGE} and ${BUSYBOX_IMAGE} are pins.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tee
+  namespace: runbook-sandbox
+  labels: {app: tee}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: tee}}
+  template:
+    metadata:
+      labels: {app: tee}
+    spec:
+      serviceAccountName: workload
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: otelcol
+          image: ${OTELCOL_CONTRIB_IMAGE}
+          args: ["--config=/etc/otelcol/tee.yaml"]
+          env:
+            - name: TEE_TENANT
+              valueFrom: {secretKeyRef: {name: tee-tenant, key: username}}
+            - name: TEE_PASSWORD
+              valueFrom: {secretKeyRef: {name: tee-tenant, key: password}}
+          ports:
+            - {name: otlp-http, containerPort: 4318}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/otelcol}
+            - {name: out, mountPath: /tee}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+        # The collector image has no shell: the driver reads the file through this one.
+        - name: reader
+          image: ${BUSYBOX_IMAGE}
+          command: ["sh", "-c", "trap 'exit 0' TERM; while :; do sleep 3600 & wait; done"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: out, mountPath: /tee, readOnly: true}
+          resources:
+            requests: {cpu: 5m, memory: 8Mi}
+            limits: {memory: 32Mi}
+      volumes:
+        - name: config
+          configMap: {name: tee-config}
+        - name: out
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tee
+  namespace: runbook-sandbox
+spec:
+  selector: {app: tee}
+  ports:
+    - {name: otlp-http, port: 4318, targetPort: 4318}

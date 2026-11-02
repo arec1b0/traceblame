@@ -7,7 +7,7 @@ minimum_pre_commit_version: "4.7.0"
 default_stages: [pre-commit]
 # Keep byte-identical: the verbatim design doc extract, the vendored semconv snapshot
 # (SHA256SUMS) and the captured fixtures (fixture_sha256 in their provenance).
-exclude: ^(docs/design\.md|schemas/semconv/|collector/testdata/fixtures/)
+exclude: ^(docs/design\.md|schemas/semconv/|collector/testdata/fixtures/|tools/fixtures/runbook_agent/upstream/)
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -89,7 +89,7 @@ repos:
         # Kubernetes objects of the kind cluster; CRDs (ClickHouseInstallation) have no schema.
         entry: .tools/bin/kubeconform -strict -summary -kubernetes-version 1.37.0 -ignore-missing-schemas
         language: unsupported
-        files: ^deploy/kind/manifests/.*\.yaml$
+        files: ^deploy/kind/(manifests|runbook/manifests|runbook/sandbox)/.*\.yaml$
       - id: actionlint
         name: actionlint
         entry: .tools/bin/actionlint

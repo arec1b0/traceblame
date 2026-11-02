@@ -1,0 +1,11 @@
+# Runbook-agent sandbox (#13): the agent's remediation actions run only in runbook-sandbox;
+# the monitoring that fires its alerts lives apart, out of the agent's reach.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: runbook-sandbox
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: runbook-monitoring

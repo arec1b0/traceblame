@@ -1,0 +1,61 @@
+# The runbook agent under test (#13): its own ServiceAccount, whose Role covers runbook-sandbox
+# only; kubectl inside uses in-cluster config, with no kubeconfig file anywhere in the pod.
+# Live mode, so the approval gate holds every reversible or disruptive action. Applied by
+# tools/fixtures/capture_runbook_agent.py with the image it built (${RUNBOOK_AGENT_IMAGE});
+# its environment is the runbook-agent-env ConfigMap of the run.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runbook-agent
+  namespace: runbook-sandbox
+  labels: {app: runbook-agent}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: runbook-agent}}
+  template:
+    metadata:
+      labels: {app: runbook-agent}
+    spec:
+      serviceAccountName: runbook-agent
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: runbook-agent
+          image: ${RUNBOOK_AGENT_IMAGE}
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef: {name: runbook-agent-env}
+          env:
+            # kubectl's discovery cache; the root filesystem is read-only.
+            - {name: HOME, value: /tmp}
+          ports:
+            - {name: http, containerPort: 3000}
+          readinessProbe:
+            httpGet: {path: /healthz, port: 3000}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: data, mountPath: /app/data}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 512Mi}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runbook-agent
+  namespace: runbook-sandbox
+spec:
+  selector: {app: runbook-agent}
+  ports:
+    - {name: http, port: 3000, targetPort: 3000}

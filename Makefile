@@ -34,7 +34,8 @@ OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
 export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
 .PHONY: help bootstrap lint test contract integration security fixtures fixtures-agentic-rag \
-	kind-up kind-down kind-deploy bench-scaling collector collector-smoke collector-image
+	kind-up kind-down kind-deploy kind-runbook-up kind-runbook-down \
+	bench-scaling collector collector-smoke collector-image
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-16s %s\n", $$1, $$2 }'
@@ -103,3 +104,9 @@ bench-scaling: ## Measure span loss and split traces while scaling the gateway 2
 
 kind-down: ## Delete the local kind cluster
 	kind delete cluster --name $(KIND_CLUSTER)
+
+kind-runbook-up: ## Runbook-agent sandbox: namespace-only RBAC, network policies, monitoring (needs kind-deploy)
+	bash scripts/kind-runbook.sh up
+
+kind-runbook-down: ## Delete the runbook-agent sandbox and its monitoring
+	bash scripts/kind-runbook.sh down
