@@ -2,7 +2,8 @@
 # talks only to DNS, the API server, the tee collector and the host's Ollama (or, in the
 # canary preflight, the stub LLM). The tee takes
 # OTLP only from the agent and forwards only to the observability tier's otel-agent.
-# ${APISERVER_IP} and ${OLLAMA_IP} are resolved by scripts/kind-runbook.sh at deploy time.
+# ${APISERVER_IP}, ${APISERVER_PORT} and ${OLLAMA_IP} are resolved by scripts/kind-runbook.sh at
+# deploy time; the capture fails if they no longer match the cluster or the agent cannot reach them.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -32,7 +33,9 @@ spec:
     - to:
         - ipBlock: {cidr: "${APISERVER_IP}/32"}
       ports:
-        - {protocol: TCP, port: 6443}
+        # Block style and unquoted: valid YAML before envsubst, an integer port after it.
+        - protocol: TCP
+          port: ${APISERVER_PORT}
     - to:
         - podSelector:
             matchLabels: {app: tee}

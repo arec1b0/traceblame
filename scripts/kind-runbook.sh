@@ -35,14 +35,26 @@ up() {
   "${KCTL[@]}" apply -f "${DIR}/manifests/00-namespaces.yaml" -f "${DIR}/manifests/10-rbac.yaml"
 
   step "network policies"
-  APISERVER_IP="$("${KCTL[@]}" get endpointslice -n default -l kubernetes.io/service-name=kubernetes \
-    -o jsonpath='{.items[0].endpoints[0].addresses[0]}')"
-  OLLAMA_IP="$(ollama_ip)"
-  [[ "${APISERVER_IP}" =~ ^[0-9.]+$ && "${OLLAMA_IP}" =~ ^[0-9.]+$ ]] || {
-    echo "kind-runbook: cannot resolve the API server (${APISERVER_IP}) or Ollama (${OLLAMA_IP})" >&2
+  # The API server's endpoint as pods reach it (the EndpointSlice of the kubernetes Service;
+  # the Endpoints API is deprecated), and host.docker.internal as resolved inside the cluster.
+  local endpoints
+  endpoints="$("${KCTL[@]}" get endpointslice -n default -l kubernetes.io/service-name=kubernetes \
+    -o jsonpath='{range .items[*]}{range .endpoints[*]}{range .addresses[*]}{@}{" "}{end}{end}{end}')"
+  APISERVER_PORT="$("${KCTL[@]}" get endpointslice -n default -l kubernetes.io/service-name=kubernetes \
+    -o jsonpath='{.items[0].ports[?(@.name=="https")].port}')"
+  read -r -a addresses <<<"${endpoints}"
+  [[ ${#addresses[@]} -eq 1 ]] || {
+    echo "kind-runbook: want one API server address, got '${endpoints}'" >&2
     exit 1
   }
-  APISERVER_IP="${APISERVER_IP}" OLLAMA_IP="${OLLAMA_IP}" envsubst '${APISERVER_IP} ${OLLAMA_IP}' \
+  APISERVER_IP="${addresses[0]}"
+  OLLAMA_IP="$(ollama_ip)"
+  [[ "${APISERVER_IP}" =~ ^[0-9.]+$ && "${APISERVER_PORT}" =~ ^[0-9]+$ && "${OLLAMA_IP}" =~ ^[0-9.]+$ ]] || {
+    echo "kind-runbook: cannot resolve the API server (${APISERVER_IP}:${APISERVER_PORT}) or Ollama (${OLLAMA_IP})" >&2
+    exit 1
+  }
+  APISERVER_IP="${APISERVER_IP}" APISERVER_PORT="${APISERVER_PORT}" OLLAMA_IP="${OLLAMA_IP}" \
+    envsubst '${APISERVER_IP} ${APISERVER_PORT} ${OLLAMA_IP}' \
     <"${DIR}/manifests/30-network.yaml" | "${KCTL[@]}" apply -f -
 
   step "monitoring"
@@ -64,7 +76,7 @@ up() {
   for d in kube-state-metrics prometheus alertmanager blackbox-exporter; do
     "${KCTL[@]}" "${ns[@]}" rollout status "deployment/${d}" --timeout=300s
   done
-  echo "kind-runbook: ready (API server ${APISERVER_IP}, Ollama ${OLLAMA_IP})"
+  echo "kind-runbook: ready (API server ${APISERVER_IP}:${APISERVER_PORT}, Ollama ${OLLAMA_IP})"
 }
 
 case "${1:-}" in
