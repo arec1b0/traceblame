@@ -24,7 +24,8 @@ type want struct {
 	attrs  map[string]any
 	absent []string
 	// A real application run holds many spans: kinds has one expectation per span kind
-	// (its kind, attrs and absent; sdk comes from the fixture), and spans their number.
+	// (its kind, attrs and absent; sdk comes from the fixture unless the kind sets its own,
+	// as a shim's helper spans do, ADR-0006 section 3), and spans their number.
 	kinds map[string]want
 	spans int
 	// The tenant a shim set; config mode keeps it (ADR-0005). Default: the harness's.
@@ -112,6 +113,55 @@ var agenticRAG = map[string]want{
 	},
 }
 
+// The runbook-agent runs (#13): traceblame-ts's agent and tool spans (OpenInference
+// conventions) around the AI SDK's generateObject call (chain) and its HTTP attempt (llm),
+// exported through OpenLLMetry-js. Every triage answered with a JSON object that parsed.
+var runbookAgent = map[string]want{
+	"llm": {
+		attrs: llm("qwen2.5:7b", map[string]any{
+			"gen_ai.response.model":          "qwen2.5:7b",
+			"gen_ai.response.finish_reasons": []any{"stop"},
+			"aegis.output.parse_ok":          true,
+		}),
+		absent: []string{"error.type", "http.response.status_code", "ai.prompt.messages", "ai.response.object"},
+	},
+	"chain": {
+		attrs: map[string]any{
+			"gen_ai.provider.name": "openai", "gen_ai.request.model": "qwen2.5:7b",
+			"gen_ai.response.finish_reasons": []any{"stop"},
+		},
+		// Output features belong on the llm span only (ADR-0006 section 4).
+		absent: []string{"aegis.output.parse_ok", "gen_ai.operation.name", "error.type", "ai.schema"},
+	},
+	"tool": {
+		sdk:    "openinference",
+		attrs:  map[string]any{"gen_ai.operation.name": "execute_tool"},
+		absent: []string{"tool.name"},
+	},
+	"agent": {
+		sdk:    "openinference",
+		attrs:  map[string]any{"gen_ai.operation.name": "invoke_agent", "gen_ai.agent.name": "runbook-agent"},
+		absent: []string{"agent.name"},
+	},
+}
+
+// The runbook-agent run whose model the server lacked: the attempt failed with a real HTTP
+// 404, which the shim's middleware recorded (http.response.status_code); the AI SDK's
+// exception event names the error. No output, so no parse_ok.
+var runbookAgentAPIError = map[string]want{
+	"llm": {
+		attrs: llm("traceblame-missing-model:404", map[string]any{
+			"error.type": "AI_APICallError", "http.response.status_code": int64(404),
+		}),
+		absent: []string{"aegis.output.parse_ok", "gen_ai.response.model", "gen_ai.usage.input_tokens"},
+	},
+	"chain": {
+		attrs:  map[string]any{"error.type": "AI_APICallError", "gen_ai.request.model": "traceblame-missing-model:404"},
+		absent: []string{"aegis.output.parse_ok", "http.response.status_code"},
+	},
+	"agent": runbookAgent["agent"],
+}
+
 var fixtureWants = map[string]want{
 	"openinference/openinference-instrumentation-openai-0.1.68/agentic_rag_cuad_answerable": {
 		sdk: "openinference", kinds: agenticRAG, spans: 102, tenant: "tenant-eval",
@@ -150,6 +200,21 @@ var fixtureWants = map[string]want{
 	},
 	"openllmetry/opentelemetry-instrumentation-openai-0.62.4/embeddings_basic": {
 		sdk: "openllmetry", kind: "embedding", attrs: embedding(localhost),
+	},
+	"openllmetry/traceloop-node-server-sdk-0.27.0/runbook_latency": {
+		sdk: "openllmetry", kinds: runbookAgent, spans: 18, tenant: "tenant-eval",
+	},
+	"openllmetry/traceloop-node-server-sdk-0.27.0/runbook_oom": {
+		sdk: "openllmetry", kinds: runbookAgent, spans: 20, tenant: "tenant-eval",
+	},
+	"openllmetry/traceloop-node-server-sdk-0.27.0/runbook_crash": {
+		sdk: "openllmetry", kinds: runbookAgent, spans: 19, tenant: "tenant-eval",
+	},
+	"openllmetry/traceloop-node-server-sdk-0.27.0/runbook_pending": {
+		sdk: "openllmetry", kinds: runbookAgent, spans: 18, tenant: "tenant-eval",
+	},
+	"openllmetry/traceloop-node-server-sdk-0.27.0/runbook_api_error": {
+		sdk: "openllmetry", kinds: runbookAgentAPIError, spans: 3, tenant: "tenant-eval",
 	},
 	"otel-genai/opentelemetry-instrumentation-openai-v2-2.4b0/chat_basic": {
 		sdk: "otel-genai", kind: "llm", attrs: llm("qwen2.5:7b", merge(chatBasic, localhost)),
@@ -249,7 +314,6 @@ func TestNormalizesEveryFixture(t *testing.T) {
 				got := span.Attributes().AsRaw()
 				assert.Equal(t, "aegis-telemetry/1", got["aegis.profile.version"])
 				assert.Equal(t, Version, got["aegis.normalizer.version"])
-				assert.Equal(t, w.sdk, got["aegis.source.sdk"])
 				kw := w
 				if w.kinds != nil {
 					kind, _ := got["aegis.span.kind"].(string)
@@ -257,7 +321,11 @@ func TestNormalizesEveryFixture(t *testing.T) {
 					kw, found = w.kinds[kind]
 					require.True(t, found, "unexpected span kind %q", kind)
 					kw.kind = kind
+					if kw.sdk == "" {
+						kw.sdk = w.sdk
+					}
 				}
+				assert.Equal(t, kw.sdk, got["aegis.source.sdk"])
 				assert.Equal(t, kw.kind, got["aegis.span.kind"])
 				for k, v := range kw.attrs {
 					assert.Equal(t, v, got[k], k)

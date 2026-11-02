@@ -73,7 +73,10 @@ def test_fixture_is_the_captured_export(fixture: Fixture) -> None:
     assert (ROOT / provenance.capture_script).is_file()
     assert fixture.path.parent.parent.name == provenance.sdk
     assert fixture.path.name == f"{provenance.scenario}.otlp.json"
-    assert fixture.path.parent.name in {f"{k}-{v}" for k, v in provenance.packages.items()}
+    # A scoped npm package (@scope/name) names its directory scope-name.
+    assert fixture.path.parent.name in {
+        f"{k.removeprefix('@').replace('/', '-')}-{v}" for k, v in provenance.packages.items()
+    }
 
 
 @pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f.id)
@@ -101,6 +104,10 @@ def test_fixture_carries_content_only_when_captured_with_it(fixture: Fixture) ->
         assert found == []
         assert not fixture.id.endswith("_content")
 
+
+# The tracer scopes of the shims' helper spans: traceblame_py.spans.SCOPE and
+# sdk/ts/src/spans.ts SCOPE.
+SHIM_HELPER_SCOPES = {"traceblame_py", "traceblame_ts"}
 
 # The contract gate: the collector's normalizer (collector/cmd/normalize), built by
 # `make contract`. Raw SDK exports (identity) go to the gap report instead.
@@ -134,7 +141,11 @@ def test_normalized_fixture_names_its_sdk_and_normalizer(
     fixture: Fixture, normalized: dict[str, list[dict[str, Any]]]
 ) -> None:
     for span in normalized[fixture.id]:
-        assert span["attributes"]["aegis.source.sdk"] == fixture.provenance().sdk
+        # ADR-0006 section 3: a shim's own helper spans (agent, tool) follow OpenInference
+        # conventions, whatever SDK the fixture's LLM spans come from.
+        helper = span["scope"]["name"] in SHIM_HELPER_SCOPES
+        want = "openinference" if helper else fixture.provenance().sdk
+        assert span["attributes"]["aegis.source.sdk"] == want
         assert re.fullmatch(r"\d+\.\d+\.\d+", span["attributes"]["aegis.normalizer.version"])
 
 
@@ -145,3 +156,36 @@ def test_normalized_fixture_carries_no_content(
     assert _content_attributes(normalized[fixture.id], profile) == []
     exported = json.dumps(GO.normalize(fixture.load()))
     assert [n for n in _NEEDLES if n in exported] == []
+
+
+def _output_features(profile: Profile) -> set[str]:
+    return {a.name for a in profile.attributes if a.name.startswith("aegis.output.")}
+
+
+@pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f.id)
+def test_output_features_only_on_llm_spans(
+    fixture: Fixture, normalized: dict[str, list[dict[str, Any]]], profile: Profile
+) -> None:
+    # ADR-0006 section 4: the shims set output features only on spans the normalizer
+    # classifies as llm, even when they come from another span's outcome (traceblame-ts).
+    features = _output_features(profile)
+    misplaced = [
+        (span["span_id"], span["attributes"]["aegis.span.kind"])
+        for span in normalized[fixture.id]
+        if features & span["attributes"].keys() and span["attributes"]["aegis.span.kind"] != "llm"
+    ]
+    assert misplaced == []
+
+
+def test_output_features_are_set_by_both_shims(
+    normalized: dict[str, list[dict[str, Any]]], profile: Profile
+) -> None:
+    # Not vacuous: the application runs of traceblame-py (agentic_rag_*) and traceblame-ts
+    # (runbook_*) carry them.
+    features = _output_features(profile)
+    for prefix in ("agentic_rag_", "runbook_"):
+        ids = [f.id for f in FIXTURES if f.id.rsplit("/", 1)[-1].startswith(prefix)]
+        assert ids, prefix
+        assert any(features & span["attributes"].keys() for i in ids for span in normalized[i]), (
+            prefix
+        )

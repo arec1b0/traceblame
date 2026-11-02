@@ -131,8 +131,12 @@ class TaskInfo(_Model):
     approval_policy: Literal["approve", "reject", "timeout"] | None
     approvals: tuple[ApprovalInfo, ...]
     alerts_received: int = Field(ge=0)
+    # Alertmanager's webhook requests during the task, and the failed ones among them.
     webhooks: int = Field(ge=0)
+    webhooks_failed: int = Field(ge=0)
     started_at: datetime
+    # The tee session (one fixture) the task was exported in.
+    session: str = Field(min_length=1)
 
 
 class ScenarioRunInfo(_Model):

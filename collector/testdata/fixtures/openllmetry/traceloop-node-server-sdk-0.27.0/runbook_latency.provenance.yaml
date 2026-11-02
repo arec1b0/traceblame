@@ -1,0 +1,249 @@
+sdk: openllmetry
+scenario: runbook_latency
+captured_at: '2026-11-02T09:35:30Z'
+capture_script: tools/fixtures/capture_runbook_agent.py
+capture_script_sha256: ac2ad8a32741824a984475c81d5a1f4ce68aaa84ea049af44929a5f99429507d
+node: v22.23.4
+pnpm: 10.34.9
+packages:
+  ai: 4.3.19
+  '@ai-sdk/openai': 1.3.24
+  traceblame-ts: 0.1.0
+  '@traceloop/node-server-sdk': 0.27.0
+  '@opentelemetry/sdk-trace-base': 2.0.1
+  '@opentelemetry/api': 1.9.0
+env:
+  LLM_PROVIDER: openai
+  EXECUTION_MODE: live
+  APPROVAL_TIMEOUT_MS: '30000'
+  LOG_LEVEL: warn
+  TRACEBLAME_ENABLED: '1'
+  TRACEBLAME_TENANT_ID: tenant-eval
+  TRACEBLAME_EVAL_RUN_ID: rb-20261102-s7-9560a87
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://tee.runbook-sandbox.svc:4318
+  LLM_MODEL: qwen2.5:7b
+  LLM_BASE_URL: http://host.docker.internal:11434/v1
+  LLM_STRUCTURED_OUTPUTS: 'true'
+content_capture: false
+content_check: passed
+model:
+  name: qwen2.5:7b
+  digest: 845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e
+  server: ollama
+  server_version: 0.40.5
+endpoint: http://host.docker.internal:11434/v1
+collector: otelcol-contrib otel/opentelemetry-collector-contrib:0.164.0@sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b
+fixture_sha256: 248314e81aedd2b2fe3a2e09745b7793e873e459ca7625624b53295bdfc39a3f
+app:
+  repository: https://github.com/arec1b0/runbook-agent
+  commit: 374edce639d34b8e25a3bc1c5355b94653fefe44
+shim:
+  package: traceblame-ts
+  version: 0.1.0
+  commit: 9560a8792fa0be95d97cbcf83d559a18e1e13824
+run:
+  report: evals/reports/sdk-ts-kind-2026-11-02.md
+  eval_run_id: rb-20261102-s7-9560a87
+  tenant: tenant-eval
+  image: runbook-agent:374edce-tb9560a87
+  image_id: sha256:e44e2314bdc2951fc2465c9c8de8c4479fb6560d34d3edeb553367285d32f985
+scenario_run:
+  seed: 7
+  per_scenario: 6
+  alert: HighRequestLatency
+  expected_runbook: high-load-scale-up
+  rules:
+    repository: https://github.com/samber/awesome-prometheus-alerts
+    commit: 736370e922cee74db497391c825a7a6bd3d48f17
+    files:
+    - path: dist/rules/kubernetes/kubestate-exporter.yml
+      sha256: 37903f0bd6407362035e088369337c59229af6f1de2c68c8781dfc3d86708d4e
+    - path: dist/rules/blackbox/blackbox-exporter.yml
+      sha256: 74f60cd46582cc75cc8c041289bf40cdc043472ee5ece8459baf81c445ab95ba
+    license: CC BY 4.0
+    verbatim:
+    - expr
+    - annotations
+    overrides:
+    - rule: OOMKilled
+      upstream: KubernetesContainerOomKiller
+      field: alert
+      original: KubernetesContainerOomKiller
+      used: OOMKilled
+    - rule: OOMKilled
+      upstream: KubernetesContainerOomKiller
+      field: labels.service
+      original: null
+      used: '{{ $labels.container }}'
+    - rule: HighRequestLatency
+      upstream: BlackboxProbeSlowHttp
+      field: alert
+      original: BlackboxProbeSlowHttp
+      used: HighRequestLatency
+    - rule: HighRequestLatency
+      upstream: BlackboxProbeSlowHttp
+      field: for
+      original: 1m
+      used: 30s
+    - rule: HighRequestLatency
+      upstream: BlackboxProbeSlowHttp
+      field: labels.namespace
+      original: null
+      used: runbook-sandbox
+    - rule: HighRequestLatency
+      upstream: BlackboxProbeSlowHttp
+      field: labels.service
+      original: null
+      used: '{{ $labels.instance }}'
+    - rule: HighRequestLatency
+      upstream: BlackboxProbeSlowHttp
+      field: labels.severity
+      original: warning
+      used: critical
+    - rule: KubernetesPodCrashLooping
+      upstream: KubernetesPodCrashLooping
+      field: for
+      original: 2m
+      used: 30s
+    - rule: KubernetesPodCrashLooping
+      upstream: KubernetesPodCrashLooping
+      field: labels.service
+      original: null
+      used: '{{ $labels.container }}'
+    - rule: KubernetesPodNotHealthy
+      upstream: KubernetesPodNotHealthy
+      field: for
+      original: 15m
+      used: 1m
+    - rule: KubernetesPodNotHealthy
+      upstream: KubernetesPodNotHealthy
+      field: labels.service
+      original: null
+      used: '{{ reReplaceAll "-[a-z0-9]+-[a-z0-9]+$" "" $labels.pod }}'
+  approver: scripted:7
+  approval_timeout_ms: 30000
+  tasks:
+  - task: latency-4
+    scenario: latency
+    order: 0
+    params:
+      delay_s: 2.3
+      load_rps: 1
+    alert: HighRequestLatency
+    expected_runbook: high-load-scale-up
+    runbook: none
+    status: no-runbook
+    steps: []
+    approval_policy: timeout
+    approvals: []
+    alerts_received: 1
+    webhooks: 1
+    webhooks_failed: 0
+    started_at: '2026-11-02T09:38:33Z'
+    session: latency
+  - task: latency-5
+    scenario: latency
+    order: 1
+    params:
+      delay_s: 1.6
+      load_rps: 2
+    alert: HighRequestLatency
+    expected_runbook: high-load-scale-up
+    runbook: none
+    status: no-runbook
+    steps: []
+    approval_policy: timeout
+    approvals: []
+    alerts_received: 1
+    webhooks: 1
+    webhooks_failed: 0
+    started_at: '2026-11-02T09:40:10Z'
+    session: latency
+  - task: latency-1
+    scenario: latency
+    order: 2
+    params:
+      delay_s: 2.8
+      load_rps: 4
+    alert: HighRequestLatency
+    expected_runbook: high-load-scale-up
+    runbook: none
+    status: no-runbook
+    steps: []
+    approval_policy: reject
+    approvals: []
+    alerts_received: 1
+    webhooks: 1
+    webhooks_failed: 0
+    started_at: '2026-11-02T09:41:43Z'
+    session: latency
+  - task: latency-2
+    scenario: latency
+    order: 3
+    params:
+      delay_s: 2.3
+      load_rps: 1
+    alert: HighRequestLatency
+    expected_runbook: high-load-scale-up
+    runbook: none
+    status: no-runbook
+    steps: []
+    approval_policy: approve
+    approvals: []
+    alerts_received: 1
+    webhooks: 1
+    webhooks_failed: 0
+    started_at: '2026-11-02T09:43:23Z'
+    session: latency
+  - task: latency-0
+    scenario: latency
+    order: 4
+    params:
+      delay_s: 1.9
+      load_rps: 1
+    alert: HighRequestLatency
+    expected_runbook: high-load-scale-up
+    runbook: none
+    status: no-runbook
+    steps: []
+    approval_policy: approve
+    approvals: []
+    alerts_received: 1
+    webhooks: 1
+    webhooks_failed: 0
+    started_at: '2026-11-02T09:44:41Z'
+    session: latency
+  - task: latency-3
+    scenario: latency
+    order: 5
+    params:
+      delay_s: 2.4
+      load_rps: 2
+    alert: HighRequestLatency
+    expected_runbook: high-load-scale-up
+    runbook: none
+    status: no-runbook
+    steps: []
+    approval_policy: approve
+    approvals: []
+    alerts_received: 1
+    webhooks: 1
+    webhooks_failed: 0
+    started_at: '2026-11-02T09:46:02Z'
+    session: latency
+monitoring:
+  PROMETHEUS_IMAGE: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+  ALERTMANAGER_IMAGE: prom/alertmanager:v0.34.2@sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b
+  KUBE_STATE_METRICS_IMAGE: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0@sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b
+  BLACKBOX_EXPORTER_IMAGE: prom/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
+  PYTHON_IMAGE: python:3.12.13-alpine3.22@sha256:a190708a2dec1bd18b1decb539f8e8f5407abaa9bf39cacda583f7f8c11db322
+notes:
+- Real faults in the runbook-sandbox namespace fire pinned upstream alert rules; Alertmanager posts each
+  task's alert once to the agent.
+- The agent runs in-cluster with a namespace-only Role, in live mode with its approval gate answered by
+  a scripted approver through the app's own API.
+- 'The image is the app''s Dockerfile at its commit, built from a context with the packed traceblame-ts:
+  package.json names the tarball as an optional dependency, and the Dockerfile''s dependency COPY includes
+  it.'
+- 'Exported through traceblame-ts: AI SDK telemetry with recordInputs and recordOutputs off (ADR-0006).
+  The file is what the tee collector received; the kind agent got the same requests.'

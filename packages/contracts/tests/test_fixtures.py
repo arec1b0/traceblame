@@ -191,7 +191,9 @@ _TS_CAPTURE: dict[str, Any] = {
                 "approvals": [{"action": "restart-service", "decision": "approve"}],
                 "alerts_received": 1,
                 "webhooks": 1,
+                "webhooks_failed": 0,
                 "started_at": "2026-11-01T10:00:00Z",
+                "session": "oom",
             }
         ],
     },
@@ -209,6 +211,7 @@ def test_typescript_app_capture_provenance(tmp_path: Path, write_fixture: WriteF
     assert provenance.scenario_run is not None
     assert provenance.scenario_run.tasks[0].approvals[0].decision == "approve"
     assert provenance.scenario_run.rules.overrides[0].used == "OOMKilled"
+    assert provenance.scenario_run.tasks[0].session == "oom"
 
 
 @pytest.mark.parametrize(
@@ -229,6 +232,15 @@ def test_typescript_app_capture_provenance(tmp_path: Path, write_fixture: WriteF
             ("python", "uv"),
         ),
         ({"run": {**_TS_CAPTURE["run"], "image_id": "latest"}}, ("python", "uv")),
+        (
+            {
+                "scenario_run": {
+                    **_TS_CAPTURE["scenario_run"],
+                    "tasks": [{**_TS_CAPTURE["scenario_run"]["tasks"][0], "webhooks_failed": -1}],
+                }
+            },
+            ("python", "uv"),
+        ),
     ],
 )
 def test_typescript_app_capture_provenance_is_strict(
