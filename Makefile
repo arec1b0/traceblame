@@ -26,6 +26,8 @@ export CONTRACT_BASE_REF
 KIND_CLUSTER := traceblame
 # The agentic-rag checkout that make fixtures-agentic-rag runs (#12).
 APP_DIR ?= $(CURDIR)/../agentic-rag
+# The runbook-agent checkout that make fixtures-runbook-agent runs (#13).
+RUNBOOK_APP_DIR ?= $(CURDIR)/../runbook-agent
 
 # Collector distribution (collector/builder-config.yaml, ocb from tools/versions.env).
 COLLECTOR_BUILD := collector/_build
@@ -34,7 +36,7 @@ OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
 export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
 .PHONY: help bootstrap lint test contract integration security fixtures fixtures-agentic-rag \
-	kind-up kind-down kind-deploy kind-runbook-up kind-runbook-down \
+	fixtures-runbook-agent kind-up kind-down kind-deploy kind-runbook-up kind-runbook-down \
 	bench-scaling collector collector-smoke collector-image
 
 help: ## List targets
@@ -92,6 +94,9 @@ fixtures: ## Re-capture golden span fixtures from Ollama (OLLAMA_URL=...; see co
 fixtures-agentic-rag: ## Capture agentic-rag fixtures through kind (APP_DIR, OLLAMA_URL; needs kind-up, kind-deploy)
 	bash scripts/install-tools.sh otelcol-contrib
 	uv run --locked --script tools/fixtures/capture_agentic_rag.py --app-dir "$(APP_DIR)" $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
+
+fixtures-runbook-agent: ## Capture runbook-agent fixtures in the kind sandbox (RUNBOOK_APP_DIR, OLLAMA_URL; needs kind-runbook-up)
+	uv run --locked --script tools/fixtures/capture_runbook_agent.py --app-dir "$(RUNBOOK_APP_DIR)" $(if $(OLLAMA_URL),--ollama-url $(OLLAMA_URL))
 
 kind-up: ## Create the local kind cluster, namespaces and generated Secrets (needs Docker in WSL)
 	@bash scripts/kind-up.sh

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 FIXTURE_SUFFIX = ".otlp.json"
 PROVENANCE_SUFFIX = ".provenance.yaml"
@@ -70,9 +70,88 @@ class RunInfo(_Model):
     report: str
 
 
+class ImageRunInfo(_Model):
+    """A run of an application image in the kind cluster (the runbook agent, #13)."""
+
+    report: str
+    eval_run_id: str = Field(pattern=r"^[A-Za-z0-9._:-]{1,128}$")
+    tenant: str
+    image: str
+    image_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+
+
+class RuleFile(_Model):
+    path: str
+    sha256: str = Field(pattern=_SHA256)
+
+
+class RuleOverride(_Model):
+    """One field of an alert rule that differs from its upstream text."""
+
+    rule: str
+    upstream: str
+    field: str
+    original: str | None
+    used: str | None
+
+
+class RulesInfo(_Model):
+    """Where the run's alert rules come from, and every field that differs from there."""
+
+    repository: str
+    commit: str = Field(pattern=r"^[0-9a-f]{40}$")
+    files: tuple[RuleFile, ...] = Field(min_length=1)
+    license: str
+    verbatim: tuple[str, ...] = Field(min_length=1)
+    overrides: tuple[RuleOverride, ...]
+
+
+class StepInfo(_Model):
+    action: str
+    status: str
+
+
+class ApprovalInfo(_Model):
+    action: str
+    decision: Literal["approve", "reject", "timeout"]
+
+
+class TaskInfo(_Model):
+    """One alert the agent handled: the fault's seeded parameters, and what the agent did."""
+
+    task: str
+    scenario: str
+    order: int = Field(ge=0)
+    params: dict[str, Any]
+    alert: str
+    expected_runbook: str
+    runbook: str
+    status: str
+    steps: tuple[StepInfo, ...]
+    approval_policy: Literal["approve", "reject", "timeout"] | None
+    approvals: tuple[ApprovalInfo, ...]
+    alerts_received: int = Field(ge=0)
+    webhooks: int = Field(ge=0)
+    started_at: datetime
+
+
+class ScenarioRunInfo(_Model):
+    """The alert scenario of an application run with real faults (#13)."""
+
+    seed: int
+    per_scenario: int = Field(ge=1)
+    alert: str
+    expected_runbook: str
+    rules: RulesInfo
+    approver: str = Field(pattern=r"^scripted:-?[0-9]+$")
+    approval_timeout_ms: int = Field(ge=1000)
+    tasks: tuple[TaskInfo, ...] = Field(min_length=1)
+
+
 class Provenance(_Model):
     """How a fixture was captured. Written by tools/fixtures/capture.py or, for real
-    application runs, tools/fixtures/capture_agentic_rag.py; never by hand."""
+    application runs, tools/fixtures/capture_agentic_rag.py and capture_runbook_agent.py;
+    never by hand."""
 
     sdk: Literal["openinference", "openllmetry", "otel-genai"]
     scenario: str
@@ -81,8 +160,11 @@ class Provenance(_Model):
     capture_script_sha256: str = Field(pattern=_SHA256)
     # SDK captures share tools/fixtures/_capture_common.py; app captures have no such module.
     capture_common_sha256: str | None = Field(default=None, pattern=_SHA256)
-    python: str
-    uv: str
+    # The capture's runtime: python and uv, or (the TypeScript shim) node and pnpm.
+    python: str | None = None
+    uv: str | None = None
+    node: str | None = None
+    pnpm: str | None = None
     packages: dict[str, str]
     env: dict[str, str]
     # True only for *_content scenarios: content capture was on, so the export carries
@@ -98,8 +180,19 @@ class Provenance(_Model):
     shim: ShimInfo | None = None
     dataset: DatasetInfo | None = None
     embedding_model: EmbeddingModelInfo | None = None
-    run: RunInfo | None = None
+    run: RunInfo | ImageRunInfo | None = None
+    scenario_run: ScenarioRunInfo | None = None
+    # Image pins of the monitoring that fired the run's alerts.
+    monitoring: dict[str, str] | None = None
     notes: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _one_runtime(self) -> "Provenance":
+        python = (self.python is not None, self.uv is not None)
+        node = (self.node is not None, self.pnpm is not None)
+        if {python, node} != {(True, True), (False, False)}:
+            raise ValueError("set python and uv, or node and pnpm")
+        return self
 
 
 def sha256_file(path: Path) -> str:

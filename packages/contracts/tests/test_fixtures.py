@@ -135,3 +135,107 @@ def test_app_capture_provenance_is_strict(
     (found,) = discover_fixtures(tmp_path)
     with pytest.raises(FixtureError, match="invalid provenance"):
         found.provenance()
+
+
+# A TypeScript application capture (#13): node and pnpm instead of python and uv, a run from
+# a built image, and the alert scenario of the run.
+_TS_CAPTURE: dict[str, Any] = {
+    "sdk": "openllmetry",
+    "node": "v22.23.4",
+    "pnpm": "10.34.9",
+    "content_check": "passed",
+    "app": {"repository": "https://github.com/arec1b0/runbook-agent", "commit": "c" * 40},
+    "shim": {"package": "traceblame-ts", "version": "0.1.0", "commit": "d" * 40},
+    "run": {
+        "report": "evals/reports/sdk-ts-kind-2026-11-01.md",
+        "eval_run_id": "rb-20261101-s7-abcdef1",
+        "tenant": "tenant-eval",
+        "image": "runbook-agent:c-d",
+        "image_id": "sha256:" + "e" * 64,
+    },
+    "scenario_run": {
+        "seed": 7,
+        "per_scenario": 6,
+        "alert": "OOMKilled",
+        "expected_runbook": "oom-restart",
+        "rules": {
+            "repository": "https://github.com/samber/awesome-prometheus-alerts",
+            "commit": "f" * 40,
+            "files": [{"path": "dist/rules/kubernetes/kubestate-exporter.yml", "sha256": "0" * 64}],
+            "license": "CC BY 4.0",
+            "verbatim": ["expr", "annotations"],
+            "overrides": [
+                {
+                    "rule": "OOMKilled",
+                    "upstream": "KubernetesContainerOomKiller",
+                    "field": "alert",
+                    "original": "KubernetesContainerOomKiller",
+                    "used": "OOMKilled",
+                }
+            ],
+        },
+        "approver": "scripted:7",
+        "approval_timeout_ms": 30000,
+        "tasks": [
+            {
+                "task": "oom-5",
+                "scenario": "oom",
+                "order": 6,
+                "params": {"memory_limit_mi": 64, "alloc_mib_per_s": 10},
+                "alert": "OOMKilled",
+                "expected_runbook": "oom-restart",
+                "runbook": "oom-restart",
+                "status": "remediated",
+                "steps": [{"action": "collect-diagnostics", "status": "executed"}],
+                "approval_policy": "approve",
+                "approvals": [{"action": "restart-service", "decision": "approve"}],
+                "alerts_received": 1,
+                "webhooks": 1,
+                "started_at": "2026-11-01T10:00:00Z",
+            }
+        ],
+    },
+    "monitoring": {"PROMETHEUS_IMAGE": "prom/prometheus:v3.15.1@sha256:" + "1" * 64},
+}
+
+
+def test_typescript_app_capture_provenance(tmp_path: Path, write_fixture: WriteFixture) -> None:
+    fixture = write_fixture(tmp_path)
+    _rewrite_provenance(fixture, _TS_CAPTURE, drop=("capture_common_sha256", "python", "uv"))
+    (found,) = discover_fixtures(tmp_path)
+    provenance = found.provenance()
+    assert provenance.python is None
+    assert provenance.node == "v22.23.4"
+    assert provenance.scenario_run is not None
+    assert provenance.scenario_run.tasks[0].approvals[0].decision == "approve"
+    assert provenance.scenario_run.rules.overrides[0].used == "OOMKilled"
+
+
+@pytest.mark.parametrize(
+    ("changes", "drop"),
+    [
+        ({}, ("capture_common_sha256", "python", "uv", "node")),  # a runtime half missing
+        ({}, ("capture_common_sha256",)),  # both runtimes at once
+        ({"scenario_run": {**_TS_CAPTURE["scenario_run"], "approver": "alice"}}, ("python", "uv")),
+        (
+            {
+                "scenario_run": {
+                    **_TS_CAPTURE["scenario_run"],
+                    "tasks": [
+                        {**_TS_CAPTURE["scenario_run"]["tasks"][0], "approval_policy": "maybe"}
+                    ],
+                }
+            },
+            ("python", "uv"),
+        ),
+        ({"run": {**_TS_CAPTURE["run"], "image_id": "latest"}}, ("python", "uv")),
+    ],
+)
+def test_typescript_app_capture_provenance_is_strict(
+    tmp_path: Path, write_fixture: WriteFixture, changes: dict[str, Any], drop: tuple[str, ...]
+) -> None:
+    fixture = write_fixture(tmp_path)
+    _rewrite_provenance(fixture, _TS_CAPTURE | changes, drop=drop)
+    (found,) = discover_fixtures(tmp_path)
+    with pytest.raises(FixtureError, match="invalid provenance"):
+        found.provenance()
