@@ -225,6 +225,14 @@ def build_image(
     package.setdefault("optionalDependencies", {})["traceblame-ts"] = f"file:./{tarball.name}"
     (context / "package.json").write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
     run([str(PNPM), "install", "--lockfile-only", "--ignore-scripts"], cwd=context)
+    # The Dockerfile installs from package.json and the lockfile alone, before the rest of the
+    # context; without the tarball there pnpm skips the optional dependency silently.
+    dockerfile = context / "Dockerfile"
+    text = dockerfile.read_text(encoding="utf-8")
+    if text.count(DOCKERFILE_COPY) != 1:
+        raise SystemExit(f"capture: the app's Dockerfile has no single line {DOCKERFILE_COPY!r}")
+    copy = DOCKERFILE_COPY.replace(" ./", f" {tarball.name} ./")
+    dockerfile.write_text(text.replace(DOCKERFILE_COPY, copy), encoding="utf-8")
     tag = f"runbook-agent:{app_commit[:7]}-tb{traceblame_commit[:7]}"
     kubectl_version = _pins()["KUBECTL_VERSION"]
     run(
@@ -257,6 +265,20 @@ def build_image(
     want = _checksum(f"kubectl-{kubectl_version}-linux-amd64")
     if image_kubectl != want:
         raise SystemExit(f"capture: the image's kubectl is {image_kubectl}, pinned {want}")
+    # The app imports the shim dynamically and runs untraced without it: require it here.
+    run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--entrypoint",
+            "node",
+            tag,
+            "--input-type=module",
+            "-e",
+            _LOADS_JS,
+        ]
+    )
     image_id = run(["docker", "image", "inspect", "--format", "{{.Id}}", tag]).stdout.strip()
     run(
         [str(ROOT / ".tools" / "bin" / "kind"), "load", "docker-image", "--name", "traceblame", tag]
@@ -271,16 +293,29 @@ def build_image(
         "node": node,
         "kubectl": {"version": kubectl_version, "sha256": image_kubectl},
         "shim_tarball_sha256": hashlib.sha256(tarball.read_bytes()).hexdigest(),
+        "dockerfile_patch": {"original": DOCKERFILE_COPY, "used": copy},
         "packages": installed,
     }
 
 
+DOCKERFILE_COPY = "COPY package.json pnpm-lock.yaml ./"
+_LOADS_JS = (
+    "const m = await import('traceblame-ts');"
+    "if (typeof m.instrument !== 'function') throw new Error('traceblame-ts has no instrument');"
+)
+# The installed versions, read from package.json files directly: an exports map can hide
+# `<name>/package.json` from require.resolve, and pnpm keeps the shim's dependencies beside its
+# real directory (.pnpm/<id>/node_modules), not under the /app/node_modules symlink.
 _VERSIONS_JS = (
+    "const fs = require('node:fs'), path = require('node:path');"
+    "const shim = fs.realpathSync('/app/node_modules/traceblame-ts');"
+    "const roots = [path.dirname(shim), '/app/node_modules'];"
     "const names = ['ai', '@ai-sdk/openai', 'traceblame-ts', '@traceloop/node-server-sdk',"
     " '@opentelemetry/sdk-trace-base', '@opentelemetry/api'];"
     "const out = {}; for (const n of names) {"
-    " const paths = ['/app/node_modules/traceblame-ts', '/app'];"
-    " out[n] = require(require.resolve(n + '/package.json', {paths})).version; }"
+    " const file = roots.map((r) => path.join(r, n, 'package.json')).find(fs.existsSync);"
+    " if (!file) throw new Error('not installed: ' + n);"
+    " out[n] = JSON.parse(fs.readFileSync(file, 'utf8')).version; }"
     "process.stdout.write(JSON.stringify(out));"
 )
 
@@ -1119,6 +1154,9 @@ def main() -> int:
                 "Alertmanager posts each task's alert once to the agent.",
                 "The agent runs in-cluster with a namespace-only Role, in live mode with its "
                 "approval gate answered by a scripted approver through the app's own API.",
+                "The image is the app's Dockerfile at its commit, built from a context with the "
+                "packed traceblame-ts: package.json names the tarball as an optional dependency, "
+                "and the Dockerfile's dependency COPY includes it.",
                 "Exported through traceblame-ts: AI SDK telemetry with recordInputs and "
                 "recordOutputs off (ADR-0006). The file is what the tee collector received; "
                 "the kind agent got the same requests.",
