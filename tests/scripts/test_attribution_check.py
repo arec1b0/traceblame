@@ -179,12 +179,40 @@ def test_prose_naming_the_tool_passes(fx: Fixture) -> None:
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("line", [f"{ROBOT} {PHRASE} [a tool](https://example.com)", PHRASE, ROBOT])
+FOOTERS = [
+    pytest.param(f"{ROBOT} {PHRASE} [a tool](https://example.com)", id="footer with the emoji"),
+    pytest.param(f"{PHRASE} [a tool](https://example.com)", id="footer without the emoji"),
+    pytest.param(f"    {PHRASE} [a tool](https://example.com)", id="indented footer"),
+    pytest.param(f"\t{ROBOT}  {PHRASE} a tool", id="tab-indented footer with the emoji"),
+    pytest.param(f"{PHRASE}", id="the bare phrase on its line"),
+]
+ROBOTS = [
+    pytest.param(ROBOT, id="the emoji alone"),
+    pytest.param(f"A sentence with the emoji {ROBOT} in the middle.", id="mid-sentence"),
+    pytest.param(f"Ends with it {ROBOT}", id="end of a line"),
+]
+
+
+@pytest.mark.parametrize("line", [*FOOTERS, *ROBOTS])
 def test_an_attribution_phrase_in_a_body_fails(fx: Fixture, line: str) -> None:
     sha = fx.commit(f"feat: x\n\nBody.\n\n{line}\n")
     result = fx.check()
     assert result.returncode == 1
     assert sha[:7] in result.stderr
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        f'The check rejects a line that starts with "{PHRASE}" and the robot emoji.',
+        f"A footer reading {PHRASE} followed by a tool name is what it looks for.",
+        f"Not at the start: x {PHRASE} y.",
+    ],
+)
+def test_the_phrase_in_the_middle_of_a_sentence_passes(fx: Fixture, sentence: str) -> None:
+    fx.commit(f"docs: describe the rule\n\n{sentence}\n")
+    result = fx.check()
+    assert result.returncode == 0, result.stderr
 
 
 def test_subjects_are_not_checked_for_phrases(fx: Fixture) -> None:
@@ -261,6 +289,9 @@ def test_an_unresolvable_range_fails_closed(fx: Fixture) -> None:
     [
         ("PR_BODY", "PR body", f"Summary.\n\n{ROBOT} {PHRASE} [a tool](https://example.com)\n"),
         ("PR_BODY", "PR body", f"Summary.\n\n{PHRASE} a tool\n"),
+        ("PR_BODY", "PR body", f"Summary.\n\n  {PHRASE} a tool\n"),
+        ("PR_BODY", "PR body", f"Summary, and the emoji {ROBOT} inside a sentence.\n"),
+        ("PR_TITLE", "PR title", f"{PHRASE} a tool"),
         ("PR_BODY", "PR body", "Summary.\n\nCo-Authored-By: Someone <s@example.com>\n"),
         ("PR_TITLE", "PR title", f"feat: x {ROBOT}"),
     ],
@@ -277,6 +308,16 @@ def test_a_clean_pr_text_passes(fx: Fixture) -> None:
     env = {
         "PR_TITLE": "docs: reword the rule in CLAUDE.md",
         "PR_BODY": "Closes #47.\n\nUses Claude Code in prose; Co-Authored-By mid-line is fine.\n",
+    }
+    result = fx.check("origin/main..HEAD", env=env)
+    assert result.returncode == 0, result.stderr
+
+
+def test_quoting_the_phrase_mid_sentence_in_the_pr_text_passes(fx: Fixture) -> None:
+    fx.commit("feat: clean\n")
+    env = {
+        "PR_TITLE": f'ci: reject a footer that starts with "{PHRASE}"',
+        "PR_BODY": f'It matches lines that start with "{PHRASE}".\n\nThis sentence passes.\n',
     }
     result = fx.check("origin/main..HEAD", env=env)
     assert result.returncode == 0, result.stderr

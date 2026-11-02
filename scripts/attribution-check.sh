@@ -7,11 +7,14 @@
 #   - a Co-Authored-By, Assisted-by or Generated-by trailer, as git reads trailers, or as a
 #     line starting with that key (git ignores a trailer line that is not in the last
 #     paragraph or is mixed with prose);
-#   - "Generated with" (case-sensitive) or the robot emoji in the body (not the subject).
-# Plain mentions of the instructions file or of Claude, in a subject or a body, pass.
+#   - a footer line in the body (not the subject): a line that starts, after optional white
+#     space and the robot emoji, with "Generated with" (case-sensitive);
+#   - the robot emoji anywhere in the body.
+# Plain mentions of the instructions file or of Claude, and the footer phrase in the middle
+# of a sentence, pass.
 #
-# The PR title and body (CI only, from PR_TITLE and PR_BODY) fail on the same phrases and on
-# a trailer-key line: a merge commit's body is the PR title.
+# The PR title and body (CI only, from PR_TITLE and PR_BODY) fail on the same footer line,
+# the emoji and a trailer-key line: a merge commit's body is the PR title.
 #
 # The range, in order: the first argument; PRE_COMMIT_FROM_REF..PRE_COMMIT_TO_REF, which
 # pre-commit sets for the pushed ref (for a new branch, from the parent of its oldest commit
@@ -23,7 +26,8 @@
 set -euo pipefail
 
 TRAILER_KEYS=(Co-Authored-By Assisted-by Generated-by)
-PHRASES=("Generated with" "🤖")
+ROBOT="🤖"
+FOOTER='^[[:space:]]*(🤖[[:space:]]*)?Generated with'
 
 range="${1:-}"
 if [[ -z "${range}" ]]; then
@@ -47,14 +51,21 @@ report() {
   findings=$((findings + 1))
 }
 
+# check_phrases LABEL TEXT: a footer line, and the robot emoji anywhere.
+check_phrases() {
+  local label="$1" text="$2"
+  if grep -qE -- "${FOOTER}" <<<"${text}"; then
+    report "${label}" "has a footer line starting with \"Generated with\""
+  fi
+  if grep -qF -- "${ROBOT}" <<<"${text}"; then
+    report "${label}" "contains the robot emoji"
+  fi
+}
+
 # check_text LABEL TEXT: the phrases, and a trailer-key line.
 check_text() {
-  local label="$1" text="$2" phrase
-  for phrase in "${PHRASES[@]}"; do
-    if grep -qF -- "${phrase}" <<<"${text}"; then
-      report "${label}" "contains \"${phrase}\""
-    fi
-  done
+  local label="$1" text="$2"
+  check_phrases "${label}" "${text}"
   if grep -qiE -- "${key_pattern}" <<<"${text}"; then
     report "${label}" "has an attribution trailer line"
   fi
@@ -76,11 +87,7 @@ while IFS= read -r sha; do
   if ((findings == before)) && grep -qiE -- "${key_pattern}" <<<"${body}"; then
     report "${label}" "body has a trailer line outside a trailer block"
   fi
-  for phrase in "${PHRASES[@]}"; do
-    if grep -qF -- "${phrase}" <<<"${body}"; then
-      report "${label}" "body contains \"${phrase}\""
-    fi
-  done
+  check_phrases "${label}" "${body}"
 done <<<"${commits}"
 
 [[ -z "${PR_TITLE:-}" ]] || check_text "PR title" "${PR_TITLE}"

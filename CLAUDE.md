@@ -46,8 +46,9 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 - Tests first for normalizer mappings, detectors, attributor. Coverage >= 80% there.
 - Do not create git commits with Co-Authored-By or any AI attribution trailers.
   scripts/attribution-check.sh enforces it (`make attribution`; the hook and CI run it), so
-  there is no manual grep. It also rejects the tool's footer phrase and the robot emoji in a
-  commit body, PR title or PR body, even when quoted: describe them in words.
+  there is no manual grep. It also rejects, in a commit body, PR title or PR body, a line that
+  starts with the tool's footer phrase (after optional indentation and the robot emoji) and
+  the robot emoji anywhere. The phrase in the middle of a sentence is fine.
   Commits are GPG-signed with my key: never pass --no-gpg-sign, never change git config.
 - Do not push, tag or release without explicit request.
 - Dev env: repo lives in WSL ext4 (~/src/traceblame), never /mnt/c; Windows 11 host; Go/ocb/kind/make run in WSL2 (Ubuntu) or Docker. Scripts must work there.
