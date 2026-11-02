@@ -78,6 +78,18 @@ KCTL = [str(ROOT / ".tools" / "bin" / "kubectl"), "--context", "kind-traceblame"
 SDK_DIR = ROOT / "sdk" / "ts"
 PNPM = ROOT / ".tools" / "bin" / "pnpm"
 STUB = HERE / "runbook_agent" / "stub_llm.py"
+TRIAGE_PROBE = HERE / "runbook_agent" / "triage_probe.mjs"
+PROBE_REPEATS = 3
+# Where the app turns a decision into "no-runbook", and the prompt rule behind it, as quoted in
+# the report; both are checked against the app's source at its commit before they are quoted.
+APP_DECLINE = (
+    "src/pipeline/alert.pipeline.ts",
+    "if (!decision.apply || decision.runbookId === null)",
+)
+APP_PROMPT_RULE = (
+    "src/agent/prompts/triage.prompt.ts",
+    'Prefer declining ("apply": false) over guessing.',
+)
 SANDBOX_TEMPLATES = ROOT / "deploy" / "kind" / "runbook" / "sandbox"
 PROM = f"/api/v1/namespaces/{MONITORING}/services/prometheus:9090/proxy"
 AM = f"/api/v1/namespaces/{MONITORING}/services/alertmanager:9093/proxy"
@@ -844,6 +856,68 @@ def run_task(task: Any, agent: Agent, image: str, approval_timeout_s: float) -> 
         "webhooks_failed": int(after_failed - failed),
         "started_at": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "_needles": sorted(alert_needles(incident)),
+        "_alert": incident["alert"],
+    }
+
+
+def triage_probe(alerts: list[dict[str, Any]], repeats: int) -> list[dict[str, Any]]:
+    """runbook_agent/triage_probe.mjs in the agent pod; one line per alert."""
+    out = kubectl(
+        "-n",
+        SANDBOX,
+        "exec",
+        "deploy/runbook-agent",
+        "--",
+        "node",
+        "--input-type=module",
+        "-e",
+        TRIAGE_PROBE.read_text(encoding="utf-8"),
+        json.dumps(alerts),
+        str(repeats),
+    )
+    lines = [json.loads(line) for line in out.splitlines() if line.strip()]
+    if len(lines) != len(alerts):
+        raise SystemExit(f"capture: triage probe returned {len(lines)} lines for {len(alerts)}")
+    return lines
+
+
+def model_behaviour(
+    probe: list[dict[str, Any]],
+    plan: list[Any],
+    results: list[dict[str, Any]],
+    app_dir: Path,
+    app_commit: str,
+    notes: list[str],
+) -> dict[str, Any]:
+    """Why tasks ended without a runbook, from the probe; and which approval decisions the
+    plan held for the gate against those the gate asked for."""
+    decisions = [d for line in probe for d in line["decisions"]]
+    named = [
+        d
+        for line in probe
+        for d in line["decisions"]
+        if d["model"].get("apply") is False and d["model"].get("runbookId") in line["candidates"]
+    ]
+    quoted = {}
+    for key, (path, text) in {"decline": APP_DECLINE, "prompt_rule": APP_PROMPT_RULE}.items():
+        source = run(["git", "-C", str(app_dir), "show", f"{app_commit}:{path}"]).stdout
+        if text in source:
+            quoted[key] = {"file": path, "text": text}
+    planned = Counter(t.approval for t in plan if t.approval)
+    reached = Counter(r["approval_policy"] for r in results if r["approvals"])
+    # What the planned approvals that never reached the gate ended with instead.
+    unreached = Counter(
+        r["runbook"] for r in results if r["approval_policy"] and not r["approvals"]
+    )
+    return {
+        "declines_naming_a_candidate": {"decisions": len(decisions), "count": len(named)},
+        "app_source": quoted,
+        "approvals": {
+            policy: {"planned": planned[policy], "reached_gate": reached[policy]}
+            for policy in ("approve", "reject", "timeout")
+        },
+        "unreached_runbooks": dict(unreached),
+        "notes": notes,
     }
 
 
@@ -859,6 +933,9 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--per-scenario", type=int, default=6)
     parser.add_argument("--approval-timeout-ms", type=int, default=30_000)
+    parser.add_argument(
+        "--note", action="append", default=[], help="a line for the report's Model behaviour"
+    )
     args = parser.parse_args()
 
     app_dir: Path = args.app_dir.resolve()
@@ -1027,6 +1104,22 @@ def main() -> int:
         finally:
             agent.close()
 
+        # The model's own decisions on the first recorded alert of each scenario, re-triaged by
+        # the app inside the agent pod (report: Model behaviour). Only ids and booleans return.
+        firsts: dict[str, dict[str, Any]] = {}
+        for r in results:
+            firsts.setdefault(r["scenario"], r["_alert"])
+        report["model_behaviour"] = {
+            "model": common.CHAT_MODEL,
+            "repeats": PROBE_REPEATS,
+            "probe": [
+                {"scenario": scenario} | line
+                for scenario, line in zip(
+                    firsts, triage_probe(list(firsts.values()), PROBE_REPEATS), strict=True
+                )
+            ],
+        }
+
         # One more real task, with a model the server does not have: a real HTTP 404.
         envs = dict.fromkeys(sessions, env)
         envs[API_ERROR] = env | {"LLM_MODEL": MISSING_MODEL}
@@ -1087,6 +1180,11 @@ def main() -> int:
                 f"{received} alerts received"
             )
         needles = {n for r in results for n in r.pop("_needles")}
+        for r in results:
+            del r["_alert"]
+        report["model_behaviour"] |= model_behaviour(
+            report["model_behaviour"]["probe"], plan, results, app_dir, app_commit, args.note
+        )
         found = leaks(needles, list(sessions.values()), rows)
         report["content_check"] = {"needles": len(needles), "found": len(found)}
         if found:
@@ -1222,6 +1320,85 @@ def main() -> int:
     return 0
 
 
+def _decision(d: dict[str, Any]) -> str:
+    model = d["model"]
+    if model.get("error"):
+        return "error"
+    text = f"{str(model.get('apply')).lower()}/{model.get('runbookId')}"
+    return text + (" (outside the candidates)" if model.get("outsideCandidates") else "")
+
+
+def model_behaviour_markdown(mb: dict[str, Any]) -> list[str]:
+    lines = [
+        "",
+        "## Model behaviour",
+        "",
+        f"Triage probe: {mb['model']}; the first recorded alert of each scenario re-triaged "
+        f"{mb['repeats']} times by the app inside the agent pod, with empty history as in the "
+        "task, without tracing and without executing anything. Model: apply/runbookId as the "
+        "model returned them; app: what triage handed the pipeline.",
+        "",
+        "| Scenario | Alert | Candidates | Model | App |",
+        "|---|---|---|---|---|",
+    ]
+    for line in mb["probe"]:
+        model = Counter(_decision(d) for d in line["decisions"])
+        app = Counter(
+            f"{str(d['app']['apply']).lower()}/{d['app']['runbookId']}" for d in line["decisions"]
+        )
+        lines.append(
+            f"| {line['scenario']} | {line['alert']} | {', '.join(line['candidates'])} | "
+            + ", ".join(f"{k} ({v}/{mb['repeats']})" for k, v in model.items())
+            + " | "
+            + ", ".join(f"{k} ({v}/{mb['repeats']})" for k, v in app.items())
+            + " |"
+        )
+    named = mb["declines_naming_a_candidate"]
+    source = mb["app_source"]
+    lines += ["", "Cause:", ""]
+    if named["count"]:
+        lines.append(
+            f"- {named['count']} of {named['decisions']} decisions name a candidate runbook "
+            "with `apply: false` (the model's way of saying: diagnose, do not remediate)."
+        )
+        if "decline" in source:
+            lines.append(
+                f"- The app treats `apply: false` as a decline whatever the runbook "
+                f"(`{source['decline']['file']}`: `{source['decline']['text']}` → no-runbook)."
+            )
+        if "prompt_rule" in source:
+            lines.append(
+                f"- The triage prompt (`{source['prompt_rule']['file']}`) says: "
+                f'"{source["prompt_rule"]["text"]}"'
+            )
+    else:
+        lines.append("- No decision named a candidate runbook with `apply: false`.")
+    lines += [
+        "",
+        "Approval paths (the gate holds a step only when a runbook with an approval step runs):",
+        "",
+        "| Policy | Planned | Reached the gate |",
+        "|---|---|---|",
+    ]
+    lines += [
+        f"| {policy} | {v['planned']} | {v['reached_gate']} |"
+        for policy, v in mb["approvals"].items()
+    ]
+    missed = {p: v for p, v in mb["approvals"].items() if v["reached_gate"] < v["planned"]}
+    if missed:
+        lines += [
+            "",
+            "Planned but not exercised: "
+            + ", ".join(f"{p} {v['planned'] - v['reached_gate']}" for p, v in missed.items())
+            + ". Those tasks ended with runbook "
+            + ", ".join(f"{k} ({v})" for k, v in mb["unreached_runbooks"].items())
+            + ": none of them ran a step that needs approval.",
+        ]
+    if mb["notes"]:
+        lines += ["", "Notes:", ""] + [f"- {n}" for n in mb["notes"]]
+    return lines
+
+
 def markdown(report: dict[str, Any]) -> str:
     lines = [
         f"# traceblame-ts on runbook-agent, kind ({report['captured_at']})",
@@ -1267,6 +1444,8 @@ def markdown(report: dict[str, Any]) -> str:
             f"| {t['task']} | {t['params']} | {t['runbook']} | {t['status']} | {steps} | "
             f"{t['approval_policy']} | {approvals} |"
         )
+    if "model_behaviour" in report:
+        lines += model_behaviour_markdown(report["model_behaviour"])
     lines += ["", "Safety probes:", ""]
     lines += [
         f"- {p['check']}: {'allowed' if p['allowed'] else 'denied'} "
