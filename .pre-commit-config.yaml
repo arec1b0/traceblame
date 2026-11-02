@@ -1,6 +1,7 @@
 # Run with `make lint` (pre-commit run --all-files). The only git hook is pre-push, which
 # `make bootstrap` installs (`pre-commit install --hook-type pre-push`): it runs the
-# pre-push stage only, the PR-state rule. Local hooks call the pinned tools from .tools/bin
+# pre-push stage only, the PR-state and attribution rules. pre-commit hands a pre-push hook
+# the first pushed ref only, so push one branch at a time. Local hooks call the pinned tools from .tools/bin
 # (tools/versions.env) and uv.lock, so every version has one source.
 minimum_pre_commit_version: "4.7.0"
 # Linters run in `make lint`, not on push.
@@ -80,6 +81,13 @@ repos:
       - id: prepush-pr-state
         name: PR state of the pushed branch (never push to a merged or closed PR)
         entry: scripts/prepush-check.sh
+        language: unsupported
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
+      - id: attribution
+        name: no AI attribution in the pushed commits (CI repeats it, and checks the PR text)
+        entry: scripts/attribution-check.sh
         language: unsupported
         stages: [pre-push]
         always_run: true
