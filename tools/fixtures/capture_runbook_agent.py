@@ -119,6 +119,15 @@ _REACH_JS = (
     "fetch(process.argv[1],{signal:AbortSignal.timeout(5000)})"
     ".then(()=>process.exit(0),()=>process.exit(1))"
 )
+# The API server as in-cluster clients reach it (the kubernetes Service, the pod's CA and token).
+# `kubectl get --raw` has no in-cluster fallback, so it cannot serve as this probe.
+_SA = "/var/run/secrets/kubernetes.io/serviceaccount"
+_API_JS = (
+    "const token = require('node:fs').readFileSync(process.argv[1] + '/token', 'utf8');"
+    "fetch('https://kubernetes.default.svc/version',"
+    "{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)})"
+    ".then((r)=>process.exit(r.ok?0:1),()=>process.exit(1))"
+)
 _RESOLVE_JS = "require('node:dns').lookup(process.argv[1],{family:4},(e,a)=>{console.log(a||'');})"
 
 TEE_CONFIG = """\
@@ -287,6 +296,14 @@ def build_image(
         run(["docker", "run", "--rm", "--entrypoint", "node", tag, "-e", _VERSIONS_JS]).stdout
     )
     node = run(["docker", "run", "--rm", "--entrypoint", "node", tag, "--version"]).stdout.strip()
+    uid, gid = (
+        int(v)
+        for v in run(
+            ["docker", "run", "--rm", "--entrypoint", "sh", tag, "-c", "id -u; id -g"]
+        ).stdout.split()
+    )
+    if uid == 0:
+        raise SystemExit("capture: the app image runs as root")
     return {
         "image": tag,
         "image_id": image_id,
@@ -294,6 +311,7 @@ def build_image(
         "kubectl": {"version": kubectl_version, "sha256": image_kubectl},
         "shim_tarball_sha256": hashlib.sha256(tarball.read_bytes()).hexdigest(),
         "dockerfile_patch": {"original": DOCKERFILE_COPY, "used": copy},
+        "user": {"uid": uid, "gid": gid},
         "packages": installed,
     }
 
@@ -360,14 +378,22 @@ def read_tee() -> dict[str, Any]:
     return merge_batches(text)
 
 
-def deploy_agent(image: str, env: dict[str, str]) -> None:
+def deploy_agent(build: dict[str, Any], env: dict[str, str]) -> None:
     apply([configmap("runbook-agent-env", env)])
-    kubectl(
-        "apply",
-        "-f",
-        "-",
-        input=template(SANDBOX_TEMPLATES / "agent.yaml", RUNBOOK_AGENT_IMAGE=image),
+    objects = list(
+        yaml.safe_load_all(
+            template(SANDBOX_TEMPLATES / "agent.yaml", RUNBOOK_AGENT_IMAGE=build["image"])
+        )
     )
+    # runAsNonRoot needs a numeric user, and the app's Dockerfile names one (USER agent): run as
+    # that user's ids, read from the image.
+    for obj in objects:
+        if obj["kind"] == "Deployment":
+            obj["spec"]["template"]["spec"]["securityContext"] |= {
+                "runAsUser": build["user"]["uid"],
+                "runAsGroup": build["user"]["gid"],
+            }
+    apply(objects)
     kubectl("-n", SANDBOX, "rollout", "restart", "deployment/runbook-agent")
     kubectl("-n", SANDBOX, "rollout", "status", "deployment/runbook-agent", "--timeout=300s")
 
@@ -467,7 +493,7 @@ def safety_probes() -> list[dict[str, Any]]:
             "ok": bool(resolved) and (f"{resolved}/32", OLLAMA_PORT) in allowed,
         }
     )
-    version = in_pod("kubectl", "get", "--raw", "/version", "--request-timeout=10s")
+    version = in_pod("env", f"NODE_EXTRA_CA_CERTS={_SA}/ca.crt", "node", "-e", _API_JS, _SA)
     out.append(
         {
             "check": "in pod: API server reachable (GET /version)",
@@ -901,7 +927,7 @@ def main() -> int:
         deploy_tee("canary", forward=False, password=password)
         with stub_llm(canary):
             deploy_agent(
-                build["image"],
+                build,
                 base_env
                 | {
                     "LLM_MODEL": "stub",
@@ -957,7 +983,7 @@ def main() -> int:
             "LLM_BASE_URL": OLLAMA_IN_CLUSTER,
             "LLM_STRUCTURED_OUTPUTS": "true",
         }
-        deploy_agent(build["image"], env)
+        deploy_agent(build, env)
         report["safety_after_restart"] = safety_probes()
         if not all(p["ok"] for p in report["safety_after_restart"]):
             raise SystemExit("capture: safety probes failed after the restart")
@@ -993,7 +1019,7 @@ def main() -> int:
         # One more real task, with a model the server does not have: a real HTTP 404.
         envs = dict.fromkeys(sessions, env)
         envs[API_ERROR] = env | {"LLM_MODEL": MISSING_MODEL}
-        deploy_agent(build["image"], envs[API_ERROR])
+        deploy_agent(build, envs[API_ERROR])
         report["safety_api_error"] = safety_probes()
         if not all(p["ok"] for p in report["safety_api_error"]):
             raise SystemExit("capture: safety probes failed after the restart")

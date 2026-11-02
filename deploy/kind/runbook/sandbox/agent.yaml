@@ -19,6 +19,7 @@ spec:
     spec:
       serviceAccountName: runbook-agent
       automountServiceAccountToken: true
+      # The capture adds runAsUser/runAsGroup: the numeric ids of the image's USER.
       securityContext:
         runAsNonRoot: true
       containers:
