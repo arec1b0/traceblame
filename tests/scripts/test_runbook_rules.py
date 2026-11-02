@@ -1,28 +1,12 @@
 """The runbook sandbox's alert rules: upstream expressions verbatim, every override listed (#13)."""
 
-import importlib.util
-import sys
 from pathlib import Path
-from types import ModuleType
 
 import pytest
+import rules  # tools/fixtures/runbook_agent, on pytest's pythonpath as at the driver's run time
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-
-
-def _load(name: str) -> ModuleType:
-    path = ROOT / "tools" / "fixtures" / "runbook_agent" / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(f"runbook_agent_{name}", path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module  # dataclasses look their module up
-    spec.loader.exec_module(module)
-    return module
-
-
-rules = _load("rules")
 
 # The overrides approved in #13 (expression and annotations never change).
 EXPECTED = [

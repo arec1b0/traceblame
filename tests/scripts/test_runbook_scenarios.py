@@ -1,26 +1,8 @@
 """The runbook-agent capture's seeded task plan and workloads (#13)."""
 
-import importlib.util
-import sys
 from collections import Counter
-from pathlib import Path
-from types import ModuleType
 
-ROOT = Path(__file__).resolve().parents[2]
-
-
-def _load(name: str) -> ModuleType:
-    path = ROOT / "tools" / "fixtures" / "runbook_agent" / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(f"runbook_agent_{name}", path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module  # dataclasses look their module up
-    spec.loader.exec_module(module)
-    return module
-
-
-scenarios = _load("scenarios")
+import scenarios  # tools/fixtures/runbook_agent, on pytest's pythonpath as at the driver's run time
 
 IMAGE = "python:pinned"
 

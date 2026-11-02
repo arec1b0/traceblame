@@ -4,32 +4,16 @@ The sampler must be deterministic and extensible: the same seed with a larger N 
 superset, so #19 can grow the query set to the D1 size without re-sampling (#12).
 """
 
-import importlib.util
 import json
 import zipfile
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
+import cuad  # tools/fixtures/agentic_rag, on pytest's pythonpath as at the driver's run time
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
-MODULE = ROOT / "tools" / "fixtures" / "agentic_rag" / "cuad.py"
 
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("agentic_rag_cuad", MODULE)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-cuad = _load()
-
-
-def _items(answerable: int, unanswerable: int) -> list[object]:
+def _items(answerable: int, unanswerable: int) -> list[cuad.Item]:
     """Items shaped like CUAD's, for the sampler's arithmetic; never used as eval data."""
     out = [
         cuad.Item(qid=f"c{i}__a", title=f"c{i}", question="q", answerable=True, context="x")
