@@ -64,7 +64,8 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   pre-push hook (`pre-commit install --hook-type pre-push`: scripts/prepush-check.sh), and
   `pnpm -C sdk/ts install --frozen-lockfile` (Node and pnpm pinned in tools/versions.env)
 - `make lint`: pre-commit over all tracked files (stage new files first); includes eslint and
-  `tsc --noEmit` for sdk/ts
+  `tsc --noEmit` for sdk/ts, and pyright strict over services, packages, sdk, tests and tools
+  (tools/typings: stubs for what exists only in the capture scripts' own environments)
 - `make test`: pytest with coverage gates (`COV_MIN`), `go test -race` per go.work module,
   `vitest run --coverage` in sdk/ts (same `COV_MIN`)
 - `.tools/bin/pnpm -C sdk/ts build|test|lint|typecheck`: the TypeScript shim alone

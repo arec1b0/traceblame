@@ -36,11 +36,11 @@ import tempfile
 import time
 import urllib.request
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -632,7 +632,7 @@ def active_alerts(service: str) -> list[str]:
 
 
 @contextmanager
-def stub_llm(canary: str) -> Iterator[None]:
+def stub_llm(canary: str) -> Generator[None, None, None]:
     pins = _pins()
     apply(
         [
@@ -925,7 +925,7 @@ def model_behaviour(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=cast("str", __doc__).splitlines()[0])
     parser.add_argument("--app-dir", type=Path, required=True)
     parser.add_argument(
         "--ollama-url", help="for the model check; default: localhost, then the WSL2 host"
@@ -949,7 +949,7 @@ def main() -> int:
             f"capture: {MISSING_MODEL} exists on {ollama}; the 404 task needs it absent"
         )
     password = tenant_password(TENANT)
-    tenants = (
+    tenants: list[str] = (
         yaml.safe_load(
             kubectl(
                 "-n",
@@ -1109,7 +1109,7 @@ def main() -> int:
         firsts: dict[str, dict[str, Any]] = {}
         for r in results:
             firsts.setdefault(r["scenario"], r["_alert"])
-        report["model_behaviour"] = {
+        behaviour: dict[str, Any] = {
             "model": common.CHAT_MODEL,
             "repeats": PROBE_REPEATS,
             "probe": [
@@ -1119,6 +1119,7 @@ def main() -> int:
                 )
             ],
         }
+        report["model_behaviour"] = behaviour
 
         # One more real task, with a model the server does not have: a real HTTP 404.
         envs = dict.fromkeys(sessions, env)
