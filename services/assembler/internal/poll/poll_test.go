@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -335,6 +337,8 @@ func (m *recordingMetrics) Step(_ int, r Result, _ time.Duration, err error) {
 	m.errs = append(m.errs, err)
 }
 
+func (m *recordingMetrics) Round(RoundResult) {}
+
 func (m *recordingMetrics) count() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -398,5 +402,157 @@ func TestRunLogsAFailedStepAndCarriesOn(t *testing.T) {
 	}
 	if bytes.Contains(logs.Bytes(), []byte("a1-r")) {
 		t.Fatal("span ids must not be logged")
+	}
+}
+
+// --- fair share of partitions (review: replicas that join later must get work) ---------------
+
+func (r *rig) second(t *testing.T, owner string) *Poller {
+	t.Helper()
+	p := New(r.p.cfg, r.ch, r.ch, r.st, r.wm)
+	p.cfg.Owner = owner
+	return p
+}
+
+func traceNames(n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = string(rune('a'+i%26)) + fmt.Sprintf("%031d", i) // spread over the partitions
+	}
+	return out
+}
+
+func round(t *testing.T, p *Poller) RoundResult {
+	t.Helper()
+	res, err := p.Round(context.Background())
+	if err != nil {
+		t.Fatalf("Round: %v", err)
+	}
+	return res
+}
+
+func heldBy(p *Poller) []int {
+	var out []int
+	for part := range p.held {
+		out = append(out, part)
+	}
+	sort.Ints(out)
+	return out
+}
+
+func TestAReplicaThatJoinsLaterGetsItsFairShareAndNothingIsAssembledTwice(t *testing.T) {
+	r := newRig(t, func(c *Config) { c.PartitionCount = 4 })
+	a, b := r.p, r.second(t, "b")
+
+	first := traceNames(24)
+	for _, id := range first {
+		r.ch.arrive(id, 10*second, true, rootSpan(id))
+	}
+	r.ch.nowMs = 60*second + grace
+	res := round(t, a)
+	if got := heldBy(a); len(got) != 4 || res.Live != 1 || res.Target != 4 {
+		t.Fatalf("alone, a owns everything: held %v, %+v", got, res)
+	}
+
+	later := traceNames(48)[24:]
+	for _, id := range later {
+		r.ch.arrive(id, 70*second, true, rootSpan(id))
+	}
+	r.ch.nowMs = 120*second + grace
+
+	// b joins: it registers and finds every partition leased by a.
+	if res := round(t, b); len(heldBy(b)) != 0 || res.Live != 2 || res.Target != 2 {
+		t.Fatalf("b cannot take a live lease: held %v, %+v", heldBy(b), res)
+	}
+	// a sees two live replicas, keeps its share and gives the rest up after its steps.
+	resA := round(t, a)
+	if got := heldBy(a); len(got) != 2 || len(resA.Released) != 2 {
+		t.Fatalf("a keeps half: held %v, released %v", got, resA.Released)
+	}
+	round(t, b)
+	if got := heldBy(b); len(got) != 2 {
+		t.Fatalf("b takes the released half: held %v", got)
+	}
+	union := map[int]bool{}
+	for _, part := range append(heldBy(a), heldBy(b)...) {
+		union[part] = true
+	}
+	if len(union) != 4 {
+		t.Fatalf("a %v and b %v must cover the four partitions without overlap", heldBy(a), heldBy(b))
+	}
+
+	round(t, a)
+	round(t, b)
+	want := len(first) + len(later)
+	if len(r.st.stored) != want || r.st.calls != want {
+		t.Fatalf("%d events stored after %d publishes, want %d each: a trace was assembled twice",
+			len(r.st.stored), r.st.calls, want)
+	}
+	for part := range 4 {
+		if r.wm.watermark(4, part) < 120*second {
+			t.Fatalf("partition %d stopped at %d", part, r.wm.watermark(4, part))
+		}
+	}
+}
+
+func TestAnEvenShareDoesNotChurn(t *testing.T) {
+	r := newRig(t, func(c *Config) { c.PartitionCount = 2 })
+	a, b, c := r.p, r.second(t, "b"), r.second(t, "c")
+	r.ch.nowMs = 60*second + grace
+	for range 6 { // three replicas, two partitions: one each for a and b, none for c
+		round(t, a)
+		round(t, b)
+		round(t, c)
+	}
+	if len(heldBy(a))+len(heldBy(b))+len(heldBy(c)) != 2 || len(heldBy(c)) > 1 {
+		t.Fatalf("a %v b %v c %v", heldBy(a), heldBy(b), heldBy(c))
+	}
+	epochs := [2]int64{r.wm.epoch(2, 0), r.wm.epoch(2, 1)}
+	for range 6 {
+		round(t, a)
+		round(t, b)
+		round(t, c)
+	}
+	if got := [2]int64{r.wm.epoch(2, 0), r.wm.epoch(2, 1)}; got != epochs {
+		t.Fatalf("leases changed hands in steady state: epochs %v -> %v", epochs, got)
+	}
+}
+
+func TestTheSurvivorTakesEveryPartitionOnceTheDeadReplicasLeaseExpires(t *testing.T) {
+	r := newRig(t, func(c *Config) { c.PartitionCount = 4 })
+	a, b := r.p, r.second(t, "b")
+	r.ch.nowMs = 60*second + grace
+	for range 3 {
+		round(t, b)
+		round(t, a)
+	}
+	if len(heldBy(a)) != 2 || len(heldBy(b)) != 2 {
+		t.Fatalf("a %v b %v", heldBy(a), heldBy(b))
+	}
+	// a stops (no more heartbeats); its leases and its heartbeat run out.
+	r.wm.advanceClock(2 * r.p.cfg.LeaseTTL)
+	res := round(t, b)
+	if res.Live != 1 || len(heldBy(b)) != 4 {
+		t.Fatalf("b must own all four: held %v, %+v", heldBy(b), res)
+	}
+}
+
+func TestAReleasedPartitionKeepsItsWatermarkAndTheNextOwnerResumesThere(t *testing.T) {
+	r := newRig(t, func(c *Config) { c.PartitionCount = 2 })
+	a, b := r.p, r.second(t, "b")
+	r.ch.arrive("a"+fmt.Sprintf("%031d", 1), 10*second, true, rootSpan("a"+fmt.Sprintf("%031d", 1)))
+	r.ch.nowMs = 60*second + grace
+	round(t, a)
+	atA := [2]int64{r.wm.watermark(2, 0), r.wm.watermark(2, 1)}
+	round(t, b)
+	round(t, a) // releases one
+	round(t, b) // takes it
+	for part := range 2 {
+		if r.wm.watermark(2, part) < atA[part] {
+			t.Fatalf("partition %d went back from %d to %d", part, atA[part], r.wm.watermark(2, part))
+		}
+	}
+	if len(r.st.stored) != 1 {
+		t.Fatalf("events %d", len(r.st.stored))
 	}
 }

@@ -37,6 +37,8 @@ grace (5 s by default) is part of the lag by design. Traces arriving now are ass
 4. **Is Postgres reachable?** The watermark and leases live there. If the assembler cannot claim
    or advance, steps error with `store:`. Restore Postgres; the assembler resumes from the stored
    watermark without a gap.
-5. **Scale or tune.** More replicas share partitions only up to `ASSEMBLER_PARTITIONS`. Changing
+5. **Scale or tune.** Replicas share the partitions evenly (`ceil(partitions / live replicas)` each;
+   `traceblame_assembler_live_replicas` and `..._owned_partitions` show it), so more replicas help
+   only up to `ASSEMBLER_PARTITIONS`. Changing
    the count restarts every partition from the smallest watermark of the previous count
    (ADR-0003 amendment); the overlap is idempotent.

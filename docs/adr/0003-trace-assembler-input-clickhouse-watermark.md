@@ -176,6 +176,14 @@ test checks its `EXPLAIN`, and query duration and rows read are metrics.
   `UPDATE … SET watermark = new WHERE partition = p AND epoch = mine AND watermark = old`; the
   stale owner's update matches no row, so it drops the partition and claims again.
   Exclusive ownership is an optimisation, never a condition of correctness.
+- **Fair share.** Leases alone let the first replica keep every partition while it renews them.
+  Each replica therefore heartbeats into `assembler_replicas` on every poll; the replicas seen
+  within the lease TTL are the live ones. A replica's share is `ceil(partitions / live)`. It
+  claims a partition only while it holds fewer than its share, and between two steps, when no
+  window of its own is in flight, it gives up what it holds above its share (no owner, the
+  watermark kept). A replica that joins late takes the released partitions; when one dies, its
+  leases and its heartbeat expire and the survivors' shares grow. Three replicas on two
+  partitions leave one idle, and a steady state changes no lease.
 - Rows are keyed `(partition_count, partition)`. A replica started with a new N finds no rows
   for it and starts every partition from the smallest watermark of the most recent other N.
 

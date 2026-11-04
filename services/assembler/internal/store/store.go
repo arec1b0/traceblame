@@ -24,6 +24,21 @@ var claimSQL string
 //go:embed sql/advance.sql
 var advanceSQL string
 
+//go:embed sql/heartbeat.sql
+var heartbeatSQL string
+
+//go:embed sql/prune_replicas.sql
+var pruneReplicasSQL string
+
+//go:embed sql/live_replicas.sql
+var liveReplicasSQL string
+
+//go:embed sql/release.sql
+var releaseSQL string
+
+// pruneAfter is how long a silent replica's row is kept before it is deleted.
+const pruneAfter = time.Hour
+
 // DB is the part of a pgx pool the store uses.
 type DB interface {
 	Exec(ctx context.Context, sql string, args ...any) (rowsAffected int64, err error)
@@ -98,6 +113,29 @@ func (s *Store) Advance(ctx context.Context, partitionCount int, l poll.Lease, o
 		return false, fmt.Errorf("store: advance: %w", err)
 	}
 	return n == 1, nil
+}
+
+// Heartbeat registers the replica and returns how many replicas heartbeated within the lease TTL.
+func (s *Store) Heartbeat(ctx context.Context, owner string) (int, error) {
+	if _, err := s.db.Exec(ctx, heartbeatSQL, owner); err != nil {
+		return 0, fmt.Errorf("store: heartbeat: %w", err)
+	}
+	if _, err := s.db.Exec(ctx, pruneReplicasSQL, pruneAfter.Seconds()); err != nil {
+		return 0, fmt.Errorf("store: prune replicas: %w", err)
+	}
+	var live int
+	if err := s.db.QueryRow(ctx, liveReplicasSQL, s.ttl.Seconds()).Scan(&live); err != nil {
+		return 0, fmt.Errorf("store: live replicas: %w", err)
+	}
+	return live, nil
+}
+
+// Release gives a partition up if the lease is still the owner's.
+func (s *Store) Release(ctx context.Context, partitionCount int, l poll.Lease, owner string) error {
+	if _, err := s.db.Exec(ctx, releaseSQL, partitionCount, l.Partition, owner, l.Epoch); err != nil {
+		return fmt.Errorf("store: release: %w", err)
+	}
+	return nil
 }
 
 func isNoRows(err error) bool { return errors.Is(err, pgx.ErrNoRows) }

@@ -98,6 +98,11 @@ type Watermarks interface {
 	Claim(ctx context.Context, partitionCount, partition int, owner string) (l Lease, ok bool, err error)
 	// Advance moves the watermark from l.WatermarkMs to newMs if l.Epoch is still current.
 	Advance(ctx context.Context, partitionCount int, l Lease, owner string, newMs int64) (ok bool, err error)
+	// Heartbeat registers the replica as alive and returns how many replicas are (itself
+	// included): those that heartbeated within the lease TTL.
+	Heartbeat(ctx context.Context, owner string) (live int, err error)
+	// Release gives a partition up (no owner, watermark kept) if l.Epoch is still the owner's.
+	Release(ctx context.Context, partitionCount int, l Lease, owner string) error
 }
 
 // ErrLeaseLost means a newer owner fenced this replica's watermark advance; the window's

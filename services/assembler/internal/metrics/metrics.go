@@ -35,6 +35,10 @@ type Metrics struct {
 	orphans       prometheus.Gauge
 	reconcileOK   prometheus.Gauge
 	reconcileFail prometheus.Counter
+	live          prometheus.Gauge
+	target        prometheus.Gauge
+	owned         prometheus.Gauge
+	released      prometheus.Counter
 }
 
 const ns = "traceblame_assembler"
@@ -70,7 +74,11 @@ func New(grace time.Duration) *Metrics {
 		"Traces with arrivals but no root and no summary in the last reconciled hour.")))
 	m.reconcileOK = prometheus.NewGauge(prometheus.GaugeOpts(f("reconcile_last_success_timestamp_seconds", "Unix time of the last successful reconciliation.")))
 	m.reconcileFail = prometheus.NewCounter(prometheus.CounterOpts(f("reconcile_failures_total", "Reconciliations that failed.")))
-	m.Registry.MustRegister(m.watermarkLag, m.batch, m.assembled, m.waiting, m.skipped, m.lateDelay,
+	m.live = prometheus.NewGauge(prometheus.GaugeOpts(f("live_replicas", "Trace-assembler replicas alive, as this replica sees them (heartbeat within the lease TTL).")))
+	m.target = prometheus.NewGauge(prometheus.GaugeOpts(f("target_partitions", "This replica's fair share of partitions: ceil(partitions / live replicas).")))
+	m.owned = prometheus.NewGauge(prometheus.GaugeOpts(f("owned_partitions", "Partitions this replica owned in its last round.")))
+	m.released = prometheus.NewCounter(prometheus.CounterOpts(f("partitions_released_total", "Partitions given up above the fair share so a joining replica can take them.")))
+	m.Registry.MustRegister(m.live, m.target, m.owned, m.released, m.watermarkLag, m.batch, m.assembled, m.waiting, m.skipped, m.lateDelay,
 		m.stepDuration, m.stepErrors, m.claims, m.queryDuration, m.queryRows, m.duplicates,
 		m.missing, m.orphans, m.reconcileOK, m.reconcileFail)
 	return m
@@ -106,6 +114,21 @@ func (m *Metrics) Step(partition int, r poll.Result, took time.Duration, err err
 	for _, d := range r.LateDelaysMs {
 		m.lateDelay.Observe(float64(d) / 1000)
 	}
+}
+
+// Round implements poll.Metrics: how many replicas are alive, the fair share, and how many
+// partitions this replica owns after the round.
+func (m *Metrics) Round(r poll.RoundResult) {
+	m.live.Set(float64(r.Live))
+	m.target.Set(float64(r.Target))
+	owned := 0
+	for _, res := range r.Results {
+		if res.Owned {
+			owned++
+		}
+	}
+	m.owned.Set(float64(owned))
+	m.released.Add(float64(len(r.Released)))
 }
 
 // Duplicate counts an ack the stream reported as a duplicate.

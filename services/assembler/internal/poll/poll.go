@@ -41,11 +41,13 @@ type Result struct {
 // Metrics receives each step's outcome; the zero value of the loop uses a no-op.
 type Metrics interface {
 	Step(partition int, r Result, took time.Duration, err error)
+	Round(r RoundResult)
 }
 
 type nopMetrics struct{}
 
 func (nopMetrics) Step(int, Result, time.Duration, error) {}
+func (nopMetrics) Round(RoundResult)                      {}
 
 // Poller is the trace-assembler's loop.
 type Poller struct {
@@ -60,13 +62,26 @@ type Poller struct {
 	// afterWrite runs between the outputs and the watermark advance; tests use it to
 	// interleave another replica there.
 	afterWrite func()
+
+	// held is the partitions this replica owns, with their leases. Only Round and Step touch
+	// it, and Run calls them from one goroutine.
+	held map[int]Lease
+}
+
+// RoundResult is what one pass over the partitions did.
+type RoundResult struct {
+	Live     int // replicas alive, this one included
+	Target   int // fair share: ceil(partitions / live)
+	Released []int
+	Results  map[int]Result
+	Errors   map[int]error
 }
 
 // New wires a poller. Metrics and the logger default to no-ops.
 func New(cfg Config, src Source, sum Summaries, pub Publisher, wm Watermarks) *Poller {
 	return &Poller{
 		cfg: cfg, src: src, sum: sum, pub: pub, wm: wm,
-		metrics: nopMetrics{}, log: slog.New(slog.DiscardHandler),
+		metrics: nopMetrics{}, log: slog.New(slog.DiscardHandler), held: map[int]Lease{},
 	}
 }
 
@@ -99,8 +114,10 @@ func (p *Poller) Step(ctx context.Context, partition int) (Result, error) {
 		return Result{}, fmt.Errorf("poll: claim partition %d: %w", partition, err)
 	}
 	if !ok {
+		delete(p.held, partition)
 		return Result{}, nil
 	}
+	p.held[partition] = lease
 	res := Result{Owned: true, W0: lease.WatermarkMs, W1: lease.WatermarkMs}
 
 	upper, err := p.src.Upper(ctx, p.cfg.Grace.Milliseconds())
@@ -137,9 +154,67 @@ func (p *Poller) Step(ctx context.Context, partition int) (Result, error) {
 		return res, fmt.Errorf("poll: advance partition %d: %w", partition, err)
 	}
 	if !advanced {
+		delete(p.held, partition)
 		return res, ErrLeaseLost
 	}
+	lease.WatermarkMs = res.W1
+	p.held[partition] = lease
 	return res, nil
+}
+
+// Round is one pass over the partitions with a fair share (ADR-0003 amendment). The replica
+// registers its heartbeat and learns how many replicas are alive; its share is
+// ceil(partitions / live). It gives up what it holds above the share, between two steps, when
+// no window of its own is in flight, and it claims a partition only while it holds fewer than
+// its share. A joining replica therefore takes the partitions the incumbent releases, and the
+// survivors take a dead replica's once its lease and heartbeat expire.
+func (p *Poller) Round(ctx context.Context) (RoundResult, error) {
+	live, err := p.wm.Heartbeat(ctx, p.cfg.Owner)
+	if err != nil {
+		return RoundResult{}, fmt.Errorf("poll: heartbeat: %w", err)
+	}
+	live = max(live, 1)
+	out := RoundResult{
+		Live: live, Target: (p.cfg.PartitionCount + live - 1) / live,
+		Results: map[int]Result{}, Errors: map[int]error{},
+	}
+
+	for _, part := range p.excess(out.Target) {
+		if err := p.wm.Release(ctx, p.cfg.PartitionCount, p.held[part], p.cfg.Owner); err != nil {
+			out.Errors[part] = fmt.Errorf("poll: release partition %d: %w", part, err)
+			continue
+		}
+		delete(p.held, part)
+		out.Released = append(out.Released, part)
+	}
+
+	for part := range p.cfg.PartitionCount {
+		if _, mine := p.held[part]; !mine && len(p.held) >= out.Target {
+			continue
+		}
+		t0 := time.Now()
+		res, err := p.Step(ctx, part)
+		p.metrics.Step(part, res, time.Since(t0), err)
+		out.Results[part] = res
+		if err != nil {
+			out.Errors[part] = err
+		}
+	}
+	p.metrics.Round(out)
+	return out, nil
+}
+
+// excess is the held partitions above the share, highest numbers first.
+func (p *Poller) excess(target int) []int {
+	if len(p.held) <= target {
+		return nil
+	}
+	parts := make([]int, 0, len(p.held))
+	for part := range p.held {
+		parts = append(parts, part)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(parts)))
+	return parts[:len(p.held)-target]
 }
 
 // classify keeps the arrivals to (re)assemble: a trace that has a summary (late spans, or a
@@ -232,27 +307,35 @@ func (p *Poller) assemble(ctx context.Context, todo []job, w1 int64, res *Result
 	return nil
 }
 
-// Run loops over the partitions until ctx ends. A replica that is behind steps again at once;
-// one that has caught up sleeps for the poll interval.
+// Run loops until ctx ends. A replica that is behind steps again at once; one that has caught
+// up sleeps for the poll interval.
 func (p *Poller) Run(ctx context.Context) error {
 	if err := p.Start(ctx); err != nil {
 		return err
 	}
 	for ctx.Err() == nil {
 		behind := false
-		for part := range p.cfg.PartitionCount {
-			t0 := time.Now()
-			res, err := p.Step(ctx, part)
-			p.metrics.Step(part, res, time.Since(t0), err)
-			switch {
-			case err == nil:
-				behind = behind || (res.Owned && !res.CaughtUp)
-			case errors.Is(err, ErrLeaseLost):
-				p.log.Info("lease lost", "partition", part, "component", "assembler", "version", p.cfg.AssemblerVersion)
-			case ctx.Err() != nil:
-				return nil
-			default:
-				p.log.Error("step failed", "partition", part, "error", err.Error(), "component", "assembler", "version", p.cfg.AssemblerVersion)
+		round, err := p.Round(ctx)
+		switch {
+		case ctx.Err() != nil:
+			return nil
+		case err != nil:
+			p.log.Error("round failed", "error", err.Error(), "component", "assembler", "version", p.cfg.AssemblerVersion)
+		default:
+			for part, res := range round.Results {
+				stepErr := round.Errors[part]
+				switch {
+				case stepErr == nil:
+					behind = behind || (res.Owned && !res.CaughtUp)
+				case errors.Is(stepErr, ErrLeaseLost):
+					p.log.Info("lease lost", "partition", part, "component", "assembler", "version", p.cfg.AssemblerVersion)
+				case ctx.Err() == nil:
+					p.log.Error("step failed", "partition", part, "error", stepErr.Error(), "component", "assembler", "version", p.cfg.AssemblerVersion)
+				}
+			}
+			for _, part := range round.Released {
+				p.log.Info("partition released for a fair share", "partition", part, "live", round.Live,
+					"target", round.Target, "component", "assembler", "version", p.cfg.AssemblerVersion)
 			}
 		}
 		if behind {

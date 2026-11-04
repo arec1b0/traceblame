@@ -152,7 +152,8 @@ type fakeWatermarks struct {
 	now         time.Time
 	ttl         time.Duration
 	rows        map[[2]int]*wmRow
-	failAdvance error // returned once by Advance
+	replicas    map[string]time.Time // owner -> last heartbeat
+	failAdvance error                // returned once by Advance
 }
 
 type wmRow struct {
@@ -163,7 +164,9 @@ type wmRow struct {
 }
 
 func newFakeWatermarks(ttl time.Duration) *fakeWatermarks {
-	return &fakeWatermarks{now: time.Unix(1_000, 0), ttl: ttl, rows: map[[2]int]*wmRow{}}
+	return &fakeWatermarks{
+		now: time.Unix(1_000, 0), ttl: ttl, rows: map[[2]int]*wmRow{}, replicas: map[string]time.Time{},
+	}
 }
 
 func (w *fakeWatermarks) Init(_ context.Context, count int, initialMs int64) error {
@@ -206,6 +209,42 @@ func (w *fakeWatermarks) Advance(_ context.Context, count int, l Lease, owner st
 	r.wm = newMs
 	r.leaseUntil = w.now.Add(w.ttl)
 	return true, nil
+}
+
+// Heartbeat registers the replica and counts those seen within the lease TTL.
+func (w *fakeWatermarks) Heartbeat(_ context.Context, owner string) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.replicas[owner] = w.now
+	live := 0
+	for _, at := range w.replicas {
+		if w.now.Sub(at) < w.ttl {
+			live++
+		}
+	}
+	return live, nil
+}
+
+// Release gives a partition up if the lease is still the owner's at that epoch.
+func (w *fakeWatermarks) Release(_ context.Context, count int, l Lease, owner string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if r := w.rows[[2]int{count, l.Partition}]; r.owner == owner && r.epoch == l.Epoch {
+		r.owner, r.leaseUntil = "", time.Time{}
+	}
+	return nil
+}
+
+func (w *fakeWatermarks) owner(count, partition int) string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.rows[[2]int{count, partition}].owner
+}
+
+func (w *fakeWatermarks) epoch(count, partition int) int64 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.rows[[2]int{count, partition}].epoch
 }
 
 func (w *fakeWatermarks) watermark(count, partition int) int64 {

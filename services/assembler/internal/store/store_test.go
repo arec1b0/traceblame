@@ -26,7 +26,16 @@ func (r fakeRow) Scan(dest ...any) error {
 	return nil
 }
 
+type liveRow struct{ live int }
+
+func (r liveRow) Scan(dest ...any) error {
+	*dest[0].(*int) = r.live
+	return nil
+}
+
 type fakeDB struct {
+	execs    []string
+	override pgx.Row
 	execSQL  string
 	execArgs []any
 	execN    int64
@@ -38,11 +47,15 @@ type fakeDB struct {
 
 func (d *fakeDB) Exec(_ context.Context, sql string, args ...any) (int64, error) {
 	d.execSQL, d.execArgs = sql, args
+	d.execs = append(d.execs, sql)
 	return d.execN, d.execErr
 }
 
 func (d *fakeDB) QueryRow(_ context.Context, sql string, args ...any) pgx.Row {
 	d.rowSQL, d.rowArgs = sql, args
+	if d.override != nil {
+		return d.override
+	}
 	return d.row
 }
 
@@ -114,5 +127,45 @@ func TestTheStatementsFenceByEpochOwnerAndWatermark(t *testing.T) {
 	}
 	if !strings.Contains(claimSQL, "lease_until <= now()") {
 		t.Error("claim.sql must only take an expired or free lease")
+	}
+}
+
+func TestHeartbeatRegistersPrunesAndCountsTheLiveReplicas(t *testing.T) {
+	db := &fakeDB{override: liveRow{live: 3}}
+	live, err := New(db, 30*time.Second).Heartbeat(context.Background(), "r1")
+	if err != nil || live != 3 {
+		t.Fatalf("live=%d err=%v", live, err)
+	}
+	if len(db.execs) != 2 || db.execs[0] != heartbeatSQL || db.execs[1] != pruneReplicasSQL {
+		t.Fatalf("statements %q", db.execs)
+	}
+	if db.rowSQL != liveReplicasSQL || db.rowArgs[0] != 30.0 {
+		t.Fatalf("the live count uses the lease TTL: %q %v", db.rowSQL, db.rowArgs)
+	}
+	db.execErr = errors.New("down")
+	if _, err := New(db, time.Second).Heartbeat(context.Background(), "r1"); err == nil {
+		t.Fatal("a heartbeat error must surface")
+	}
+}
+
+func TestReleaseIsFencedByTheOwnersEpoch(t *testing.T) {
+	db := &fakeDB{}
+	l := poll.Lease{Partition: 3, Epoch: 9, WatermarkMs: 100}
+	if err := New(db, time.Second).Release(context.Background(), 4, l, "r1"); err != nil {
+		t.Fatal(err)
+	}
+	want := []any{4, 3, "r1", int64(9)}
+	for i, w := range want {
+		if db.execArgs[i] != w {
+			t.Fatalf("arg %d = %v, want %v", i+1, db.execArgs[i], w)
+		}
+	}
+	for _, w := range []string{"AND owner = $3", "AND epoch = $4", "owner = NULL"} {
+		if !strings.Contains(releaseSQL, w) {
+			t.Errorf("release.sql lacks %q", w)
+		}
+	}
+	if strings.Contains(releaseSQL, "watermark_ms") {
+		t.Error("a release must keep the watermark")
 	}
 }

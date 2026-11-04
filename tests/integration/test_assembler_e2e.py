@@ -521,17 +521,37 @@ def test_a_crash_between_the_summary_write_and_the_watermark_loses_and_doubles_n
     )
 
 
-def test_replicas_share_the_partitions_and_the_survivor_takes_over(stack: Stack) -> None:
+def _owners(stack: Stack) -> Counter[str]:
+    return Counter(o for _, o, _ in stack.watermarks().values() if o)
+
+
+def test_a_replica_that_joins_later_gets_half_of_the_partitions_and_the_survivor_takes_over(
+    stack: Stack,
+) -> None:
     a = stack.start_assembler("a", partitions=4)
+    _wait("a owns every partition", lambda: _owners(stack) == Counter({"a": 4}), 30)
+
     b = stack.start_assembler("b", partitions=4)
+    _wait("each replica owns half", lambda: _owners(stack) == Counter({"a": 2, "b": 2}), 60)
+
     stack.ingest_fixtures()
     expected = stack.expected()
     stack.wait_assembled(expected)
-    stack.wait_events(len(expected))
+    events = stack.wait_events(len(expected))
+    assert set(Counter(e["payload"]["trace_id"] for e in events).values()) == {1}, "no duplicates"
 
-    owners = Counter(o for _, o, _ in stack.watermarks().values())
-    assert set(owners) <= {"a", "b"}
-    victim, survivor = (a, b) if owners["a"] >= owners["b"] else (b, a)
+    def assembled(asm: Assembler) -> float:
+        total = 0.0
+        for line in asm.metrics().splitlines():
+            if line.startswith("traceblame_assembler_assembled_traces_total{"):
+                total += float(line.rsplit(" ", 1)[1])
+        return total
+
+    assert assembled(a) > 0, "a assembled its half"
+    assert assembled(b) > 0, "b assembled its half"
+    assert assembled(a) + assembled(b) == len(expected), "no trace was assembled twice"
+
+    victim, survivor = a, b
     victim.kill()
 
     # new traces after the failure: a copy of a fixture with fresh trace ids
@@ -554,8 +574,7 @@ def test_replicas_share_the_partitions_and_the_survivor_takes_over(stack: Stack)
     events = stack.wait_events(len(expected), timeout=120)
     assert set(Counter(e["payload"]["trace_id"] for e in events).values()) == {1}
     assert survivor.proc.poll() is None
-    final_owners = {o for _, o, _ in stack.watermarks().values()}
-    assert final_owners == {survivor.owner}, "the survivor owns every partition"
+    _wait("the survivor owns every partition", lambda: _owners(stack) == Counter({"b": 4}), 60)
 
 
 def test_a_bad_configuration_stops_the_assembler_at_startup(stack: Stack) -> None:

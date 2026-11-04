@@ -26,6 +26,12 @@ def _stmt(name: str) -> str:
 
 
 INIT, CLAIM, ADVANCE = _stmt("init.sql"), _stmt("claim.sql"), _stmt("advance.sql")
+HEARTBEAT, LIVE, PRUNE = (
+    _stmt("heartbeat.sql"),
+    _stmt("live_replicas.sql"),
+    _stmt("prune_replicas.sql"),
+)
+RELEASE = _stmt("release.sql")
 
 
 def _bind(*values: object) -> dict[str, object]:
@@ -214,3 +220,48 @@ def test_the_schema_rejects_a_partition_outside_its_count(db: Any) -> None:
             "INSERT INTO assembler_partitions (partition_count, partition, watermark_ms) "
             "VALUES (2, 2, 0)"
         )
+
+
+# --- replicas and the release of a partition (fair share) ---------------------------------------
+
+
+def test_a_replica_is_alive_while_its_heartbeat_is_inside_the_window(db: Any) -> None:
+    for owner in ("a", "b", "c"):
+        db.execute(HEARTBEAT, _bind(owner))
+    db.execute(
+        "UPDATE assembler_replicas SET heartbeat_at = now() - interval '45 seconds' "
+        "WHERE owner = 'c'"
+    )
+
+    def live(window: float) -> int:
+        return int(db.execute(LIVE, _bind(window)).fetchone()[0])
+
+    assert live(30) == 2, "c has not been seen for 45 s"
+    assert live(60) == 3
+    db.execute(HEARTBEAT, _bind("c"))
+    assert live(30) == 3, "a heartbeat revives the row"
+    assert int(db.execute("SELECT count(*) FROM assembler_replicas").fetchone()[0]) == 3, "upsert"
+
+
+def test_silent_replicas_are_pruned_after_a_long_time(db: Any) -> None:
+    db.execute(HEARTBEAT, _bind("old"))
+    db.execute(HEARTBEAT, _bind("new"))
+    db.execute(
+        "UPDATE assembler_replicas SET heartbeat_at = now() - interval '2 hours' "
+        "WHERE owner = 'old'"
+    )
+    db.execute(PRUNE, _bind(3600))
+    owners = [r[0] for r in db.execute("SELECT owner FROM assembler_replicas").fetchall()]
+    assert owners == ["new"]
+
+
+def test_a_release_frees_the_partition_keeps_the_watermark_and_is_fenced_by_epoch(db: Any) -> None:
+    db.execute(INIT, _bind(1, 100))
+    _claim(db, "a")  # epoch 1
+    assert _advance(db, "a", 1, 200, 100) == 1
+    assert db.execute(RELEASE, _bind(1, 0, "b", 1)).rowcount == 0, "not the owner"
+    assert db.execute(RELEASE, _bind(1, 0, "a", 7)).rowcount == 0, "not that epoch"
+    assert db.execute(RELEASE, _bind(1, 0, "a", 1)).rowcount == 1
+    assert _rows(db, 1)[0] == (200, None, 1), "free, watermark kept"
+    assert _claim(db, "b") == (2, 200), "the next owner resumes at the watermark with a new epoch"
+    assert _advance(db, "a", 1, 300, 200) == 0, "a's late commit is fenced"
