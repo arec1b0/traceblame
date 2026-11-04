@@ -3,6 +3,9 @@ package metrics
 import (
 	"context"
 	"errors"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,15 +16,60 @@ import (
 	"github.com/arec1b0/traceblame/services/assembler/internal/reconcile"
 )
 
-func TestAStepFeedsTheCountersAndTheLag(t *testing.T) {
+// lagOf reads the exported lag of one partition; ok is false when there is no series.
+func lagOf(t *testing.T, m *Metrics, partition string) (lag float64, ok bool) {
+	t.Helper()
+	families, err := m.Registry.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range families {
+		if f.GetName() != "traceblame_assembler_watermark_lag_seconds" {
+			continue
+		}
+		for _, metric := range f.GetMetric() {
+			for _, l := range metric.GetLabel() {
+				if l.GetName() == "partition" && l.GetValue() == partition {
+					return metric.GetGauge().GetValue(), true
+				}
+			}
+		}
+	}
+	return 0, false
+}
+
+// alertThreshold is the number in AssemblerWatermarkLagHigh's expression, read from the rule file.
+func alertThreshold(t *testing.T) float64 {
+	t.Helper()
+	raw, err := os.ReadFile("../../../../deploy/alerts/traceblame-assembler.rules.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^\s*expr:\s*traceblame_assembler_watermark_lag_seconds\s*>\s*(\d+)\s*$`).FindSubmatch(raw)
+	if m == nil {
+		t.Fatal("AssemblerWatermarkLagHigh no longer compares traceblame_assembler_watermark_lag_seconds with a number")
+	}
+	v, _ := strconv.ParseFloat(string(m[1]), 64)
+	return v
+}
+
+type clock struct{ at time.Time }
+
+func (c *clock) now() time.Time          { return c.at }
+func (c *clock) advance(d time.Duration) { c.at = c.at.Add(d) }
+
+func TestTheLagIsClickHousesNowMinusTheCommittedWatermark(t *testing.T) {
+	c := &clock{at: time.Unix(1_000, 0)}
 	m := New(5 * time.Second)
+	m.now = c.now
+	// ClickHouse's clock reads 100 s; the frontier (now - grace) is 95 s; the commit reached 90 s.
 	m.Step(1, poll.Result{
-		Owned: true, UpperMs: 100_000, W1: 90_000, Scanned: true, Arrivals: 4,
+		Owned: true, UpperMs: 95_000, W1: 90_000, CommittedMs: 90_000, Scanned: true, Arrivals: 4,
 		Assembled: 2, Reassembled: 1, Waiting: 1, Skipped: 1, LateDelaysMs: []int64{12_000},
 	}, 40*time.Millisecond, nil)
 
-	if got := testutil.ToFloat64(m.watermarkLag.WithLabelValues("1")); got != 15 {
-		t.Fatalf("lag = %v, want 10 s behind the frontier + 5 s grace", got)
+	if lag, ok := lagOf(t, m, "1"); !ok || lag != 10 {
+		t.Fatalf("lag = %v (%v), want 100 s - 90 s", lag, ok)
 	}
 	if testutil.ToFloat64(m.assembled.WithLabelValues("first")) != 2 || testutil.ToFloat64(m.assembled.WithLabelValues("again")) != 1 {
 		t.Fatal("assembled counters")
@@ -31,6 +79,50 @@ func TestAStepFeedsTheCountersAndTheLag(t *testing.T) {
 	}
 	if n, err := testutil.GatherAndCount(m.Registry, "traceblame_assembler_late_span_delay_seconds"); err != nil || n == 0 {
 		t.Fatalf("late span delay: %d, %v", n, err)
+	}
+}
+
+func TestAStepThatKeepsFailingMakesTheLagGrowUntilTheAlertFires(t *testing.T) {
+	threshold := alertThreshold(t)
+	c := &clock{at: time.Unix(1_000, 0)}
+	m := New(5 * time.Second)
+	m.now = c.now
+
+	// Healthy: committed up to the frontier, 5 s behind ClickHouse's clock.
+	m.Step(0, poll.Result{Owned: true, UpperMs: 95_000, W1: 95_000, CommittedMs: 95_000, Scanned: true}, time.Millisecond, nil)
+	if lag, _ := lagOf(t, m, "0"); lag != 5 || lag > threshold {
+		t.Fatalf("a caught-up partition is %v s behind", lag)
+	}
+
+	// Every later step fails at the frontier: its window ends at now - grace, the watermark stays.
+	for i := 1; i <= 4; i++ {
+		c.advance(time.Minute)
+		upper := int64(95_000 + i*60_000)
+		m.Step(0, poll.Result{Owned: true, UpperMs: upper, W1: upper, CommittedMs: 95_000}, time.Millisecond, errors.New("boom"))
+	}
+	lag, ok := lagOf(t, m, "0")
+	if !ok || lag != 245 {
+		t.Fatalf("lag = %v (%v), want 245 s: ClickHouse now (340 s) - committed (95 s)", lag, ok)
+	}
+	if lag <= threshold {
+		t.Fatalf("a partition that has not moved for 4 minutes is %v s behind: AssemblerWatermarkLagHigh (> %v) must fire", lag, threshold)
+	}
+}
+
+func TestTheLagKeepsGrowingWhenTheClickHouseClockFailsToo(t *testing.T) {
+	c := &clock{at: time.Unix(1_000, 0)}
+	m := New(5 * time.Second)
+	m.now = c.now
+	m.Step(0, poll.Result{Owned: true, UpperMs: 95_000, W1: 95_000, CommittedMs: 95_000, Scanned: true}, time.Millisecond, nil)
+	c.advance(3 * time.Minute)
+	// ClickHouse does not answer (no UpperMs): the clock offset of the last reading is used.
+	m.Step(0, poll.Result{Owned: true, CommittedMs: 95_000}, time.Millisecond, errors.New("clickhouse down"))
+	if lag, _ := lagOf(t, m, "0"); lag != 185 {
+		t.Fatalf("lag = %v, want 185 s", lag)
+	}
+	c.advance(time.Minute) // and with no step at all (a wedged replica) it still grows at scrape time
+	if lag, _ := lagOf(t, m, "0"); lag != 245 {
+		t.Fatalf("lag = %v, want 245 s", lag)
 	}
 }
 
@@ -44,7 +136,7 @@ func lagSeries(t *testing.T, m *Metrics) int {
 }
 
 func TestOnlyTheOwnerOfAPartitionReportsItsLag(t *testing.T) {
-	owned := poll.Result{Owned: true, UpperMs: 100_000, W1: 90_000, Scanned: true}
+	owned := poll.Result{Owned: true, UpperMs: 100_000, W1: 90_000, CommittedMs: 90_000, Scanned: true}
 
 	// The lease is lost to another replica: the next step finds it held elsewhere.
 	m := New(time.Second)

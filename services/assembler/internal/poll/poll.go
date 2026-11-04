@@ -26,6 +26,7 @@ type Config struct {
 // Result describes one step, for the loop's metrics and the tests.
 type Result struct {
 	Owned        bool  // false: another replica holds the partition's lease
+	CommittedMs  int64 // the partition's committed watermark: W0 until this step commits, then W1
 	UpperMs      int64 // ClickHouse's now - grace when the step ran
 	W0, W1       int64
 	Scanned      bool
@@ -118,7 +119,7 @@ func (p *Poller) Step(ctx context.Context, partition int) (Result, error) {
 		return Result{}, nil
 	}
 	p.held[partition] = lease
-	res := Result{Owned: true, W0: lease.WatermarkMs, W1: lease.WatermarkMs}
+	res := Result{Owned: true, W0: lease.WatermarkMs, W1: lease.WatermarkMs, CommittedMs: lease.WatermarkMs}
 
 	upper, err := p.src.Upper(ctx, p.cfg.Grace.Milliseconds())
 	if err != nil {
@@ -159,6 +160,7 @@ func (p *Poller) Step(ctx context.Context, partition int) (Result, error) {
 	}
 	lease.WatermarkMs = res.W1
 	p.held[partition] = lease
+	res.CommittedMs = res.W1
 	return res, nil
 }
 

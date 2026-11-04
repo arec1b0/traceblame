@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,7 +20,13 @@ type Metrics struct {
 	Registry *prometheus.Registry
 	grace    time.Duration
 
-	watermarkLag  *prometheus.GaugeVec
+	// The lag is computed at scrape time from the committed watermark and ClickHouse's clock, so
+	// it keeps growing while steps fail or do not run at all.
+	mu            sync.Mutex
+	committed     map[int]int64 // owned partition -> committed watermark (epoch ms)
+	offsetMs      int64         // ClickHouse's clock minus this host's, at the last reading
+	haveClock     bool
+	now           func() time.Time
 	batch         prometheus.Histogram
 	assembled     *prometheus.CounterVec
 	waiting       prometheus.Counter
@@ -46,14 +53,14 @@ const ns = "traceblame_assembler"
 // New registers every metric. grace is added back to the watermark lag: the watermark trails
 // ClickHouse's clock by the grace by design.
 func New(grace time.Duration) *Metrics {
-	m := &Metrics{Registry: prometheus.NewRegistry(), grace: grace}
+	m := &Metrics{
+		Registry: prometheus.NewRegistry(), grace: grace, committed: map[int]int64{}, now: time.Now,
+	}
 	f := func(name, help string) prometheus.Opts { return prometheus.Opts{Namespace: ns, Name: name, Help: help} }
 	h := func(name, help string, buckets []float64) prometheus.HistogramOpts {
 		return prometheus.HistogramOpts{Namespace: ns, Name: name, Help: help, Buckets: buckets}
 	}
 	secs := []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60}
-	m.watermarkLag = prometheus.NewGaugeVec(prometheus.GaugeOpts(f("watermark_lag_seconds",
-		"Age of the partition's watermark against ClickHouse's clock; the ADR-0003 grace is part of it.")), []string{"partition"})
 	m.batch = prometheus.NewHistogram(h("batch_traces", "Traces in one window's scan.", []float64{0, 1, 5, 10, 50, 100, 500, 1000, 5000}))
 	m.assembled = prometheus.NewCounterVec(prometheus.CounterOpts(f("assembled_traces_total",
 		"Traces assembled; kind=first for a new trace, again for a re-assembly (late spans or a replayed window).")), []string{"kind"})
@@ -78,29 +85,64 @@ func New(grace time.Duration) *Metrics {
 	m.target = prometheus.NewGauge(prometheus.GaugeOpts(f("target_partitions", "This replica's fair share of partitions: ceil(partitions / live replicas).")))
 	m.owned = prometheus.NewGauge(prometheus.GaugeOpts(f("owned_partitions", "Partitions this replica owned in its last round.")))
 	m.released = prometheus.NewCounter(prometheus.CounterOpts(f("partitions_released_total", "Partitions given up above the fair share so a joining replica can take them.")))
-	m.Registry.MustRegister(m.live, m.target, m.owned, m.released, m.watermarkLag, m.batch, m.assembled, m.waiting, m.skipped, m.lateDelay,
+	m.Registry.MustRegister(lagCollector{m}, m.live, m.target, m.owned, m.released, m.batch, m.assembled, m.waiting, m.skipped, m.lateDelay,
 		m.stepDuration, m.stepErrors, m.claims, m.queryDuration, m.queryRows, m.duplicates,
 		m.missing, m.orphans, m.reconcileOK, m.reconcileFail)
 	return m
+}
+
+var lagDesc = prometheus.NewDesc(
+	ns+"_watermark_lag_seconds",
+	"ClickHouse's clock minus the partition's committed watermark, for the partitions this replica owns. "+
+		"The grace is part of it by design; it keeps growing while steps fail.",
+	[]string{"partition"}, nil)
+
+// lagCollector computes the lag when it is scraped.
+type lagCollector struct{ m *Metrics }
+
+func (lagCollector) Describe(ch chan<- *prometheus.Desc) { ch <- lagDesc }
+
+func (c lagCollector) Collect(ch chan<- prometheus.Metric) {
+	c.m.mu.Lock()
+	defer c.m.mu.Unlock()
+	if !c.m.haveClock {
+		return
+	}
+	nowMs := c.m.now().UnixMilli() + c.m.offsetMs
+	for partition, committed := range c.m.committed {
+		ch <- prometheus.MustNewConstMetric(lagDesc, prometheus.GaugeValue,
+			float64(nowMs-committed)/1000, strconv.Itoa(partition))
+	}
+}
+
+func (m *Metrics) forget(partition int) {
+	m.mu.Lock()
+	delete(m.committed, partition)
+	m.mu.Unlock()
 }
 
 // Step implements poll.Metrics.
 func (m *Metrics) Step(partition int, r poll.Result, took time.Duration, err error) {
 	if !r.Owned {
 		m.claims.WithLabelValues("held").Inc()
-		m.watermarkLag.DeleteLabelValues(strconv.Itoa(partition)) // only the owner reports a lag
+		m.forget(partition) // only the owner reports a lag
 		return
 	}
 	m.claims.WithLabelValues("owned").Inc()
 	m.stepDuration.Observe(took.Seconds())
-	if r.UpperMs > 0 {
-		lag := time.Duration(r.UpperMs-r.W1)*time.Millisecond + m.grace
-		m.watermarkLag.WithLabelValues(strconv.Itoa(partition)).Set(lag.Seconds())
+	m.mu.Lock()
+	if r.UpperMs > 0 { // ClickHouse's now is the frontier plus the grace
+		m.offsetMs = r.UpperMs + m.grace.Milliseconds() - m.now().UnixMilli()
+		m.haveClock = true
 	}
+	if !errors.Is(err, poll.ErrLeaseLost) {
+		m.committed[partition] = r.CommittedMs // also after an error: the watermark did not move
+	}
+	m.mu.Unlock()
 	switch {
 	case errors.Is(err, poll.ErrLeaseLost):
 		m.stepErrors.WithLabelValues("lease_lost").Inc()
-		m.watermarkLag.DeleteLabelValues(strconv.Itoa(partition))
+		m.forget(partition)
 		return
 	case err != nil:
 		m.stepErrors.WithLabelValues("error").Inc()
@@ -132,7 +174,7 @@ func (m *Metrics) Round(r poll.RoundResult) {
 	m.owned.Set(float64(owned))
 	m.released.Add(float64(len(r.Released)))
 	for _, part := range r.Released {
-		m.watermarkLag.DeleteLabelValues(strconv.Itoa(part))
+		m.forget(part)
 	}
 }
 

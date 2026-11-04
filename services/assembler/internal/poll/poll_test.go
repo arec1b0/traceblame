@@ -556,3 +556,37 @@ func TestAReleasedPartitionKeepsItsWatermarkAndTheNextOwnerResumesThere(t *testi
 		t.Fatalf("events %d", len(r.st.stored))
 	}
 }
+
+func TestAResultSaysWhichWatermarkIsCommitted(t *testing.T) {
+	r := newRig(t)
+	r.ch.arrive("a1", 10*second, true, rootSpan("a1"))
+	r.ch.nowMs = 60*second + grace
+	r.wm.failAdvance = errBoom
+	res, err := r.p.Step(context.Background(), 0)
+	if !errors.Is(err, errBoom) || res.CommittedMs != 0 {
+		t.Fatalf("a window that did not commit leaves the watermark at its start: %+v, %v", res, err)
+	}
+	res = r.step(t)
+	if res.CommittedMs != 60*second || res.CommittedMs != res.W1 {
+		t.Fatalf("a committed window moves it to W1: %+v", res)
+	}
+	r.ch.nowMs = 61*second + grace
+	r.wm.rows[[2]int{1, 0}].wm = 40 * second
+	if res = r.step(t); res.CommittedMs != 61*second {
+		t.Fatalf("%+v", res)
+	}
+}
+
+func TestACommittedWatermarkIsReportedEvenWhenTheClickHouseClockFails(t *testing.T) {
+	r := newRig(t)
+	r.wm.rows[[2]int{1, 0}].wm = 33 * second
+	r.p.src = failingClock{r.ch}
+	res, err := r.p.Step(context.Background(), 0)
+	if err == nil || !res.Owned || res.CommittedMs != 33*second {
+		t.Fatalf("%+v, %v", res, err)
+	}
+}
+
+type failingClock struct{ *fakeCH }
+
+func (failingClock) Upper(context.Context, int64) (int64, error) { return 0, errBoom }
