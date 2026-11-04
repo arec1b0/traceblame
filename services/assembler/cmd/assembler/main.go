@@ -72,11 +72,7 @@ func run(log *slog.Logger) error {
 	m := metrics.New(cfg.Grace)
 	pub := natsx.NewPublisher(js, cfg.Subject, config.PublishRetryBudget)
 	pub.OnDuplicate = m.Duplicate
-	loop := poll.New(poll.Config{
-		Owner: cfg.Owner, PartitionCount: cfg.PartitionCount, Grace: cfg.Grace,
-		MaxWindow: cfg.MaxWindow, LeaseTTL: cfg.LeaseTTL, BatchSize: cfg.BatchSize,
-		Lookback: cfg.Lookback, InitialLookback: cfg.InitialLookback, PollInterval: cfg.PollInterval, AssemblerVersion: cfg.AssemblerVersion,
-	}, m.Source(click), click, pub, store.New(store.PoolDB{Pool: pool}, cfg.LeaseTTL)).
+	loop := poll.New(pollConfig(cfg), m.Source(click), click, pub, store.New(store.PoolDB{Pool: pool}, cfg.LeaseTTL)).
 		WithMetrics(m).WithLogger(log)
 
 	var ready atomic.Bool

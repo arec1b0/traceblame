@@ -146,13 +146,14 @@ func (p *Poller) adapt(ctx context.Context, partition int, res *Result, err erro
 	switch {
 	case err == nil && res.Scanned:
 		p.clean[partition]++
-		if p.clean[partition] >= p.cfg.WindowRecoverySteps && cur < p.cfg.MaxWindow {
+		if p.clean[partition] >= max(p.cfg.WindowRecoverySteps, 1) && cur < p.cfg.MaxWindow {
 			p.window[partition] = min(cur*2, p.cfg.MaxWindow)
 			p.clean[partition] = 0
 		}
 	case err != nil && !errors.Is(err, ErrLeaseLost) && ctx.Err() == nil && res.W1 > res.W0:
 		p.clean[partition] = 0
-		if next := max(cur/2, p.cfg.MinWindow); next < cur {
+		// A floor of zero (an unset config) would halve the window to nothing: never below 1 ms.
+		if next := max(cur/2, p.cfg.MinWindow, time.Millisecond); next < cur {
 			p.window[partition] = next
 			res.Shrank = true
 		}

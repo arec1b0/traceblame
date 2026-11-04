@@ -731,3 +731,27 @@ func TestALostLeaseOrACancelledContextDoesNotShrinkTheWindow(t *testing.T) {
 		t.Fatal("a cancelled context (shutdown) is not a reason to shrink")
 	}
 }
+
+func TestAnUnsetFloorOrRecoveryCountCannotDriveTheWindowToZero(t *testing.T) {
+	r := denseRig(t, func(c *Config) { c.MinWindow, c.WindowRecoverySteps = 0, 0 })
+	r.ch.failScan = true // nothing can be answered: the window shrinks as far as it can
+	for range 60 {
+		if _, err := r.p.Step(context.Background(), 0); err == nil {
+			t.Fatal("expected the scan to fail")
+		}
+	}
+	if got := r.p.window[0]; got < time.Millisecond {
+		t.Fatalf("the window fell to %s: a zero window never reaches a single arrival", got)
+	}
+	r.ch.failScan, r.ch.failScanAbove = false, 0
+	steps := 0
+	for r.wm.watermark(1, 0) < 60*second && steps < 100_000 {
+		if _, err := r.p.Step(context.Background(), 0); err != nil {
+			t.Fatal(err)
+		}
+		steps++
+	}
+	if r.wm.watermark(1, 0) < 60*second {
+		t.Fatalf("the partition never caught up after %d steps", steps)
+	}
+}

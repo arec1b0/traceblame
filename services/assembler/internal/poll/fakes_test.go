@@ -23,6 +23,7 @@ type fakeCH struct {
 	// failScanAbove makes a scan fail once its window holds more arrivals than this: a dense
 	// window that ClickHouse cannot answer in time. Zero means never.
 	failScanAbove  int
+	failScan       bool // every scan fails: ClickHouse is down
 	assembledCalls []int
 }
 
@@ -62,6 +63,9 @@ func (f *fakeCH) Scan(_ context.Context, count, partition int, w0, w1 int64) ([]
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.scans = append(f.scans, scanCall{count, partition, w0, w1})
+	if f.failScan {
+		return nil, errors.New("connection refused")
+	}
 	by := map[string]*Arrival{}
 	for _, a := range f.arrivals {
 		if a.atMs <= w0 || a.atMs > w1 || f.partOf(a.trace, count) != partition {
