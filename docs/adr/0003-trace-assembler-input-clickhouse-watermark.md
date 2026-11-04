@@ -178,7 +178,8 @@ test checks its `EXPLAIN`, and query duration and rows read are metrics.
   Exclusive ownership is an optimisation, never a condition of correctness.
 - **Fair share.** Leases alone let the first replica keep every partition while it renews them.
   Each replica therefore heartbeats into `assembler_replicas` on every poll; the replicas seen
-  within the lease TTL are the live ones. A replica's share is `ceil(partitions / live)`. It
+  within the lease TTL, judged by the database's clock and not the replica's, are the live ones;
+  a row silent for ten lease TTLs is deleted by the next heartbeat (at most 100 rows per call). A replica's share is `ceil(partitions / live)`. It
   claims a partition only while it holds fewer than its share, and between two steps, when no
   window of its own is in flight, it gives up what it holds above its share (no owner, the
   watermark kept). A replica that joins late takes the released partitions; when one dies, its

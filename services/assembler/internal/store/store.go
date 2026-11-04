@@ -36,8 +36,12 @@ var liveReplicasSQL string
 //go:embed sql/release.sql
 var releaseSQL string
 
-// pruneAfter is how long a silent replica's row is kept before it is deleted.
-const pruneAfter = time.Hour
+const (
+	// pruneTTLs: a silent replica's row is kept for this many lease TTLs before it is deleted.
+	pruneTTLs = 10
+	// pruneBatch bounds one prune; the next heartbeat takes the rest.
+	pruneBatch = 100
+)
 
 // DB is the part of a pgx pool the store uses.
 type DB interface {
@@ -120,7 +124,7 @@ func (s *Store) Heartbeat(ctx context.Context, owner string) (int, error) {
 	if _, err := s.db.Exec(ctx, heartbeatSQL, owner); err != nil {
 		return 0, fmt.Errorf("store: heartbeat: %w", err)
 	}
-	if _, err := s.db.Exec(ctx, pruneReplicasSQL, pruneAfter.Seconds()); err != nil {
+	if _, err := s.db.Exec(ctx, pruneReplicasSQL, pruneTTLs*s.ttl.Seconds(), pruneBatch); err != nil {
 		return 0, fmt.Errorf("store: prune replicas: %w", err)
 	}
 	var live int

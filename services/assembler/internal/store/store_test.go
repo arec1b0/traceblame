@@ -34,20 +34,22 @@ func (r liveRow) Scan(dest ...any) error {
 }
 
 type fakeDB struct {
-	execs    []string
-	override pgx.Row
-	execSQL  string
-	execArgs []any
-	execN    int64
-	execErr  error
-	row      fakeRow
-	rowSQL   string
-	rowArgs  []any
+	execs       []string
+	allExecArgs [][]any
+	override    pgx.Row
+	execSQL     string
+	execArgs    []any
+	execN       int64
+	execErr     error
+	row         fakeRow
+	rowSQL      string
+	rowArgs     []any
 }
 
 func (d *fakeDB) Exec(_ context.Context, sql string, args ...any) (int64, error) {
 	d.execSQL, d.execArgs = sql, args
 	d.execs = append(d.execs, sql)
+	d.allExecArgs = append(d.allExecArgs, args)
 	return d.execN, d.execErr
 }
 
@@ -145,6 +147,55 @@ func TestHeartbeatRegistersPrunesAndCountsTheLiveReplicas(t *testing.T) {
 	db.execErr = errors.New("down")
 	if _, err := New(db, time.Second).Heartbeat(context.Background(), "r1"); err == nil {
 		t.Fatal("a heartbeat error must surface")
+	}
+}
+
+func TestLivenessIsDecidedByPostgresClockNotTheReplicas(t *testing.T) {
+	// The statements stamp and compare with now() in SQL, and the replica sends only durations
+	// and its name: no timestamp from its own clock reaches the database.
+	for name, sql := range map[string]string{
+		"heartbeat": heartbeatSQL, "live count": liveReplicasSQL, "prune": pruneReplicasSQL,
+	} {
+		if !strings.Contains(sql, "now()") {
+			t.Errorf("%s does not use the database clock:\n%s", name, sql)
+		}
+	}
+	if !strings.Contains(liveReplicasSQL, "heartbeat_at > now() - make_interval(") {
+		t.Errorf("a replica is live when heartbeat_at > now() - ttl, decided in SQL:\n%s", liveReplicasSQL)
+	}
+
+	db := &fakeDB{override: liveRow{live: 1}}
+	if _, err := New(db, 30*time.Second).Heartbeat(context.Background(), "r1"); err != nil {
+		t.Fatal(err)
+	}
+	var all []any
+	all = append(all, db.rowArgs...)
+	for _, args := range db.allExecArgs {
+		all = append(all, args...)
+	}
+	for _, a := range all {
+		switch a.(type) {
+		case string, float64, int, int64:
+		default:
+			t.Errorf("argument %v (%T) could carry the replica's clock", a, a)
+		}
+	}
+}
+
+func TestSilentReplicasArePrunedAfterTenLeaseTTLsInBoundedBatches(t *testing.T) {
+	db := &fakeDB{override: liveRow{live: 1}}
+	if _, err := New(db, 30*time.Second).Heartbeat(context.Background(), "r1"); err != nil {
+		t.Fatal(err)
+	}
+	prune := db.allExecArgs[1]
+	if prune[0] != 300.0 {
+		t.Fatalf("prune age = %v s, want 10 x the 30 s lease TTL", prune[0])
+	}
+	if prune[1] != pruneBatch {
+		t.Fatalf("prune batch = %v, want %d", prune[1], pruneBatch)
+	}
+	if !strings.Contains(pruneReplicasSQL, "LIMIT $2") {
+		t.Errorf("the prune must be bounded:\n%s", pruneReplicasSQL)
 	}
 }
 

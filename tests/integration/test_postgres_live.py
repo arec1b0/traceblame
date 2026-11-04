@@ -243,16 +243,72 @@ def test_a_replica_is_alive_while_its_heartbeat_is_inside_the_window(db: Any) ->
     assert int(db.execute("SELECT count(*) FROM assembler_replicas").fetchone()[0]) == 3, "upsert"
 
 
-def test_silent_replicas_are_pruned_after_a_long_time(db: Any) -> None:
-    db.execute(HEARTBEAT, _bind("old"))
-    db.execute(HEARTBEAT, _bind("new"))
+def _owners(db: Any) -> list[str]:
+    return sorted(r[0] for r in db.execute("SELECT owner FROM assembler_replicas").fetchall())
+
+
+def test_a_dead_owners_row_disappears_and_a_live_one_stays(db: Any) -> None:
+    ttl = 30
+    for owner in ("dead", "silent", "alive"):
+        db.execute(HEARTBEAT, _bind(owner))
+    # 20 min and 2 min without a heartbeat; the prune age is 10 x the TTL = 300 s
     db.execute(
-        "UPDATE assembler_replicas SET heartbeat_at = now() - interval '2 hours' "
-        "WHERE owner = 'old'"
+        "UPDATE assembler_replicas SET heartbeat_at = now() - interval '20 minutes' "
+        "WHERE owner = 'dead'"
     )
-    db.execute(PRUNE, _bind(3600))
-    owners = [r[0] for r in db.execute("SELECT owner FROM assembler_replicas").fetchall()]
-    assert owners == ["new"]
+    db.execute(
+        "UPDATE assembler_replicas SET heartbeat_at = now() - interval '2 minutes' "
+        "WHERE owner = 'silent'"
+    )
+    db.execute(PRUNE, _bind(10 * ttl, 100))
+    assert _owners(db) == ["alive", "silent"], (
+        "dead is gone; silent is not live but not yet forgotten"
+    )
+    live = int(db.execute(LIVE, _bind(ttl)).fetchone()[0])
+    assert live == 1, "only the replica with a fresh heartbeat counts"
+    db.execute(PRUNE, _bind(10 * ttl, 100))
+    assert _owners(db) == ["alive", "silent"], "pruning twice changes nothing (idempotent)"
+
+
+def test_the_prune_is_bounded_and_oldest_first(db: Any) -> None:
+    for i in range(150):
+        db.execute(HEARTBEAT, _bind(f"old-{i:03d}"))
+    db.execute(HEARTBEAT, _bind("alive"))
+    db.execute(
+        "UPDATE assembler_replicas SET heartbeat_at = now() - interval '1 hour' "
+        "- (substr(owner, 5)::integer || ' seconds')::interval WHERE owner LIKE 'old-%'"
+    )
+    db.execute(PRUNE, _bind(300, 100))
+    assert len(_owners(db)) == 51, "one call removes at most 100 rows"
+    left = [o for o in _owners(db) if o != "alive"]
+    assert left == [f"old-{i:03d}" for i in range(50)], "the oldest rows went first"
+    db.execute(PRUNE, _bind(300, 100))
+    assert _owners(db) == ["alive"], "the next heartbeat finishes the job"
+
+
+def test_liveness_ignores_the_clients_clock(pg_database: str) -> None:
+    """The heartbeat and the live count use now() on the server: clients whose sessions claim
+    different time zones are judged by the one server clock."""
+    with connect_postgres(pg_database) as conn:
+        migrate(conn, packaged(POSTGRES))
+    with (
+        psycopg.connect(pg_database, autocommit=True) as conn_a,
+        psycopg.connect(pg_database, autocommit=True) as conn_b,
+    ):
+        a: Any = conn_a  # the statements are files read at run time, not literals
+        b: Any = conn_b
+        a.execute("SET TIME ZONE 'Pacific/Kiritimati'")
+        b.execute("SET TIME ZONE 'Etc/GMT+12'")
+        a.execute(HEARTBEAT, _bind("a"))
+        b.execute(HEARTBEAT, _bind("b"))
+        live = a.execute(LIVE, _bind(30)).fetchone()
+        assert live is not None
+        assert live[0] == 2
+        skew = a.execute(
+            "SELECT max(abs(extract(epoch FROM heartbeat_at - now()))) FROM assembler_replicas"
+        ).fetchone()
+        assert skew is not None
+        assert float(skew[0]) < 5, "both heartbeats carry the server's now(), whatever the zone"
 
 
 def test_a_release_frees_the_partition_keeps_the_watermark_and_is_fenced_by_epoch(db: Any) -> None:
