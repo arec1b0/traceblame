@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"reflect"
 	"sort"
 	"sync"
 	"testing"
@@ -31,6 +32,7 @@ func newRig(t *testing.T, mutate ...func(*Config)) *rig {
 		Owner: "a", PartitionCount: 1, Grace: 5 * time.Second, MaxWindow: 60 * time.Second,
 		LeaseTTL: 30 * time.Second, BatchSize: 100, Lookback: 48 * time.Hour,
 		AssemblerVersion: "1.0.0", PollInterval: 2 * time.Second, InitialLookback: 36 * time.Hour,
+		MinWindow: time.Second, WindowRecoverySteps: 5,
 	}
 	for _, m := range mutate {
 		m(&cfg)
@@ -110,10 +112,11 @@ func TestACrashBetweenTheSummaryAndTheWatermarkResumesWithNoGap(t *testing.T) {
 		t.Fatalf("outputs of the failed window: %d summaries, %d events", len(r.ch.summaries), len(r.st.stored))
 	}
 
-	res := r.step(t) // resumes from w0 = 0
-	if res.W0 != 0 || res.W1 != 60*second {
+	res := r.step(t) // resumes from w0 = 0, with the window halved by the failed step
+	if res.W0 != 0 || res.W1 != 30*second {
 		t.Fatalf("resumed from the wrong place: %+v", res)
 	}
+	r.step(t)
 	if got := r.wm.watermark(1, 0); got != 60*second {
 		t.Fatalf("watermark = %d", got)
 	}
@@ -566,8 +569,8 @@ func TestAResultSaysWhichWatermarkIsCommitted(t *testing.T) {
 	if !errors.Is(err, errBoom) || res.CommittedMs != 0 {
 		t.Fatalf("a window that did not commit leaves the watermark at its start: %+v, %v", res, err)
 	}
-	res = r.step(t)
-	if res.CommittedMs != 60*second || res.CommittedMs != res.W1 {
+	res = r.step(t) // the failed step halved the window
+	if res.CommittedMs != 30*second || res.CommittedMs != res.W1 {
 		t.Fatalf("a committed window moves it to W1: %+v", res)
 	}
 	r.ch.nowMs = 61*second + grace
@@ -590,3 +593,141 @@ func TestACommittedWatermarkIsReportedEvenWhenTheClickHouseClockFails(t *testing
 type failingClock struct{ *fakeCH }
 
 func (failingClock) Upper(context.Context, int64) (int64, error) { return 0, errBoom }
+
+// --- dense windows (review: an unbatched check and a window that never shrinks stall catch-up) ---
+
+func TestTheAssembledCheckIsBatchedLikeTheSpansRead(t *testing.T) {
+	r := newRig(t, func(c *Config) { c.BatchSize = 2 })
+	for _, id := range traceNames(5) {
+		r.ch.arrive(id, 10*second, true, rootSpan(id))
+	}
+	r.ch.nowMs = 60*second + grace
+	r.step(t)
+	if !reflect.DeepEqual(r.ch.assembledCalls, []int{2, 2, 1}) {
+		t.Fatalf("Assembled was asked for %v ids per call, want batches of 2", r.ch.assembledCalls)
+	}
+	if len(r.st.stored) != 5 {
+		t.Fatalf("events %d", len(r.st.stored))
+	}
+}
+
+// denseRig: 600 traces over one minute, and a ClickHouse that cannot answer a window of more
+// than 100 of them.
+func denseRig(t *testing.T, mutate ...func(*Config)) *rig {
+	t.Helper()
+	r := newRig(t, append([]func(*Config){func(c *Config) {
+		c.MinWindow, c.WindowRecoverySteps = 2*time.Second, 3
+	}}, mutate...)...)
+	for i, id := range traceNames(600) {
+		r.ch.arrive(id, int64(i+1)*100, true, rootSpan(id)) // one every 100 ms, the first after w0
+	}
+	r.ch.nowMs = 60*second + grace
+	r.ch.failScanAbove = 100
+	return r
+}
+
+func TestAWindowThatErrorsIsHalvedUntilItFitsAndTheBacklogIsWorkedOff(t *testing.T) {
+	r := denseRig(t)
+	var failures, shrinks int
+	var smallest int64 = 1 << 62
+	for range 200 {
+		res, err := r.p.Step(context.Background(), 0)
+		if res.Shrank {
+			shrinks++
+		}
+		if err != nil {
+			failures++
+		} else if res.WindowMs < smallest {
+			smallest = res.WindowMs
+		}
+		if r.wm.watermark(1, 0) >= 60*second {
+			break
+		}
+	}
+	if got := r.wm.watermark(1, 0); got != 60*second {
+		t.Fatalf("the watermark stopped at %d: a dense window stalled catch-up", got)
+	}
+	if failures == 0 || shrinks != failures {
+		t.Fatalf("%d failures, %d shrinks: every failed step must shrink the window", failures, shrinks)
+	}
+	if smallest > 10*second {
+		t.Fatalf("a window of 100 arrivals is 10 s here; the successful windows were %d ms", smallest)
+	}
+	if len(r.st.stored) != 600 || r.st.calls != 600 {
+		t.Fatalf("%d events after %d publishes, want 600 each", len(r.st.stored), r.st.calls)
+	}
+}
+
+func TestTheWindowNeverShrinksBelowItsFloorAndIsRecordedWhenItDoes(t *testing.T) {
+	r := denseRig(t, func(c *Config) { c.MinWindow = 5 * time.Second })
+	r.ch.failScanAbove = 10 // even the floor is too dense
+	m := &recordingMetrics{}
+	r.p.WithMetrics(m)
+	var last Result
+	shrinks := 0
+	for range 10 {
+		res, err := r.p.Step(context.Background(), 0)
+		if err == nil {
+			t.Fatal("a window of 50 arrivals cannot be answered here")
+		}
+		last = res
+		if res.Shrank {
+			shrinks++
+		}
+	}
+	if last.WindowMs != 5_000 {
+		t.Fatalf("window = %d ms, want the 5 s floor", last.WindowMs)
+	}
+	if shrinks != 4 { // 60 -> 30 -> 15 -> 7.5 -> 5 (floor)
+		t.Fatalf("the window shrank %d times, want 4 (it stays at the floor afterwards)", shrinks)
+	}
+	if r.wm.watermark(1, 0) != 0 {
+		t.Fatal("nothing committed")
+	}
+}
+
+func TestAShrunkWindowGrowsBackAfterEnoughCleanSteps(t *testing.T) {
+	r := denseRig(t)
+	r.ch.failScanAbove = 0
+	r.p.window[0] = 4 * time.Second // as if it had been shrunk
+	r.ch.nowMs = 600*second + grace // plenty of backlog, all empty windows
+	sizes := []int64{}
+	for range 8 {
+		res := r.step(t)
+		sizes = append(sizes, res.WindowMs)
+	}
+	want := []int64{4_000, 4_000, 4_000, 8_000, 8_000, 8_000, 16_000, 16_000}
+	if !reflect.DeepEqual(sizes, want) {
+		t.Fatalf("windows %v, want %v: doubled after 3 clean steps", sizes, want)
+	}
+	for range 40 {
+		r.step(t)
+	}
+	if got := r.p.window[0]; got != r.p.cfg.MaxWindow {
+		t.Fatalf("the window stops growing at the maximum, got %s", got)
+	}
+}
+
+func TestALostLeaseOrACancelledContextDoesNotShrinkTheWindow(t *testing.T) {
+	r := newRig(t)
+	r.ch.arrive("a1", 10*second, true, rootSpan("a1"))
+	r.ch.nowMs = 60*second + grace
+	r.p.afterWrite = func() {
+		r.wm.advanceClock(2 * r.p.cfg.LeaseTTL)
+		_, _, _ = r.wm.Claim(context.Background(), 1, 0, "b")
+	}
+	res, err := r.p.Step(context.Background(), 0)
+	if !errors.Is(err, ErrLeaseLost) || res.Shrank {
+		t.Fatalf("a fenced commit is not a reason to shrink: %+v, %v", res, err)
+	}
+	r2 := newRig(t)
+	r2.ch.arrive("a1", 10*second, true, rootSpan("a1"))
+	r2.ch.nowMs = 60*second + grace
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r2.st.failAt, r2.st.failErr = 1, context.Canceled
+	res, _ = r2.p.Step(ctx, 0)
+	if res.Shrank {
+		t.Fatal("a cancelled context (shutdown) is not a reason to shrink")
+	}
+}

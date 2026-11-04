@@ -187,6 +187,13 @@ test checks its `EXPLAIN`, and query duration and rows read are metrics.
 - Rows are keyed `(partition_count, partition)`. A replica started with a new N finds no rows
   for it and starts every partition from the smallest watermark of the most recent other N.
 
+**A dense window shrinks.** The window is capped (max window), but a capped window can still hold
+more traces than ClickHouse answers in time, and a step that fails is retried on the same window.
+After a failed step (not a fenced commit, not a shutdown) the partition's window is halved, down to
+a floor (config, start 1 s), and it doubles again after a few clean steps (config, start 5). The
+check for already assembled traces is batched by the batch size like the spans read, so no query
+takes an unbounded `IN` list. `window_seconds` and `window_shrinks_total` show it.
+
 **The claim boundary.** Per partition and poll, in order:
 1. scan `(w0, w1]`, read the spans, compute the summaries (pure);
 2. insert `trace_summary` (idempotent: the same `(trace_id, assembler_version, revision)` is

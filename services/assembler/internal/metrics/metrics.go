@@ -42,6 +42,8 @@ type Metrics struct {
 	orphans       prometheus.Gauge
 	reconcileOK   prometheus.Gauge
 	reconcileFail prometheus.Counter
+	window        *prometheus.GaugeVec
+	shrinks       prometheus.Counter
 	live          prometheus.Gauge
 	target        prometheus.Gauge
 	owned         prometheus.Gauge
@@ -81,11 +83,15 @@ func New(grace time.Duration) *Metrics {
 		"Traces with arrivals but no root and no summary in the last reconciled hour.")))
 	m.reconcileOK = prometheus.NewGauge(prometheus.GaugeOpts(f("reconcile_last_success_timestamp_seconds", "Unix time of the last successful reconciliation.")))
 	m.reconcileFail = prometheus.NewCounter(prometheus.CounterOpts(f("reconcile_failures_total", "Reconciliations that failed.")))
+	m.window = prometheus.NewGaugeVec(prometheus.GaugeOpts(f("window_seconds",
+		"The window of a partition's last step: MaxWindow, or smaller after failed steps.")), []string{"partition"})
+	m.shrinks = prometheus.NewCounter(prometheus.CounterOpts(f("window_shrinks_total",
+		"Failed steps after which a partition's window was halved (down to the floor).")))
 	m.live = prometheus.NewGauge(prometheus.GaugeOpts(f("live_replicas", "Trace-assembler replicas alive, as this replica sees them (heartbeat within the lease TTL).")))
 	m.target = prometheus.NewGauge(prometheus.GaugeOpts(f("target_partitions", "This replica's fair share of partitions: ceil(partitions / live replicas).")))
 	m.owned = prometheus.NewGauge(prometheus.GaugeOpts(f("owned_partitions", "Partitions this replica owned in its last round.")))
 	m.released = prometheus.NewCounter(prometheus.CounterOpts(f("partitions_released_total", "Partitions given up above the fair share so a joining replica can take them.")))
-	m.Registry.MustRegister(lagCollector{m}, m.live, m.target, m.owned, m.released, m.batch, m.assembled, m.waiting, m.skipped, m.lateDelay,
+	m.Registry.MustRegister(lagCollector{m}, m.window, m.shrinks, m.live, m.target, m.owned, m.released, m.batch, m.assembled, m.waiting, m.skipped, m.lateDelay,
 		m.stepDuration, m.stepErrors, m.claims, m.queryDuration, m.queryRows, m.duplicates,
 		m.missing, m.orphans, m.reconcileOK, m.reconcileFail)
 	return m
@@ -119,6 +125,7 @@ func (m *Metrics) forget(partition int) {
 	m.mu.Lock()
 	delete(m.committed, partition)
 	m.mu.Unlock()
+	m.window.DeleteLabelValues(strconv.Itoa(partition))
 }
 
 // Step implements poll.Metrics.
@@ -130,6 +137,12 @@ func (m *Metrics) Step(partition int, r poll.Result, took time.Duration, err err
 	}
 	m.claims.WithLabelValues("owned").Inc()
 	m.stepDuration.Observe(took.Seconds())
+	if r.WindowMs > 0 {
+		m.window.WithLabelValues(strconv.Itoa(partition)).Set(float64(r.WindowMs) / 1000)
+	}
+	if r.Shrank {
+		m.shrinks.Inc()
+	}
 	m.mu.Lock()
 	if r.UpperMs > 0 { // ClickHouse's now is the frontier plus the grace
 		m.offsetMs = r.UpperMs + m.grace.Milliseconds() - m.now().UnixMilli()

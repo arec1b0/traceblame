@@ -22,17 +22,19 @@ const PublishRetryBudget = 30 * time.Second
 // Config is the whole configuration.
 type Config struct {
 	// Thresholds (ADR-0003): starting hypotheses.
-	PartitionCount   int
-	Grace            time.Duration
-	PollInterval     time.Duration
-	MaxWindow        time.Duration
-	BatchSize        int
-	LeaseTTL         time.Duration
-	Lookback         time.Duration // how far back a trace's spans are read
-	InitialLookback  time.Duration // where a partition count with no earlier state starts
-	ReconcileEvery   time.Duration
-	ReconcileMargin  time.Duration // how long after an hour closes it is reconciled
-	AssemblerVersion string
+	PartitionCount      int
+	Grace               time.Duration
+	PollInterval        time.Duration
+	MaxWindow           time.Duration
+	MinWindow           time.Duration // the floor a failing window is halved down to
+	WindowRecoverySteps int           // clean steps before a shrunk window doubles again
+	BatchSize           int
+	LeaseTTL            time.Duration
+	Lookback            time.Duration // how far back a trace's spans are read
+	InitialLookback     time.Duration // where a partition count with no earlier state starts
+	ReconcileEvery      time.Duration
+	ReconcileMargin     time.Duration // how long after an hour closes it is reconciled
+	AssemblerVersion    string
 
 	// Streams.
 	NATSURL         string
@@ -62,17 +64,19 @@ func Load(get func(string) (string, bool)) (Config, error) {
 	r := &reader{get: get}
 	host, _ := os.Hostname()
 	c := Config{
-		PartitionCount:   r.integer("ASSEMBLER_PARTITIONS", 2),
-		Grace:            r.duration("ASSEMBLER_GRACE", 5*time.Second),
-		PollInterval:     r.duration("ASSEMBLER_POLL_INTERVAL", 2*time.Second),
-		MaxWindow:        r.duration("ASSEMBLER_MAX_WINDOW", 60*time.Second),
-		BatchSize:        r.integer("ASSEMBLER_BATCH_SIZE", 500),
-		LeaseTTL:         r.duration("ASSEMBLER_LEASE_TTL", 30*time.Second),
-		Lookback:         r.duration("ASSEMBLER_LOOKBACK", 48*time.Hour),
-		InitialLookback:  r.duration("ASSEMBLER_INITIAL_LOOKBACK", 48*time.Hour),
-		ReconcileEvery:   r.duration("ASSEMBLER_RECONCILE_EVERY", 10*time.Minute),
-		ReconcileMargin:  r.duration("ASSEMBLER_RECONCILE_MARGIN", 5*time.Minute),
-		AssemblerVersion: r.str("ASSEMBLER_VERSION", Version),
+		PartitionCount:      r.integer("ASSEMBLER_PARTITIONS", 2),
+		Grace:               r.duration("ASSEMBLER_GRACE", 5*time.Second),
+		PollInterval:        r.duration("ASSEMBLER_POLL_INTERVAL", 2*time.Second),
+		MaxWindow:           r.duration("ASSEMBLER_MAX_WINDOW", 60*time.Second),
+		MinWindow:           r.duration("ASSEMBLER_MIN_WINDOW", time.Second),
+		WindowRecoverySteps: r.integer("ASSEMBLER_WINDOW_RECOVERY_STEPS", 5),
+		BatchSize:           r.integer("ASSEMBLER_BATCH_SIZE", 500),
+		LeaseTTL:            r.duration("ASSEMBLER_LEASE_TTL", 30*time.Second),
+		Lookback:            r.duration("ASSEMBLER_LOOKBACK", 48*time.Hour),
+		InitialLookback:     r.duration("ASSEMBLER_INITIAL_LOOKBACK", 48*time.Hour),
+		ReconcileEvery:      r.duration("ASSEMBLER_RECONCILE_EVERY", 10*time.Minute),
+		ReconcileMargin:     r.duration("ASSEMBLER_RECONCILE_MARGIN", 5*time.Minute),
+		AssemblerVersion:    r.str("ASSEMBLER_VERSION", Version),
 
 		NATSURL:         r.str("NATS_URL", "nats://localhost:4222"),
 		NATSUser:        r.str("NATS_USER", ""),
@@ -111,6 +115,9 @@ func (c Config) Validate() error {
 	check(c.Grace > 0, "ASSEMBLER_GRACE must be > 0, got %s", c.Grace)
 	check(c.PollInterval > 0, "ASSEMBLER_POLL_INTERVAL must be > 0, got %s", c.PollInterval)
 	check(c.MaxWindow >= time.Second, "ASSEMBLER_MAX_WINDOW must be >= 1s, got %s", c.MaxWindow)
+	check(c.MinWindow >= 100*time.Millisecond && c.MinWindow <= c.MaxWindow,
+		"ASSEMBLER_MIN_WINDOW (%s) must be between 100ms and the maximum window (%s)", c.MinWindow, c.MaxWindow)
+	check(c.WindowRecoverySteps >= 1, "ASSEMBLER_WINDOW_RECOVERY_STEPS must be >= 1, got %d", c.WindowRecoverySteps)
 	check(c.BatchSize >= 1, "ASSEMBLER_BATCH_SIZE must be >= 1, got %d", c.BatchSize)
 	check(c.Lookback >= c.MaxWindow, "ASSEMBLER_LOOKBACK (%s) must cover a window (%s)", c.Lookback, c.MaxWindow)
 	check(c.InitialLookback > 0, "ASSEMBLER_INITIAL_LOOKBACK must be > 0, got %s", c.InitialLookback)

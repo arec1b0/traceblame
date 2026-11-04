@@ -5,22 +5,25 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"sort"
 	"time"
 )
 
 // Config holds the thresholds of ADR-0003; every value comes from the service's config.
 type Config struct {
-	Owner            string        // this replica's identity in the lease
-	PartitionCount   int           // N: a trace belongs to cityHash64(trace_id) % N
-	Grace            time.Duration // batching margin behind ClickHouse's clock
-	MaxWindow        time.Duration // longest window of one step
-	LeaseTTL         time.Duration
-	BatchSize        int           // traces per spans read
-	Lookback         time.Duration // how far back a trace's spans are read
-	InitialLookback  time.Duration // where a partition count with no earlier state starts
-	PollInterval     time.Duration
-	AssemblerVersion string
+	Owner               string        // this replica's identity in the lease
+	PartitionCount      int           // N: a trace belongs to cityHash64(trace_id) % N
+	Grace               time.Duration // batching margin behind ClickHouse's clock
+	MaxWindow           time.Duration // longest window of one step
+	MinWindow           time.Duration // the floor a failing window is halved down to
+	WindowRecoverySteps int           // clean steps before a shrunk window doubles again
+	LeaseTTL            time.Duration
+	BatchSize           int           // traces per spans read
+	Lookback            time.Duration // how far back a trace's spans are read
+	InitialLookback     time.Duration // where a partition count with no earlier state starts
+	PollInterval        time.Duration
+	AssemblerVersion    string
 }
 
 // Result describes one step, for the loop's metrics and the tests.
@@ -30,7 +33,9 @@ type Result struct {
 	UpperMs      int64 // ClickHouse's now - grace when the step ran
 	W0, W1       int64
 	Scanned      bool
-	CaughtUp     bool // W1 reached ClickHouse's now - grace
+	WindowMs     int64 // the window this step used
+	Shrank       bool  // the step failed and the next window is smaller
+	CaughtUp     bool  // W1 reached ClickHouse's now - grace
 	Arrivals     int
 	Assembled    int // first assembly of a trace
 	Reassembled  int // the trace had a summary before
@@ -67,6 +72,11 @@ type Poller struct {
 	// held is the partitions this replica owns, with their leases. Only Round and Step touch
 	// it, and Run calls them from one goroutine.
 	held map[int]Lease
+
+	// window is each partition's current window: MaxWindow until a step fails (then halved down
+	// to MinWindow), doubled again after WindowRecoverySteps clean steps. clean counts them.
+	window map[int]time.Duration
+	clean  map[int]int
 }
 
 // RoundResult is what one pass over the partitions did.
@@ -83,6 +93,7 @@ func New(cfg Config, src Source, sum Summaries, pub Publisher, wm Watermarks) *P
 	return &Poller{
 		cfg: cfg, src: src, sum: sum, pub: pub, wm: wm,
 		metrics: nopMetrics{}, log: slog.New(slog.DiscardHandler), held: map[int]Lease{},
+		window: map[int]time.Duration{}, clean: map[int]int{},
 	}
 }
 
@@ -110,6 +121,45 @@ func (p *Poller) Start(ctx context.Context) error {
 //  3. publish trace.completed with publish-ack and Nats-Msg-Id (idempotent in the duplicate window);
 //  4. advance the watermark, fenced by the lease epoch: the commit point.
 func (p *Poller) Step(ctx context.Context, partition int) (Result, error) {
+	res, err := p.step(ctx, partition)
+	p.adapt(ctx, partition, &res, err)
+	return res, err
+}
+
+// windowFor is the partition's current window.
+func (p *Poller) windowFor(partition int) time.Duration {
+	if w, ok := p.window[partition]; ok {
+		return w
+	}
+	return p.cfg.MaxWindow
+}
+
+// adapt halves the partition's window after a failed step (a window too dense to answer in
+// time stalls catch-up when it is retried unchanged) down to the floor, and doubles it again
+// after WindowRecoverySteps clean steps. A fenced commit and a cancelled context say nothing
+// about the window.
+func (p *Poller) adapt(ctx context.Context, partition int, res *Result, err error) {
+	if !res.Owned {
+		return
+	}
+	cur := p.windowFor(partition)
+	switch {
+	case err == nil && res.Scanned:
+		p.clean[partition]++
+		if p.clean[partition] >= p.cfg.WindowRecoverySteps && cur < p.cfg.MaxWindow {
+			p.window[partition] = min(cur*2, p.cfg.MaxWindow)
+			p.clean[partition] = 0
+		}
+	case err != nil && !errors.Is(err, ErrLeaseLost) && ctx.Err() == nil && res.W1 > res.W0:
+		p.clean[partition] = 0
+		if next := max(cur/2, p.cfg.MinWindow); next < cur {
+			p.window[partition] = next
+			res.Shrank = true
+		}
+	}
+}
+
+func (p *Poller) step(ctx context.Context, partition int) (Result, error) {
 	lease, ok, err := p.wm.Claim(ctx, p.cfg.PartitionCount, partition, p.cfg.Owner)
 	if err != nil {
 		return Result{}, fmt.Errorf("poll: claim partition %d: %w", partition, err)
@@ -130,7 +180,9 @@ func (p *Poller) Step(ctx context.Context, partition int) (Result, error) {
 		res.CaughtUp = true
 		return res, nil
 	}
-	res.W1 = min(upper, res.W0+p.cfg.MaxWindow.Milliseconds())
+	window := p.windowFor(partition)
+	res.WindowMs = window.Milliseconds()
+	res.W1 = min(upper, res.W0+window.Milliseconds())
 	res.CaughtUp = res.W1 == upper
 
 	arrivals, err := p.src.Scan(ctx, p.cfg.PartitionCount, partition, res.W0, res.W1)
@@ -230,9 +282,13 @@ func (p *Poller) classify(ctx context.Context, arrivals []Arrival, res *Result) 
 	for i, a := range arrivals {
 		ids[i] = a.TraceID
 	}
-	before, err := p.src.Assembled(ctx, ids)
-	if err != nil {
-		return nil, fmt.Errorf("poll: assembled check: %w", err)
+	before := map[string]int64{}
+	for start := 0; start < len(ids); start += max(p.cfg.BatchSize, 1) {
+		got, err := p.src.Assembled(ctx, ids[start:min(start+max(p.cfg.BatchSize, 1), len(ids))])
+		if err != nil {
+			return nil, fmt.Errorf("poll: assembled check: %w", err)
+		}
+		maps.Copy(before, got)
 	}
 	var todo []job
 	for _, a := range arrivals {

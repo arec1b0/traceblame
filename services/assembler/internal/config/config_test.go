@@ -112,6 +112,26 @@ func TestTheInitialLookbackIsSeparateFromTheSpansLookback(t *testing.T) {
 	}
 }
 
+func TestTheWindowShrinksToAFloorThatIsConfigurable(t *testing.T) {
+	c, err := Load(env(base))
+	if err != nil || c.MinWindow != time.Second || c.WindowRecoverySteps != 5 {
+		t.Fatalf("%+v %v", c, err)
+	}
+	c, err = Load(env(with(map[string]string{"ASSEMBLER_MIN_WINDOW": "250ms", "ASSEMBLER_WINDOW_RECOVERY_STEPS": "8"})))
+	if err != nil || c.MinWindow != 250*time.Millisecond || c.WindowRecoverySteps != 8 {
+		t.Fatalf("%+v %v", c, err)
+	}
+	for name, kv := range map[string]map[string]string{
+		"floor above the maximum": {"ASSEMBLER_MIN_WINDOW": "2m"},
+		"floor of zero":           {"ASSEMBLER_MIN_WINDOW": "0s"},
+		"no recovery steps":       {"ASSEMBLER_WINDOW_RECOVERY_STEPS": "0"},
+	} {
+		if _, err := Load(env(with(kv))); err == nil {
+			t.Errorf("%s must be refused", name)
+		}
+	}
+}
+
 func TestAllErrorsAreReportedTogether(t *testing.T) {
 	_, err := Load(env(map[string]string{"ASSEMBLER_PARTITIONS": "x", "ASSEMBLER_GRACE": "y"}))
 	if err == nil || !strings.Contains(err.Error(), "ASSEMBLER_PARTITIONS") || !strings.Contains(err.Error(), "ASSEMBLER_GRACE") {

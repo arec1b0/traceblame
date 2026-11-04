@@ -32,7 +32,9 @@ grace (5 s by default) is part of the lag by design. Traces arriving now are ass
    ```
    A slow `spans` query is the look-back read with no service filter (ADR-0003 amendment):
    check `system.query_log` for rows read, and lower `ASSEMBLER_LOOKBACK` or the batch size
-   `ASSEMBLER_BATCH_SIZE`. A backlog is worked off in steps of `ASSEMBLER_MAX_WINDOW` without
+   `ASSEMBLER_BATCH_SIZE`. After a failed step the window is halved down to `ASSEMBLER_MIN_WINDOW`
+   (`traceblame_assembler_window_seconds`, `..._window_shrinks_total`): a partition that stays at
+   the floor and still fails has a window ClickHouse cannot answer even when small. A backlog is worked off in steps of `ASSEMBLER_MAX_WINDOW` without
    sleeping, so the lag shrinks by itself once the cause is gone.
 4. **Is Postgres reachable?** The watermark and leases live there. If the assembler cannot claim
    or advance, steps error with `store:`. Restore Postgres; the assembler resumes from the stored

@@ -234,3 +234,23 @@ func TestEveryMetricIsUnderTheAssemblerNamespace(t *testing.T) {
 		}
 	}
 }
+
+func TestAShrunkWindowIsCountedAndReportedPerPartition(t *testing.T) {
+	m := New(time.Second)
+	m.Step(0, poll.Result{Owned: true, WindowMs: 30_000, Shrank: true, CommittedMs: 1}, time.Millisecond, errors.New("timeout"))
+	m.Step(0, poll.Result{Owned: true, WindowMs: 15_000, Shrank: true, CommittedMs: 1}, time.Millisecond, errors.New("timeout"))
+	m.Step(1, poll.Result{Owned: true, WindowMs: 60_000, CommittedMs: 1}, time.Millisecond, nil)
+	if got := testutil.ToFloat64(m.shrinks); got != 2 {
+		t.Fatalf("shrinks = %v, want 2", got)
+	}
+	if got := testutil.ToFloat64(m.window.WithLabelValues("0")); got != 15 {
+		t.Fatalf("window of partition 0 = %v s, want 15", got)
+	}
+	if got := testutil.ToFloat64(m.window.WithLabelValues("1")); got != 60 {
+		t.Fatalf("window of partition 1 = %v s, want 60", got)
+	}
+	m.Step(0, poll.Result{}, 0, nil) // lease gone
+	if n, _ := testutil.GatherAndCount(m.Registry, "traceblame_assembler_window_seconds"); n != 1 {
+		t.Fatalf("the window series of a partition this replica no longer owns must go: %d left", n)
+	}
+}

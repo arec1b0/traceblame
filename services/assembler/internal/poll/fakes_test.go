@@ -20,6 +20,10 @@ type fakeCH struct {
 	scans     []scanCall
 	spanReads [][]string
 	sinces    []int64
+	// failScanAbove makes a scan fail once its window holds more arrivals than this: a dense
+	// window that ClickHouse cannot answer in time. Zero means never.
+	failScanAbove  int
+	assembledCalls []int
 }
 
 type fakeArrival struct {
@@ -71,6 +75,9 @@ func (f *fakeCH) Scan(_ context.Context, count, partition int, w0, w1 int64) ([]
 		cur.HasRoot = cur.HasRoot || a.root
 		cur.LastArrivalMs = max(cur.LastArrivalMs, a.atMs)
 	}
+	if f.failScanAbove > 0 && len(by) > f.failScanAbove {
+		return nil, errors.New("code 159: timeout exceeded")
+	}
 	out := make([]Arrival, 0, len(by))
 	for _, a := range by {
 		out = append(out, *a)
@@ -82,6 +89,7 @@ func (f *fakeCH) Scan(_ context.Context, count, partition int, w0, w1 int64) ([]
 func (f *fakeCH) Assembled(_ context.Context, ids []string) (map[string]int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.assembledCalls = append(f.assembledCalls, len(ids))
 	out := map[string]int64{}
 	for _, s := range f.summaries {
 		for _, id := range ids {
