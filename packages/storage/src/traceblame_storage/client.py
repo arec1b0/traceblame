@@ -1,11 +1,13 @@
-"""A ClickHouse connection for the runner: clickhouse-connect over HTTP(S)."""
+"""Connections for the runners: clickhouse-connect over HTTP(S), psycopg for Postgres."""
 
 from collections.abc import Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, LiteralString, cast
 from urllib.parse import unquote, urlsplit
 
 import clickhouse_connect
+import psycopg
 
 
 @dataclass(frozen=True)
@@ -69,3 +71,36 @@ class ClickHouseClient:
 
     def close(self) -> None:
         self._client.close()
+
+
+class PostgresClient:
+    """Implements traceblame_storage.pg_runner.Connection over psycopg.
+
+    psycopg types a query as LiteralString to keep injection out. The runner executes only
+    the packaged migration files and its own bookkeeping statements, which are trusted code,
+    so the cast is made here once.
+    """
+
+    def __init__(self, conn: psycopg.Connection[Any]) -> None:
+        self._conn = conn
+
+    def execute(self, query: str, params: Sequence[Any] | None = None) -> psycopg.Cursor[Any]:
+        return self._conn.execute(cast("LiteralString", query), params)
+
+    def transaction(self) -> AbstractContextManager[object]:
+        return self._conn.transaction()
+
+    def close(self) -> None:
+        self._conn.close()
+
+    def __enter__(self) -> "PostgresClient":
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+
+def connect_postgres(url: str) -> PostgresClient:
+    """A direct, autocommit connection: the runner's advisory lock is session-scoped, so it
+    must not go through a transaction-mode pooler (ADR-0007)."""
+    return PostgresClient(psycopg.connect(url, autocommit=True))

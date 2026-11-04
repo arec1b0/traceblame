@@ -1,8 +1,8 @@
 import pytest
 
-from traceblame_storage.cli import main
+from traceblame_storage.cli import backend_of, main
 from traceblame_storage.client import Target, parse_url
-from traceblame_storage.migrations import packaged
+from traceblame_storage.migrations import POSTGRES, packaged
 
 
 def test_parse_url() -> None:
@@ -24,6 +24,21 @@ def test_parse_url_rejects(url: str) -> None:
         parse_url(url)
 
 
+@pytest.mark.parametrize(
+    ("url", "backend"),
+    [
+        ("http://default@localhost:8123/db", "clickhouse"),
+        ("https://ch.example:8443/db", "clickhouse"),
+        ("postgres://u:p@localhost:5432/db", "postgres"),
+        ("postgresql://u:p@localhost/db", "postgres"),
+    ],
+)
+def test_backend_of_follows_the_url_scheme(url: str, backend: str) -> None:
+    assert backend_of(url) == backend
+
+
 def test_check_passes_on_the_packaged_migrations(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["check"]) == 0
-    assert f"{len(packaged())} migration(s) ok" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert f"{len(packaged())} clickhouse" in out
+    assert f"{len(packaged(POSTGRES))} postgres migration(s) ok" in out
