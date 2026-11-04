@@ -1,0 +1,30 @@
+# Alerts on the trace-assembler's self-telemetry (design 1.5, ADR-0003). Prometheus rule file;
+# every alert links its runbook (CLAUDE.md rule 6), and tests/contract/test_alert_runbooks.py
+# checks that the file exists. The thresholds are starting hypotheses.
+groups:
+  - name: traceblame-assembler
+    rules:
+      # The reconciliation (every ASSEMBLER_RECONCILE_EVERY, over the last closed hour) found a
+      # trace with a root arrival in trace_arrivals and no row in trace_summary. The assembler
+      # skipped it or the watermark passed it (a part that became visible later than the grace).
+      - alert: TraceSummaryReconciliationMiss
+        expr: max(traceblame_assembler_reconcile_missing_traces) > 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Traces with a root arrival have no trace_summary row"
+          description: "{{ $value }} trace(s) in the last reconciled hour were never assembled."
+          runbook_url: https://github.com/arec1b0/traceblame/blob/main/docs/runbooks/TraceSummaryReconciliationMiss.md
+
+      # The slowest partition's watermark trails ClickHouse's clock by more than the pipeline lag
+      # SLO leaves room for (p95 <= 60 s end to end; the grace alone is 5 s).
+      - alert: AssemblerWatermarkLagHigh
+        expr: traceblame_assembler_watermark_lag_seconds > 120
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "The trace-assembler's watermark is more than 2 minutes behind"
+          description: "Partition {{ $labels.partition }} trails by {{ $value }} s."
+          runbook_url: https://github.com/arec1b0/traceblame/blob/main/docs/runbooks/AssemblerWatermarkLagHigh.md

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploy the two-tier collector topology into the kind cluster (issue #10, design §1.1):
 # ClickHouse through the Altinity operator, the migrations, the otel-agent DaemonSet and the
-# otel-gateway Deployment. Run `make kind-up` first (cluster, namespaces, Secrets).
+# otel-gateway Deployment; and the trace-assembler (issue #35) with the NATS JetStream and
+# Postgres it needs. Run `make kind-up` first (cluster, namespaces, Secrets).
 #
 # Every image is pinned (tools/versions.env); the operator bundle is checked against
 # tools/checksums.txt and its images are rewritten to their pinned digests.
@@ -42,6 +43,12 @@ docker build --quiet --build-arg "DISTROLESS_STATIC_IMAGE=${DISTROLESS_STATIC_IM
   --file "${ROOT}/bench/gateway-scaling/loadgen.Dockerfile" --tag traceblame-loadgen:local "${BUILD}/loadgen" >/dev/null
 kind load docker-image traceblame-loadgen:local --name "${CLUSTER}"
 
+step "trace-assembler image"
+docker build --quiet --platform linux/amd64 \
+  --build-arg "GO_BUILD_IMAGE=${GO_BUILD_IMAGE}" --build-arg "DISTROLESS_STATIC_IMAGE=${DISTROLESS_STATIC_IMAGE}" \
+  --file "${ROOT}/services/assembler/Dockerfile" --tag traceblame-assembler:local "${ROOT}/services/assembler" >/dev/null
+kind load docker-image traceblame-assembler:local --name "${CLUSTER}"
+
 step "ClickHouse operator ${CLICKHOUSE_OPERATOR_VERSION}"
 bundle="clickhouse-operator-install-bundle-${CLICKHOUSE_OPERATOR_VERSION}.yaml"
 curl -fsSL --retry 3 -o "${WORK}/${bundle}" \
@@ -79,6 +86,26 @@ done
 (cd "${ROOT}" && uv run --frozen traceblame-storage migrate --url "http://${user}:${password}@127.0.0.1:18123/traceblame")
 kill "${PF_PID}" && PF_PID=""
 
+step "NATS JetStream and Postgres"
+NATS_IMAGE="${NATS_IMAGE}" envsubst '${NATS_IMAGE}' <"${ROOT}/deploy/kind/manifests/40-nats.yaml" | "${KCTL[@]}" apply -f -
+POSTGRES_IMAGE="${POSTGRES_IMAGE}" envsubst '${POSTGRES_IMAGE}' <"${ROOT}/deploy/kind/manifests/50-postgres.yaml" | "${KCTL[@]}" apply -f -
+"${KCTL[@]}" -n observability rollout status statefulset/nats --timeout=300s
+"${KCTL[@]}" -n traceblame rollout status statefulset/postgres --timeout=300s
+pg_user="$("${KCTL[@]}" -n traceblame get secret postgres-credentials -o jsonpath='{.data.user}' | base64 -d)"
+pg_password="$("${KCTL[@]}" -n traceblame get secret postgres-credentials -o jsonpath='{.data.password}' | base64 -d)"
+ready=""
+for _ in $(seq 1 60); do
+  if [[ -z "${PF_PID}" ]] || ! kill -0 "${PF_PID}" 2>/dev/null; then
+    "${KCTL[@]}" -n traceblame port-forward svc/postgres 15432:5432 >/dev/null 2>&1 &
+    PF_PID=$!
+  fi
+  if (exec 3<>/dev/tcp/127.0.0.1/15432) 2>/dev/null; then ready=1; break; fi
+  sleep 1
+done
+[[ -n "${ready}" ]] || { echo "kind-deploy: Postgres did not answer through the port-forward" >&2; exit 1; }
+(cd "${ROOT}" && uv run --frozen traceblame-storage migrate --url "postgres://${pg_user}:${pg_password}@127.0.0.1:15432/traceblame")
+kill "${PF_PID}" && PF_PID=""
+
 step "collector configuration"
 collector="${ROOT}/deploy/kind/collector"
 "${KCTL[@]}" -n observability create configmap agent-config --from-file="${collector}/agent.yaml" \
@@ -99,4 +126,12 @@ BUSYBOX_IMAGE="${BUSYBOX_IMAGE}" envsubst '${BUSYBOX_IMAGE}' <"${ROOT}/deploy/ki
 "${KCTL[@]}" -n observability rollout restart daemonset/otel-agent deployment/otel-gateway
 "${KCTL[@]}" -n observability rollout status deployment/otel-gateway --timeout=300s
 "${KCTL[@]}" -n observability rollout status daemonset/otel-agent --timeout=300s
+step "trace-assembler"
+# The assembler reads and writes ClickHouse with the gateway's user (a demo-cluster shortcut).
+"${KCTL[@]}" -n traceblame delete secret assembler-clickhouse --ignore-not-found >/dev/null
+"${KCTL[@]}" -n traceblame create secret generic assembler-clickhouse \
+  --from-literal=user="${user}" --from-literal=password="${password}" >/dev/null
+"${KCTL[@]}" apply -f "${ROOT}/deploy/kind/manifests/60-assembler.yaml"
+"${KCTL[@]}" -n traceblame rollout restart deployment/trace-assembler
+"${KCTL[@]}" -n traceblame rollout status deployment/trace-assembler --timeout=300s
 echo "kind-deploy: ready"
