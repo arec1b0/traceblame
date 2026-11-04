@@ -235,12 +235,6 @@ func (w *fakeWatermarks) Release(_ context.Context, count int, l Lease, owner st
 	return nil
 }
 
-func (w *fakeWatermarks) owner(count, partition int) string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.rows[[2]int{count, partition}].owner
-}
-
 func (w *fakeWatermarks) epoch(count, partition int) int64 {
 	w.mu.Lock()
 	defer w.mu.Unlock()

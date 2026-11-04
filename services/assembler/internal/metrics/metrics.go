@@ -88,6 +88,7 @@ func New(grace time.Duration) *Metrics {
 func (m *Metrics) Step(partition int, r poll.Result, took time.Duration, err error) {
 	if !r.Owned {
 		m.claims.WithLabelValues("held").Inc()
+		m.watermarkLag.DeleteLabelValues(strconv.Itoa(partition)) // only the owner reports a lag
 		return
 	}
 	m.claims.WithLabelValues("owned").Inc()
@@ -99,6 +100,7 @@ func (m *Metrics) Step(partition int, r poll.Result, took time.Duration, err err
 	switch {
 	case errors.Is(err, poll.ErrLeaseLost):
 		m.stepErrors.WithLabelValues("lease_lost").Inc()
+		m.watermarkLag.DeleteLabelValues(strconv.Itoa(partition))
 		return
 	case err != nil:
 		m.stepErrors.WithLabelValues("error").Inc()
@@ -129,6 +131,9 @@ func (m *Metrics) Round(r poll.RoundResult) {
 	}
 	m.owned.Set(float64(owned))
 	m.released.Add(float64(len(r.Released)))
+	for _, part := range r.Released {
+		m.watermarkLag.DeleteLabelValues(strconv.Itoa(part))
+	}
 }
 
 // Duplicate counts an ack the stream reported as a duplicate.

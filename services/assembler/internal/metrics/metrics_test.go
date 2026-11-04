@@ -34,6 +34,46 @@ func TestAStepFeedsTheCountersAndTheLag(t *testing.T) {
 	}
 }
 
+func lagSeries(t *testing.T, m *Metrics) int {
+	t.Helper()
+	n, err := testutil.GatherAndCount(m.Registry, "traceblame_assembler_watermark_lag_seconds")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestOnlyTheOwnerOfAPartitionReportsItsLag(t *testing.T) {
+	owned := poll.Result{Owned: true, UpperMs: 100_000, W1: 90_000, Scanned: true}
+
+	// The lease is lost to another replica: the next step finds it held elsewhere.
+	m := New(time.Second)
+	m.Step(1, owned, time.Millisecond, nil)
+	if lagSeries(t, m) != 1 {
+		t.Fatal("the owner reports the lag")
+	}
+	m.Step(1, poll.Result{}, 0, nil)
+	if got := lagSeries(t, m); got != 0 {
+		t.Fatalf("a replica that lost the lease still exports %d lag series", got)
+	}
+
+	// The commit is fenced (a takeover happened during the step).
+	m = New(time.Second)
+	m.Step(0, owned, time.Millisecond, poll.ErrLeaseLost)
+	if got := lagSeries(t, m); got != 0 {
+		t.Fatalf("a fenced step leaves %d lag series", got)
+	}
+
+	// The replica gives the partition up for a fair share and never steps it again.
+	m = New(time.Second)
+	m.Step(2, owned, time.Millisecond, nil)
+	m.Step(3, owned, time.Millisecond, nil)
+	m.Round(poll.RoundResult{Live: 2, Target: 1, Released: []int{3}})
+	if got := lagSeries(t, m); got != 1 {
+		t.Fatalf("after releasing partition 3 only partition 2 remains, got %d series", got)
+	}
+}
+
 func TestAStepThatDoesNotCommitIsCountedByReason(t *testing.T) {
 	m := New(time.Second)
 	m.Step(0, poll.Result{Owned: true}, time.Millisecond, poll.ErrLeaseLost)
