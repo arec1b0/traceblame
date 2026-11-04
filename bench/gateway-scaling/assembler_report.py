@@ -39,6 +39,12 @@ class Lags:
 
 
 @dataclass(frozen=True)
+class SplitLag:
+    to_arrival: list[float]  # seconds, root span end to the trace's first arrival in ClickHouse
+    to_assembly: list[float]  # seconds, the trace's last arrival to its summary being written
+
+
+@dataclass(frozen=True)
 class Rejoin:
     split_kept: int  # traces with stored spans from two or more gateways
     rejoined: int  # one summary whose span count equals the spans stored
@@ -70,6 +76,25 @@ def completion_lags(events: Iterable[Event], root_end_ms: dict[str, int]) -> Lag
     return Lags(first, again)
 
 
+def split_lag(
+    root_end_ms: dict[str, int],
+    arrivals_ms: dict[str, tuple[int, int]],
+    assembled_ms: dict[str, int],
+) -> SplitLag:
+    """Where the end-to-end lag is spent: the pipeline up to ClickHouse (agent, gateway tail
+    sampling, export), and the assembler (grace, poll, assembly). arrivals_ms: first and last
+    arrival per trace; assembled_ms: when the newest summary row was written."""
+    to_arrival: list[float] = []
+    to_assembly: list[float] = []
+    for trace, end in root_end_ms.items():
+        if trace not in arrivals_ms or trace not in assembled_ms:
+            continue
+        first, last = arrivals_ms[trace]
+        to_arrival.append((first - end) / 1000)
+        to_assembly.append((assembled_ms[trace] - last) / 1000)
+    return SplitLag(to_arrival, to_assembly)
+
+
 def rejoin_report(
     stored: Iterable[tuple[str, str]],
     roots: set[str],
@@ -99,7 +124,7 @@ def _fmt(x: float) -> str:
     return "n/a" if math.isnan(x) else f"{x:.2f} s"
 
 
-def render(lags: Lags, rejoin: Rejoin, prefix: str) -> str:
+def render(lags: Lags, rejoin: Rejoin, prefix: str, split: SplitLag) -> str:
     rows = [
         ("first assembly", lags.first),
         ("re-assembly (late spans)", lags.again),
@@ -114,6 +139,18 @@ def render(lags: Lags, rejoin: Rejoin, prefix: str) -> str:
         *(
             f"| {name} | {len(v)} | {_fmt(percentile(v, 0.5))} | {_fmt(percentile(v, 0.95))} |"
             for name, v in rows
+        ),
+        "",
+        "Where that lag is spent (all traces with a summary):",
+        "",
+        "| segment | traces | p50 | p95 |",
+        "|---|---|---|---|",
+        *(
+            f"| {name} | {len(v)} | {_fmt(percentile(v, 0.5))} | {_fmt(percentile(v, 0.95))} |"
+            for name, v in (
+                ("root end to first arrival in ClickHouse", split.to_arrival),
+                ("last arrival to trace_summary written", split.to_assembly),
+            )
         ),
         "",
         "Traces split across gateways (#38) and kept on both:",
@@ -168,6 +205,12 @@ def main() -> int:
     ap.add_argument("--roots", type=Path, required=True, help="TSV: trace_id, root end (ms)")
     ap.add_argument("--summaries", type=Path, required=True, help="TSV: trace_id, span_count")
     ap.add_argument("--stored", type=Path, required=True, help="TSV of stored spans (run.sh)")
+    ap.add_argument(
+        "--arrivals", type=Path, required=True, help="TSV: trace_id, first and last arrival (ms)"
+    )
+    ap.add_argument(
+        "--assembled", type=Path, required=True, help="TSV: trace_id, summary written at (ms)"
+    )
     ap.add_argument("--markdown", type=Path, required=True)
     ap.add_argument("--json", type=Path, required=True)
     args = ap.parse_args()
@@ -178,8 +221,13 @@ def main() -> int:
     events = asyncio.run(read_events(args.nats, args.stream, args.prefix))
     lags = completion_lags(events, root_end)
     rejoin = rejoin_report(stored, set(root_end), summaries)
+    split = split_lag(
+        root_end,
+        {r[0]: (int(r[1]), int(r[2])) for r in _tsv(args.arrivals)},
+        {r[0]: int(r[1]) for r in _tsv(args.assembled)},
+    )
 
-    args.markdown.write_text(render(lags, rejoin, args.prefix), encoding="utf-8")
+    args.markdown.write_text(render(lags, rejoin, args.prefix, split), encoding="utf-8")
     args.json.write_text(
         json.dumps(
             {
@@ -194,6 +242,16 @@ def main() -> int:
                     "n": len(lags.again),
                     "p50": percentile(lags.again, 0.5),
                     "p95": percentile(lags.again, 0.95),
+                },
+                "root_end_to_first_arrival_s": {
+                    "n": len(split.to_arrival),
+                    "p50": percentile(split.to_arrival, 0.5),
+                    "p95": percentile(split.to_arrival, 0.95),
+                },
+                "last_arrival_to_summary_s": {
+                    "n": len(split.to_assembly),
+                    "p50": percentile(split.to_assembly, 0.5),
+                    "p95": percentile(split.to_assembly, 0.95),
                 },
                 "split_traces": rejoin.__dict__,
             },

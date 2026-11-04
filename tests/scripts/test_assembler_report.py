@@ -41,11 +41,36 @@ def test_a_split_trace_counts_once_per_outcome() -> None:
 
 
 def test_the_markdown_has_both_tables_and_marks_missing_data() -> None:
-    text = report.render(report.Lags([1.0, 2.0, 3.0], []), report.Rejoin(5, 4, 1, 0, 0), "0a1b2c3d")
+    text = report.render(
+        report.Lags([1.0, 2.0, 3.0], []),
+        report.Rejoin(5, 4, 1, 0, 0),
+        "0a1b2c3d",
+        report.SplitLag([], []),
+    )
     assert "| first assembly | 3 | 2.00 s | 3.00 s |" in text
     assert "| re-assembly (late spans) | 0 | n/a | n/a |" in text
     assert "| 5 | 4 | 1 | 0 | 0 |" in text
     assert "0a1b2c3d" in text
+
+
+def test_the_lag_splits_into_pipeline_to_arrival_and_arrival_to_assembly() -> None:
+    root_end = {"a": 1_000, "b": 2_000, "no-arrival": 3_000}
+    arrivals = {"a": (31_000, 31_000), "b": (62_000, 65_000), "orphan": (1, 1)}
+    assembled = {"a": 38_000, "b": 71_000, "orphan": 9}
+    got = report.split_lag(root_end, arrivals, assembled)
+    assert got.to_arrival == [30.0, 60.0]
+    assert got.to_assembly == [7.0, 6.0]
+
+
+def test_the_markdown_shows_where_the_lag_comes_from() -> None:
+    text = report.render(
+        report.Lags([1.0], []),
+        report.Rejoin(0, 0, 0, 0, 0),
+        "0a1b2c3d",
+        report.SplitLag([30.0, 60.0], [6.0, 7.0]),
+    )
+    assert "| root end to first arrival in ClickHouse | 2 | 30.00 s | 60.00 s |" in text
+    assert "| last arrival to trace_summary written | 2 | 6.00 s | 7.00 s |" in text
 
 
 @pytest.mark.parametrize("q", [0.5, 0.95])
