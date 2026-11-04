@@ -21,6 +21,13 @@ pytestmark = pytest.mark.integration
 # Far beyond any arrival: the upper bound of a scan that wants everything after w0.
 FAR_MS = 4_102_444_800_000
 
+
+def _recent_ms() -> int:
+    """An hour ago: trace_arrivals expires a row 2 days after its arrival day, and ClickHouse
+    drops expired rows at insert, so test rows must carry recent stamps."""
+    return int(datetime.now(UTC).timestamp() * 1000) - 3_600_000
+
+
 # The fault injector's write with injection_id, and the join of an injection to the span it
 # was applied at (#36). They use a column new in this schema, so they are not contract
 # statements yet (code N must run on schema N-1); faults/ (#14) moves them into contract/.
@@ -38,6 +45,7 @@ ENGINES = {
     "spans_from_otel": "MaterializedView",
     "trace_arrivals": "MergeTree",
     "trace_arrivals_from_otel": "MaterializedView",
+    "trace_summary": "ReplacingMergeTree",
     "findings": "ReplacingMergeTree",
     "blame": "ReplacingMergeTree",
     "injections": "MergeTree",
@@ -82,7 +90,7 @@ def test_the_contract_statements_run_on_the_schema(
             if name.endswith("_write.sql"):
                 client.command(sql)
             else:
-                results[name] = client.query_rows(sql)
+                results[name] = client.query_rows(sql, parameters=contract.parameters(sql))
         (span,) = results["spans_read.sql"]
         cols = [
             "trace_id",
@@ -224,14 +232,15 @@ def test_consecutive_windows_see_an_arrival_stamped_at_the_edge_once(
     client = clickhouse.client(database)
     try:
         migrate(client, packaged())
-        _arrive(client, "a" * 32, 1_000, root=True)
-        _arrive(client, "b" * 32, 2_000, root=True)  # exactly w1
-        _arrive(client, "c" * 32, 2_001, root=True)
-        first = _scan(client, 0, 2_000)
-        second = _scan(client, 2_000, 3_000)
+        t = _recent_ms()
+        _arrive(client, "a" * 32, t + 1_000, root=True)
+        _arrive(client, "b" * 32, t + 2_000, root=True)  # exactly w1
+        _arrive(client, "c" * 32, t + 2_001, root=True)
+        first = _scan(client, t, t + 2_000)
+        second = _scan(client, t + 2_000, t + 3_000)
         assert [r[0] for r in first] == ["a" * 32, "b" * 32]
         assert [r[0] for r in second] == ["c" * 32]
-        assert first[1][2] == 2_000
+        assert first[1][2] == t + 2_000
     finally:
         client.close()
 
@@ -244,10 +253,11 @@ def test_the_partitions_of_a_count_split_the_window_without_overlap(
     try:
         migrate(client, packaged())
         traces = [f"{i:032x}" for i in range(1, 41)]
+        t = _recent_ms()
         for i, trace in enumerate(traces):
-            _arrive(client, trace, 100 + i, root=True)
+            _arrive(client, trace, t + 100 + i, root=True)
         count = 4
-        parts = [{r[0] for r in _scan(client, 0, FAR_MS, count, p)} for p in range(count)]
+        parts = [{r[0] for r in _scan(client, t, FAR_MS, count, p)} for p in range(count)]
         assert sorted(t for part in parts for t in part) == sorted(traces)
         assert all(parts), "40 traces spread over 4 partitions"
         assert sum(len(p) for p in parts) == len(traces), "no trace in two partitions"

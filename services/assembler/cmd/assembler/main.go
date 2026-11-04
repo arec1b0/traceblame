@@ -75,7 +75,7 @@ func run(log *slog.Logger) error {
 	loop := poll.New(poll.Config{
 		Owner: cfg.Owner, PartitionCount: cfg.PartitionCount, Grace: cfg.Grace,
 		MaxWindow: cfg.MaxWindow, LeaseTTL: cfg.LeaseTTL, BatchSize: cfg.BatchSize,
-		Lookback: cfg.Lookback, PollInterval: cfg.PollInterval, AssemblerVersion: cfg.AssemblerVersion,
+		Lookback: cfg.Lookback, InitialLookback: cfg.InitialLookback, PollInterval: cfg.PollInterval, AssemblerVersion: cfg.AssemblerVersion,
 	}, m.Source(click), click, pub, store.New(store.PoolDB{Pool: pool}, cfg.LeaseTTL)).
 		WithMetrics(m).WithLogger(log)
 

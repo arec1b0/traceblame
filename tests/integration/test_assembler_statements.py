@@ -18,6 +18,9 @@ ASSEMBLED = (HERE / "trace_summary_assembled_read.sql").read_text(encoding="utf-
 RECONCILE = (HERE / "trace_summary_reconcile_read.sql").read_text(encoding="utf-8")
 TRACE = "0af7651916cd43dd8448eb211c80319c"
 HOUR_MS = 3_600_000
+# Rows older than their TTL (30 days for trace_summary, 2 days for trace_arrivals) are dropped
+# by ClickHouse at insert, so every stamp here is relative to an hour ago.
+T0_MS = int(datetime.now(UTC).timestamp() * 1000) - 3 * HOUR_MS
 
 
 def _statement(name: str) -> str:
@@ -32,7 +35,7 @@ def _at(ms: int) -> datetime:
 def _summary(trace: str, revision_ms: int, *, version: str = "1.0.0", spans: int = 1) -> list[Any]:
     return [
         trace, version, _at(revision_ms), "svc", "tenant", "00f067aa0ba902b7", "Ok",
-        _at(1_000), 12.5, spans, 0, "sha256:b", "s-1",
+        _at(T0_MS), 12.5, spans, 0, "sha256:b", "s-1",
     ]  # fmt: skip
 
 
@@ -61,20 +64,22 @@ def test_an_identical_reassembly_is_one_row_and_a_newer_revision_supersedes_it(
     client = clickhouse.client(database)
     try:
         migrate(client, packaged())
-        _write_summary(client, _summary(TRACE, 5_000, spans=2))
-        _write_summary(client, _summary(TRACE, 5_000, spans=2))  # the replayed window
+        _write_summary(client, _summary(TRACE, T0_MS + 5_000, spans=2))
+        _write_summary(client, _summary(TRACE, T0_MS + 5_000, spans=2))  # the replayed window
         client.command("OPTIMIZE TABLE trace_summary FINAL")
         assert client.query_rows("SELECT count() FROM trace_summary") == [(1,)]
 
-        _write_summary(client, _summary(TRACE, 9_000, spans=3))  # a late span
-        _write_summary(client, _summary(TRACE, 7_000, spans=9))  # an older revision, written late
+        _write_summary(client, _summary(TRACE, T0_MS + 9_000, spans=3))  # a late span
+        _write_summary(
+            client, _summary(TRACE, T0_MS + 7_000, spans=9)
+        )  # an older revision, written late
         client.command("OPTIMIZE TABLE trace_summary FINAL")
         rows = client.query_rows(
             "SELECT toUnixTimestamp64Milli(revision), span_count FROM trace_summary"
         )
-        assert rows == [(9_000, 3)], "the highest revision wins, whatever the write order"
+        assert rows == [(T0_MS + 9_000, 3)], "the highest revision wins, whatever the write order"
 
-        _write_summary(client, _summary(TRACE, 9_500, version="1.1.0"))
+        _write_summary(client, _summary(TRACE, T0_MS + 9_500, version="1.1.0"))
         client.command("OPTIMIZE TABLE trace_summary FINAL")
         assert client.query_rows("SELECT count() FROM trace_summary") == [(2,)], (
             "one row per version"
@@ -92,13 +97,15 @@ def test_the_assembled_read_gives_the_newest_revision_of_any_version(
         other = "b" * 32
         _write_summary(
             client,
-            _summary(TRACE, 5_000),
-            _summary(TRACE, 8_000, version="2.0.0"),
-            _summary(other, 1_000),
+            _summary(TRACE, T0_MS + 5_000),
+            _summary(TRACE, T0_MS + 8_000, version="2.0.0"),
+            _summary(other, T0_MS + 1_000),
         )
         ids = [TRACE, other, "c" * 32]
         rows = client.query_rows(ASSEMBLED, parameters={"trace_ids": ids})
-        assert dict(rows) == {TRACE: 8_000, other: 1_000}, "a trace without a summary is absent"
+        assert dict(rows) == {TRACE: T0_MS + 8_000, other: T0_MS + 1_000}, (
+            "a trace without a summary is absent"
+        )
     finally:
         client.close()
 
@@ -109,7 +116,7 @@ def test_the_reconciliation_counts_misses_and_orphans_of_a_closed_window(
     client = clickhouse.client(database)
     try:
         migrate(client, packaged())
-        h0, h1 = 10 * HOUR_MS, 11 * HOUR_MS
+        h0, h1 = T0_MS - T0_MS % HOUR_MS, T0_MS - T0_MS % HOUR_MS + HOUR_MS
         done, missing, orphan, late_root = "1" * 32, "2" * 32, "3" * 32, "4" * 32
         _arrive(client, done, h0 + 10, root=True)
         _write_summary(client, _summary(done, h0 + 10))
@@ -118,7 +125,7 @@ def test_the_reconciliation_counts_misses_and_orphans_of_a_closed_window(
         _arrive(client, late_root, h0 + 40, root=False)  # its root arrives in the next hour
         _arrive(client, late_root, h1 + 5, root=True)
         _arrive(client, "5" * 32, h1 + 6, root=True)  # outside the window
-        params = {"h0": h0, "h1": h1, "since": 0}
+        params = {"h0": h0, "h1": h1, "since": h0 - HOUR_MS}
         assert client.query_rows(RECONCILE, parameters=params) == [(1, 1)]
 
         _write_summary(client, _summary(missing, h0 + 20))

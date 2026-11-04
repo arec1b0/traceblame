@@ -28,7 +28,8 @@ type Config struct {
 	MaxWindow        time.Duration
 	BatchSize        int
 	LeaseTTL         time.Duration
-	Lookback         time.Duration
+	Lookback         time.Duration // how far back a trace's spans are read
+	InitialLookback  time.Duration // where a partition count with no earlier state starts
 	ReconcileEvery   time.Duration
 	ReconcileMargin  time.Duration // how long after an hour closes it is reconciled
 	AssemblerVersion string
@@ -68,6 +69,7 @@ func Load(get func(string) (string, bool)) (Config, error) {
 		BatchSize:        r.integer("ASSEMBLER_BATCH_SIZE", 500),
 		LeaseTTL:         r.duration("ASSEMBLER_LEASE_TTL", 30*time.Second),
 		Lookback:         r.duration("ASSEMBLER_LOOKBACK", 48*time.Hour),
+		InitialLookback:  r.duration("ASSEMBLER_INITIAL_LOOKBACK", 48*time.Hour),
 		ReconcileEvery:   r.duration("ASSEMBLER_RECONCILE_EVERY", 10*time.Minute),
 		ReconcileMargin:  r.duration("ASSEMBLER_RECONCILE_MARGIN", 5*time.Minute),
 		AssemblerVersion: r.str("ASSEMBLER_VERSION", Version),
@@ -111,6 +113,7 @@ func (c Config) Validate() error {
 	check(c.MaxWindow >= time.Second, "ASSEMBLER_MAX_WINDOW must be >= 1s, got %s", c.MaxWindow)
 	check(c.BatchSize >= 1, "ASSEMBLER_BATCH_SIZE must be >= 1, got %d", c.BatchSize)
 	check(c.Lookback >= c.MaxWindow, "ASSEMBLER_LOOKBACK (%s) must cover a window (%s)", c.Lookback, c.MaxWindow)
+	check(c.InitialLookback > 0, "ASSEMBLER_INITIAL_LOOKBACK must be > 0, got %s", c.InitialLookback)
 	check(c.LeaseTTL >= 3*c.PollInterval,
 		"ASSEMBLER_LEASE_TTL (%s) must be at least 3 poll intervals (%s)", c.LeaseTTL, 3*c.PollInterval)
 	// ADR-0003: a repeated publish must fall inside the duplicate window. The longest delay

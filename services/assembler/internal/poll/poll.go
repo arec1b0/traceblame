@@ -17,7 +17,8 @@ type Config struct {
 	MaxWindow        time.Duration // longest window of one step
 	LeaseTTL         time.Duration
 	BatchSize        int           // traces per spans read
-	Lookback         time.Duration // how far back spans are read, and where a new count starts
+	Lookback         time.Duration // how far back a trace's spans are read
+	InitialLookback  time.Duration // where a partition count with no earlier state starts
 	PollInterval     time.Duration
 	AssemblerVersion string
 }
@@ -77,13 +78,13 @@ func (p *Poller) WithLogger(l *slog.Logger) *Poller { p.log = l; return p }
 
 // Start creates the partitions of the configured count that do not exist yet. A new count
 // starts at the smallest watermark of the most recent other count (Watermarks.Init), else
-// at ClickHouse's now - grace - lookback: whatever trace_arrivals still holds.
+// at ClickHouse's now - grace - initial lookback (the 2-day TTL of trace_arrivals by default).
 func (p *Poller) Start(ctx context.Context) error {
 	upper, err := p.src.Upper(ctx, p.cfg.Grace.Milliseconds())
 	if err != nil {
 		return fmt.Errorf("poll: clickhouse clock: %w", err)
 	}
-	return p.wm.Init(ctx, p.cfg.PartitionCount, upper-p.cfg.Lookback.Milliseconds())
+	return p.wm.Init(ctx, p.cfg.PartitionCount, upper-p.cfg.InitialLookback.Milliseconds())
 }
 
 // Step does one window of one partition. The order is the claim boundary of ADR-0003:

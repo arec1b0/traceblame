@@ -183,6 +183,11 @@ class Stack:
             "ASSEMBLER_POLL_INTERVAL": "300ms",
             "ASSEMBLER_LEASE_TTL": f"{LEASE_TTL_S}s",
             "ASSEMBLER_RECONCILE_EVERY": "1s",
+            # The golden fixtures were captured days ago: their spans are older than the default
+            # span look-back. The watermark of a fresh partition count starts 10 minutes back,
+            # where the fixtures' arrivals (stamped by ClickHouse at ingest) are.
+            "ASSEMBLER_LOOKBACK": "8760h",
+            "ASSEMBLER_INITIAL_LOOKBACK": "10m",
             "ASSEMBLER_METRICS_ADDR": f"127.0.0.1:{port}",
             **env,
         }
@@ -406,16 +411,17 @@ def test_every_golden_fixture_trace_is_assembled_with_one_event_per_revision(sta
                 "GROUP BY trace_id"
             )
         )
-        roots = dict(
-            client.query_rows(
-                "SELECT toString(trace_id), toString(argMin(span_id, start_ts)) FROM spans "
-                "WHERE parent_span_id = '' GROUP BY trace_id"
+        roots = {
+            t: (sid, ten)
+            for t, sid, ten in client.query_rows(
+                "SELECT toString(trace_id), toString(argMin(span_id, start_ts)), "
+                "argMin(tenant_id, start_ts) FROM spans WHERE parent_span_id = '' GROUP BY trace_id"
             )
-        )
+        }
         for trace, service, tenant, root_span, spans, error_spans in rows:
-            assert (tenant, spans) == ("integration", expected[trace]), trace
+            assert spans == expected[trace], trace
             assert service != "", trace
-            assert root_span == roots[trace]
+            assert (root_span, tenant) == roots[trace], "the root's id and tenant, as stored"
             assert error_spans == errors[trace]
     finally:
         client.close()
@@ -497,11 +503,20 @@ def test_a_crash_between_the_summary_write_and_the_watermark_loses_and_doubles_n
     per_trace = Counter(e["payload"]["trace_id"] for e in events)
     assert set(per_trace) == set(expected), "no event lost"
     assert set(per_trace.values()) == {1}, "no event doubled"
+    client = stack.ch()
+    try:
+        every = {
+            t: int(p)
+            for t, p in client.query_rows(
+                "SELECT toString(trace_id), cityHash64(trace_id) % 2 FROM trace_summary"
+            )
+        }
+    finally:
+        client.close()
     _wait(
         "the watermark passed every revision",
         lambda: all(
-            stack.watermarks()[int(partition_of[t])][0] >= r
-            for t, (r, _) in stack.summaries().items()
+            stack.watermarks()[every[t]][0] >= r for t, (r, _) in stack.summaries().items()
         ),
     )
 

@@ -28,7 +28,7 @@ func newRig(t *testing.T, mutate ...func(*Config)) *rig {
 	cfg := Config{
 		Owner: "a", PartitionCount: 1, Grace: 5 * time.Second, MaxWindow: 60 * time.Second,
 		LeaseTTL: 30 * time.Second, BatchSize: 100, Lookback: 48 * time.Hour,
-		AssemblerVersion: "1.0.0", PollInterval: 2 * time.Second,
+		AssemblerVersion: "1.0.0", PollInterval: 2 * time.Second, InitialLookback: 36 * time.Hour,
 	}
 	for _, m := range mutate {
 		m(&cfg)
@@ -299,7 +299,7 @@ func TestAStepThatLosesItsLeaseReportsErrLeaseLost(t *testing.T) {
 	}
 }
 
-func TestInitStartsANewPartitionCountAtTheLookbackBound(t *testing.T) {
+func TestInitStartsANewPartitionCountAtTheInitialLookbackNotTheSpansLookback(t *testing.T) {
 	r := newRig(t)
 	r.ch.nowMs = 10 * 24 * 3600 * second
 	if err := r.p.Start(context.Background()); err != nil {
@@ -316,7 +316,7 @@ func TestInitStartsANewPartitionCountAtTheLookbackBound(t *testing.T) {
 	if err := r2.p.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	want := r2.ch.nowMs - grace - int64(48*time.Hour/time.Millisecond)
+	want := r2.ch.nowMs - grace - int64(36*time.Hour/time.Millisecond)
 	if got := r2.wm.watermark(2, 1); got != want {
 		t.Fatalf("initial watermark = %d, want %d", got, want)
 	}

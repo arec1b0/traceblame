@@ -81,7 +81,7 @@ def test_a_failing_migration_leaves_nothing_behind(pg_database: str) -> None:
     good = parse("0001_expand_a.sql", "CREATE TABLE IF NOT EXISTS a (x integer)")
     bad = parse(
         "0002_expand_b.sql",
-        "CREATE TABLE IF NOT EXISTS b (x integer);\nCREATE TABLE IF NOT EXISTS a (x NOPE)",
+        "CREATE TABLE IF NOT EXISTS b (x integer);\nCREATE TABLE IF NOT EXISTS c (x NOPE)",
     )
     with connect_postgres(pg_database) as conn:
         with pytest.raises(psycopg.Error):

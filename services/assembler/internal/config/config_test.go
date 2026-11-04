@@ -94,6 +94,24 @@ func TestTheStreamKeepsMessagesAtLeastAsLongAsItDeduplicates(t *testing.T) {
 	}
 }
 
+func TestTheInitialLookbackIsSeparateFromTheSpansLookback(t *testing.T) {
+	c, err := Load(env(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.InitialLookback != 48*time.Hour || c.Lookback != 48*time.Hour {
+		t.Fatalf("initial %s lookback %s", c.InitialLookback, c.Lookback)
+	}
+	c, err = Load(env(with(map[string]string{"ASSEMBLER_INITIAL_LOOKBACK": "10m", "ASSEMBLER_LOOKBACK": "720h"})))
+	if err != nil || c.InitialLookback != 10*time.Minute || c.Lookback != 720*time.Hour {
+		t.Fatalf("%+v %v", c, err)
+	}
+	if _, err := Load(env(with(map[string]string{"ASSEMBLER_INITIAL_LOOKBACK": "0s"}))); err == nil ||
+		!strings.Contains(err.Error(), "ASSEMBLER_INITIAL_LOOKBACK") {
+		t.Fatalf("a zero initial lookback must be refused: %v", err)
+	}
+}
+
 func TestAllErrorsAreReportedTogether(t *testing.T) {
 	_, err := Load(env(map[string]string{"ASSEMBLER_PARTITIONS": "x", "ASSEMBLER_GRACE": "y"}))
 	if err == nil || !strings.Contains(err.Error(), "ASSEMBLER_PARTITIONS") || !strings.Contains(err.Error(), "ASSEMBLER_GRACE") {
