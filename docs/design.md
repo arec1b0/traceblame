@@ -83,11 +83,11 @@ DaemonSet; loadbalancing exporter роутит по trace_id, file_storage sendi
 4
 Collector gateway tier
 OTel Collector
-tail_sampling: 100% ошибок, 100% eval- и fault-трейсов (aegis.eval.run.id, aegis.fault.injection.id; только tenants из eval_tenants, #36), latency > p95, low eval score, 10% остального; export в ClickHouse + NATS
+tail_sampling: 100% ошибок, 100% eval- и fault-трейсов (aegis.eval.run.id, aegis.fault.injection.id; только tenants из eval_tenants, #36), latency > p95, low eval score, 10% остального; export только в ClickHouse (ADR-0003)
 5
 trace-assembler
 Go
-Считает трейс завершённым (root span end + grace 30 s), пишет trace_summary, публикует trace.completed
+Опрашивает ClickHouse по watermark прихода спанов (trace_arrivals, grace 5 s; watermark в Postgres), пишет trace_summary, публикует trace.completed; поздние спаны — идемпотентная пересборка (ADR-0003)
 6
 detectors
 Python worker
@@ -114,9 +114,9 @@ App span → shim → OTLP → agent collector (no blocking: при отказе
 - 
 Agent tier → loadbalancing по trace_id → gateway tier: все спаны трейса на одном инстансе, иначе tail sampling ломается.
 - 
-Gateway: normalizer → tail_sampling → ClickHouse spans + NATS spans.sampled. Eval- и fault-маркеры оба прохода normalizer (agent и gateway) оставляют только для tenants из одного общего eval_tenants; остальные отбрасываются и считаются (ADR-0005).
+Gateway: normalizer → tail_sampling → ClickHouse spans. Eval- и fault-маркеры оба прохода normalizer (agent и gateway) оставляют только для tenants из одного общего eval_tenants; остальные отбрасываются и считаются (ADR-0005).
 - 
-trace-assembler закрывает трейс → trace.completed.
+trace-assembler по watermark читает trace_arrivals, собирает трейс (и пересобирает его при поздних спанах) → trace.completed.
 - 
 detectors читают трейс из ClickHouse, пишут findings (idempotent по (trace_id, detector, detector_version)).
 - 
@@ -251,7 +251,7 @@ ClickHouse (Altinity operator)
 observability
 NATS JetStream
 3
-streams spans.sampled, trace.completed
+streams trace.completed, traceblame.finding.v1, traceblame.blame.v1
 traceblame
 trace-assembler
 2

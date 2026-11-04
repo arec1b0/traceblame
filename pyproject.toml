@@ -17,6 +17,7 @@ members = [
 [dependency-groups]
 dev = [
     "coverage==7.17.0",
+    "nats-py==2.16.0",
     "openai==3.41.0",
     "pre-commit==4.7.0",
     "pyright[nodejs]==1.1.414",
@@ -53,7 +54,7 @@ known-first-party = ["traceblame_*"]
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
-include = ["services", "packages", "sdk", "tests", "tools"]
+include = ["services", "packages", "sdk", "tests", "tools", "bench"]
 exclude = ["**/.venv", "**/__pycache__", ".tools"]
 venvPath = "."
 venv = ".venv"
@@ -73,15 +74,21 @@ extraPaths = [
 ]
 
 # The tests of those modules import them by their run-time names (pytest pythonpath below).
+# bench/gateway-scaling/assembler_report.py is imported the same way.
 [[tool.pyright.executionEnvironments]]
 root = "tests/scripts"
-extraPaths = ["tools/fixtures/agentic_rag", "tools/fixtures/runbook_agent"]
+extraPaths = ["tools/fixtures/agentic_rag", "tools/fixtures/runbook_agent", "bench/gateway-scaling"]
+
+# The bench scripts run with the workspace environment (`uv run --frozen`).
+[[tool.pyright.executionEnvironments]]
+root = "bench"
 
 [tool.pytest.ini_options]
 minversion = "9.0"
 # The capture drivers add these directories to sys.path at run time (rules, scenarios, cuad);
 # tests/scripts imports those modules by the same names, and pyright's extraPaths match.
-pythonpath = ["tools/fixtures/agentic_rag", "tools/fixtures/runbook_agent"]
+# bench/gateway-scaling holds assembler_report.py.
+pythonpath = ["tools/fixtures/agentic_rag", "tools/fixtures/runbook_agent", "bench/gateway-scaling"]
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config", "-ra"]
 testpaths = ["services", "packages", "sdk", "tests"]
 xfail_strict = true

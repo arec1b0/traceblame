@@ -1,4 +1,4 @@
-"""Test support: where a ClickHouse server for integration tests listens."""
+"""Test support: where the servers of the integration tests listen."""
 
 from dataclasses import dataclass
 
@@ -18,3 +18,25 @@ class ClickHouseServer:
 
     def client(self, database: str) -> ClickHouseClient:
         return ClickHouseClient(parse_url(self.url(database)))
+
+
+@dataclass(frozen=True)
+class PostgresServer:
+    host: str
+    port: int
+    user: str
+    password: str
+
+    def url(self, database: str) -> str:
+        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{database}"
+
+
+@dataclass(frozen=True)
+class NatsServer:
+    host: str
+    port: int
+    monitor_port: int
+
+    @property
+    def url(self) -> str:
+        return f"nats://{self.host}:{self.port}"

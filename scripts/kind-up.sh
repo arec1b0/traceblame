@@ -87,4 +87,9 @@ if ! has_secret observability clickhouse-credentials; then
     --from-literal=user=traceblame --from-literal=password="${pw}" \
     --from-literal=password_sha256_hex="$(printf %s "${pw}" | sha256sum | cut -d' ' -f1)"
 fi
+# Postgres (control-plane state, ADR-0003/0007) in the traceblame namespace.
+if ! has_secret traceblame postgres-credentials; then
+  "${KCTL[@]}" -n traceblame create secret generic postgres-credentials \
+    --from-literal=user=traceblame --from-literal=password="$(openssl rand -hex 24)"
+fi
 echo "kind-up: namespaces and Secrets ready"

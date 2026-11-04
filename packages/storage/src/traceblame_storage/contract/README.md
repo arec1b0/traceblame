@@ -10,10 +10,16 @@ Add the statement here when a service starts to read or write a column.
 - `*_read.sql` / `*_write.sql`: what the detectors, the attributor and the fault injector
   will read and write (design §1.1)
 
-The trace-assembler's watermark scan (ADR-0003) is not here yet. It reads `trace_arrivals`,
-which is new in this schema, so as a contract statement it would fail on schema N-1. It
-lives in `tests/integration/trace_arrivals_scan.sql`, and the assembler (#35) moves it here
-once the table is on main.
+- `trace_arrivals_scan.sql` and `spans_by_trace_read.sql`: the trace-assembler's watermark scan
+  and its read of a batch of traces (ADR-0003, #35). They take ClickHouse query parameters
+  (`{name:Type}`); the header lines `-- param <name> = <JSON value>` give the sample values
+  that the N-1 run passes. The assembler embeds a copy of each (`services/assembler/internal/ch/sql/`,
+  `scripts/sync-assembler-sql.sh`; a contract test fails when the copies differ).
+
+The trace-assembler's other statements read or write `trace_summary` and `assembler_partitions`,
+new in this schema, so they are not here yet (code N must run on schema N-1): the ClickHouse
+ones live in `tests/integration/` and the Postgres ones in `services/assembler/internal/store/sql/`.
+The first reader of `trace_summary` (#15) moves its statements here once the table is on main.
 
 The fault injector's write with `injections.injection_id`, and the join of an injection to the
 span it was applied at (`spans.attrs['aegis.fault.injection.id']`, #36), are not here either:

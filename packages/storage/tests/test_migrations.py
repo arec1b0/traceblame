@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from traceblame_storage.migrations import (
+    CLICKHOUSE,
+    POSTGRES,
     Migration,
     MigrationError,
     check,
@@ -98,3 +100,57 @@ def test_load_dir_sorts_by_version(tmp_path: Path) -> None:
     (tmp_path / "0001_expand_a.sql").write_text("SELECT 1", "utf-8")
     (tmp_path / "README.md").write_text("not a migration", "utf-8")
     assert [m.version for m in load_dir(tmp_path)] == [1, 2]
+
+
+def test_check_applies_the_postgres_rules() -> None:
+    good = [
+        _m(1, "expand", "CREATE TABLE IF NOT EXISTS t (a text PRIMARY KEY, b integer)"),
+        _m(2, "expand", "CREATE UNIQUE INDEX IF NOT EXISTS t_b ON t (b)"),
+        _m(3, "expand", "ALTER TABLE t ADD COLUMN IF NOT EXISTS c bigint NOT NULL DEFAULT 0"),
+        _m(4, "migrate", "UPDATE t SET c = b"),
+        _m(5, "migrate", "INSERT INTO t (a, b) SELECT a, b FROM t2"),
+        _m(6, "contract", "ALTER TABLE t DROP COLUMN IF EXISTS b"),
+        _m(7, "contract", "DROP TABLE IF EXISTS t"),
+    ]
+    assert check(good, dialect=POSTGRES) == []
+
+
+@pytest.mark.parametrize(
+    ("migration", "problem"),
+    [
+        (_m(1, "expand", "CREATE TABLE t (a text)"), "IF NOT EXISTS"),
+        (_m(1, "expand", "CREATE INDEX CONCURRENTLY IF NOT EXISTS i ON t (a)"), "not allowed"),
+        (_m(1, "expand", "ALTER TABLE t ADD CONSTRAINT c CHECK (a > 0)"), "not allowed"),
+        (_m(1, "expand", "ALTER TABLE t RENAME COLUMN a TO b"), "not allowed in an expand"),
+        (_m(1, "expand", "ALTER TABLE t ALTER COLUMN a TYPE bigint"), "not allowed in an expand"),
+        (_m(1, "migrate", "ALTER TABLE t ALTER COLUMN a TYPE bigint"), "not allowed in a migrate"),
+        (_m(1, "contract", "DROP TABLE t"), "not allowed in a contract"),
+        (_m(1, "contract", "TRUNCATE t"), "not allowed in a contract"),
+    ],
+)
+def test_check_enforces_the_postgres_phase_rules(migration: Migration, problem: str) -> None:
+    problems = check([migration], dialect=POSTGRES)
+    assert any(problem in p for p in problems), problems
+
+
+def test_the_dialects_do_not_accept_each_others_statements() -> None:
+    add_index = _m(1, "expand", "ALTER TABLE t ADD INDEX IF NOT EXISTS i a TYPE minmax")
+    assert check([add_index], dialect=CLICKHOUSE) == []
+    assert any("not allowed" in p for p in check([add_index], dialect=POSTGRES))
+    update = _m(1, "migrate", "UPDATE t SET a = 1")
+    assert check([update], dialect=POSTGRES) == []
+    assert any("not allowed" in p for p in check([update], dialect=CLICKHOUSE))
+
+
+def test_postgres_strings_take_no_backslash_escapes() -> None:
+    sql = "UPDATE t SET a = 'x\\'; UPDATE t SET b = 'y'"
+    assert split_statements(sql, backslash_escapes=False) == [
+        "UPDATE t SET a = 'x\\'",
+        "UPDATE t SET b = 'y'",
+    ]
+
+
+def test_the_packaged_postgres_migrations_are_valid() -> None:
+    migrations = packaged(POSTGRES)
+    assert migrations, "no Postgres migrations are packaged"
+    assert check(migrations, dialect=POSTGRES) == []

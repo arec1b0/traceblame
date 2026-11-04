@@ -84,12 +84,13 @@ Alternatives considered:
 | D11 | `model` = `gen_ai.request.model`; the response model stays in `attrs` | required by the profile |
 | D12 | `trace_roots` (`MergeTree`, `ORDER BY (ingested_at, trace_id)`) and `trace_roots_from_otel` | the first watermark table (#11); superseded by D13; dropped by 0011 and 0012 (#41) |
 | D13 | `trace_arrivals` (`MergeTree`, `ORDER BY ingested_at`, TTL 2 d) and `trace_arrivals_from_otel` (#39) | the trace-assembler's watermark scan; section 4 |
+| D14 | `trace_summary` (`ReplacingMergeTree(revision)`, `ORDER BY (trace_id, assembler_version)`, TTL 30 d) (#35) | the assembled trace; `revision` is its last arrival (ADR-0003) |
 
 `findings`, `blame` and `injections` are as in §1.1, with `IF NOT EXISTS`.
 
 ### 4. Arrivals for the trace-assembler's watermark
 
-ADR-0003 (Proposed) has the trace-assembler poll ClickHouse with a persisted watermark
+ADR-0003 has the trace-assembler poll ClickHouse with a persisted watermark
 instead of consuming `spans.sampled`. #11 shipped `trace_roots` (root spans only, D12). #39
 replaces it with `trace_arrivals` (D13) as a forward-only expand step (0009, 0010). The
 contract phase (#41: 0011 drops the view, 0012 the table) removed `trace_roots`. Each poll is one scan on arrival time:

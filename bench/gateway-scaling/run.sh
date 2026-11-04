@@ -7,6 +7,10 @@
 # tail_sampling decision (replayed with the gateway's own policies), or lost. The report
 # goes to evals/reports/gateway-scaling-<date>.{md,json}.
 #
+# The trace-assembler (#35) runs during the load; the report gets its section: the lag from a
+# trace's root span end to its trace.completed message (p50/p95) and how many traces split
+# across gateways (#38) and kept on both were re-assembled into one.
+#
 # Needs `make kind-up kind-deploy`. Usage: bench/gateway-scaling/run.sh
 set -euo pipefail
 
@@ -101,6 +105,33 @@ step "collecting"
 for i in 0 1; do "${KCTL[@]}" -n bench logs "job/loadgen-${i}" | tail -n 1; done >"${WORK}/summaries.jsonl"
 ch "SELECT trace_id, span_id, resource_attrs['traceblame.bench.gateway'], tenant_id, toUnixTimestamp64Nano(start_ts)
     FROM spans WHERE startsWith(trace_id, '${PREFIX}') FORMAT TSV" >"${WORK}/stored.tsv"
+
+step "waiting for the trace-assembler (grace, poll interval, then stable summary counts)"
+sleep 20
+last=-1
+stable=0
+while (( stable < 30 )); do
+  n="$(ch "SELECT uniqExact(trace_id) FROM trace_summary WHERE startsWith(trace_id, '${PREFIX}')")"
+  if [[ "${n}" == "${last}" ]]; then stable=$((stable + 5)); else stable=0; last="${n}"; fi
+  sleep 5
+done
+ch "SELECT trace_id, toUnixTimestamp64Milli(start_ts) + toInt64(duration_ms) FROM spans
+    WHERE startsWith(trace_id, '${PREFIX}') AND parent_span_id = '' FORMAT TSV" >"${WORK}/roots.tsv"
+ch "SELECT trace_id, span_count FROM trace_summary FINAL
+    WHERE startsWith(trace_id, '${PREFIX}') FORMAT TSV" >"${WORK}/summaries.tsv"
+ch "SELECT trace_id, toUnixTimestamp64Milli(min(ingested_at)), toUnixTimestamp64Milli(max(ingested_at))
+    FROM trace_arrivals WHERE startsWith(trace_id, '${PREFIX}') GROUP BY trace_id FORMAT TSV" >"${WORK}/arrivals.tsv"
+ch "SELECT trace_id, toUnixTimestamp64Milli(max(assembled_at)) FROM trace_summary
+    WHERE startsWith(trace_id, '${PREFIX}') GROUP BY trace_id FORMAT TSV" >"${WORK}/assembled.tsv"
+"${KCTL[@]}" -n observability port-forward svc/nats 14222:4222 >/dev/null 2>&1 &
+NATS_PF=$!
+sleep 3
+(cd "${ROOT}" && uv run --frozen python bench/gateway-scaling/assembler_report.py \
+  --nats nats://127.0.0.1:14222 --prefix "${PREFIX}" --roots "${WORK}/roots.tsv" \
+  --summaries "${WORK}/summaries.tsv" --stored "${WORK}/stored.tsv" \
+  --arrivals "${WORK}/arrivals.tsv" --assembled "${WORK}/assembled.tsv" \
+  --markdown "${WORK}/assembler.md" --json "${WORK}/assembler.json") || { kill "${NATS_PF}"; exit 1; }
+kill "${NATS_PF}"
 k8s_version="$("${KCTL[@]}" version -o json | python3 -c 'import json,sys; print(json.load(sys.stdin)["serverVersion"]["gitVersion"])')"
 docker_info="$(docker info --format '{{.NCPU}} CPUs, {{.MemTotal}} bytes')"
 python3 - "${WORK}/env.json" <<PY
@@ -130,6 +161,8 @@ mkdir -p "${OUT}"
   --events "${events}" --env "${WORK}/env.json" \
   --out "${OUT}" --name "gateway-scaling-${DATE}") >/dev/null
 cp "${events}" "${OUT}/gateway-scaling-${DATE}.events.jsonl"
+{ echo; cat "${WORK}/assembler.md"; } >>"${OUT}/gateway-scaling-${DATE}.md"
+cp "${WORK}/assembler.json" "${OUT}/gateway-scaling-${DATE}.assembler.json"
 
 step "restoring the gateway (no bench overlay)"
 gw patch deployment otel-gateway --type=json -p '[

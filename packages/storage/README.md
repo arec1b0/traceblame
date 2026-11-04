@@ -1,15 +1,17 @@
 # traceblame-storage
 
-Forward-only ClickHouse migrations and the storage contract ([ADR-0004](../../docs/adr/0004-clickhouse-schema-management.md)).
+Forward-only ClickHouse and Postgres migrations and the storage contract ([ADR-0004](../../docs/adr/0004-clickhouse-schema-management.md), [ADR-0007](../../docs/adr/0007-postgres-schema-management.md)).
 
 | Path | What it is |
 |---|---|
 | `src/traceblame_storage/migrations/clickhouse/` | `NNNN_<expand\|migrate\|contract>_<name>.sql`, applied in order |
+| `src/traceblame_storage/migrations/postgres/` | the same, for Postgres: one transaction per file, an advisory lock per run |
 | `src/traceblame_storage/contract/` | the statements code runs against the schema (N-1 test) |
 
 ```bash
 uv run traceblame-storage check --base-ref origin/main     # phase rules, applied files unchanged
 uv run traceblame-storage migrate --url http://user:pass@localhost:8123/traceblame
+uv run traceblame-storage migrate --url postgres://user:pass@localhost:5432/traceblame   # Postgres
 uv run traceblame-storage status --url http://user:pass@localhost:8123/traceblame
 ```
 

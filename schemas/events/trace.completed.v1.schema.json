@@ -1,0 +1,37 @@
+{
+  "$id": "urn:aegis:schema:traceblame-trace-completed:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "NATS JetStream subject trace.completed (ADR-0003). Published by the trace-assembler after trace_summary holds the row. Nats-Msg-Id is trace_id/assembler_version/revision. A new revision is a new message that replaces the earlier ones for the trace. No tenant, service or span content: consumers read those from ClickHouse.",
+  "additionalProperties": false,
+  "description": "A trace was assembled, or re-assembled after later spans.",
+  "properties": {
+    "assembler_version": {
+      "description": "Version of the assembler that wrote the summary (semver).",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "revision": {
+      "description": "The trace's last arrival (trace_arrivals.ingested_at) in epoch milliseconds: the version of its trace_summary row.",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "span_count": {
+      "description": "Spans of the trace the assembler read for this revision.",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "trace_id": {
+      "description": "Lowercase hex trace id, 32 characters.",
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trace_id",
+    "revision",
+    "span_count",
+    "assembler_version"
+  ],
+  "title": "traceblame trace.completed v1",
+  "type": "object"
+}
