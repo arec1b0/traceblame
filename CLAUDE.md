@@ -15,7 +15,7 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 - Analysis/control: Python 3.12, uv workspace, FastAPI (api, detectors, attributor, replayer, faults)
 - SDK shims: Python + TypeScript over OpenInference / OpenLLMetry
 - Storage: ClickHouse (spans, findings, blame, injections), Postgres (replay_jobs state machine)
-- Messaging: NATS JetStream (spans.sampled, trace.completed, traceblame.finding.v1, traceblame.blame.v1)
+- Messaging: NATS JetStream (trace.completed, traceblame.finding.v1, traceblame.blame.v1)
 - Deploy: kind locally, Helm + Argo CD; Grafana/Alertmanager dashboards-as-code, Sloth SLOs
 - Supply chain: cosign keyless, Syft SBOM, scanners pinned by digest, release-please
 

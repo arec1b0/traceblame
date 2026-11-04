@@ -1,7 +1,7 @@
 # ADR-0003: Trace-assembler input: a ClickHouse watermark instead of spans.sampled
 
-- **Status:** Proposed
-- **Date:** 2026-10-31
+- **Status:** Accepted
+- **Date:** 2026-10-31 (accepted 2026-11-04)
 - **Issue:** #10 (topology), #11 (`trace_roots`), #39 (`trace_arrivals`); implementation #35
 - **Decider:** Daniil Krizhanovskyi
 

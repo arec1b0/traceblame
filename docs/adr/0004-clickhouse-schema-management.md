@@ -90,7 +90,7 @@ Alternatives considered:
 
 ### 4. Arrivals for the trace-assembler's watermark
 
-ADR-0003 (Proposed) has the trace-assembler poll ClickHouse with a persisted watermark
+ADR-0003 has the trace-assembler poll ClickHouse with a persisted watermark
 instead of consuming `spans.sampled`. #11 shipped `trace_roots` (root spans only, D12). #39
 replaces it with `trace_arrivals` (D13) as a forward-only expand step (0009, 0010). The
 contract phase (#41: 0011 drops the view, 0012 the table) removed `trace_roots`. Each poll is one scan on arrival time:
