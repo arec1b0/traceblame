@@ -197,6 +197,10 @@ func TestSilentReplicasArePrunedAfterTenLeaseTTLsInBoundedBatches(t *testing.T) 
 	if !strings.Contains(pruneReplicasSQL, "LIMIT $2") {
 		t.Errorf("the prune must be bounded:\n%s", pruneReplicasSQL)
 	}
+	// the outer DELETE re-checks the heartbeat, so a replica revived during the prune stays
+	if strings.Count(pruneReplicasSQL, "heartbeat_at < now() - make_interval(") != 2 {
+		t.Errorf("both the subquery and the DELETE must test the heartbeat:\n%s", pruneReplicasSQL)
+	}
 }
 
 func TestReleaseIsFencedByTheOwnersEpoch(t *testing.T) {

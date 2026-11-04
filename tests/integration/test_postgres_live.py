@@ -3,6 +3,7 @@ Postgres (ADR-0007, ADR-0003 amendment, #35)."""
 
 import re
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -284,6 +285,58 @@ def test_the_prune_is_bounded_and_oldest_first(db: Any) -> None:
     assert left == [f"old-{i:03d}" for i in range(50)], "the oldest rows went first"
     db.execute(PRUNE, _bind(300, 100))
     assert _owners(db) == ["alive"], "the next heartbeat finishes the job"
+
+
+def test_a_replica_that_heartbeats_while_a_prune_runs_is_not_deleted(pg_database: str) -> None:
+    """The prune picks stale rows in a subquery. A replica revived between that read and the
+    delete (its upsert holds the row lock, the delete waits for it) must keep its row: the
+    delete re-checks the heartbeat once it gets the lock."""
+    with connect_postgres(pg_database) as conn:
+        migrate(conn, packaged(POSTGRES))
+    with (
+        psycopg.connect(pg_database, autocommit=True) as setup_conn,
+        psycopg.connect(pg_database) as reviver_conn,
+        psycopg.connect(pg_database, autocommit=True) as pruner_conn,
+        psycopg.connect(pg_database, autocommit=True) as watcher_conn,
+    ):
+        setup: Any = setup_conn
+        reviver: Any = reviver_conn
+        pruner: Any = pruner_conn
+        watcher: Any = watcher_conn
+        setup.execute(HEARTBEAT, _bind("revived"))
+        setup.execute(HEARTBEAT, _bind("dead"))
+        setup.execute("UPDATE assembler_replicas SET heartbeat_at = now() - interval '1 hour'")
+
+        reviver.execute(HEARTBEAT, _bind("revived"))  # uncommitted: it holds the row lock
+        outcome: list[int] = []
+
+        def prune() -> None:
+            outcome.append(pruner.execute(PRUNE, _bind(300, 100)).rowcount)
+
+        t = threading.Thread(target=prune)
+        t.start()
+        try:
+            deadline = time.monotonic() + 20
+            while True:  # the prune has read its subquery and now waits for the lock
+                waiting = watcher.execute(
+                    "SELECT count(*) FROM pg_stat_activity "
+                    "WHERE wait_event_type = 'Lock' AND pid <> pg_backend_pid() "
+                    "AND query LIKE '%DELETE FROM assembler_replicas%'"
+                ).fetchone()
+                if waiting[0] == 1:
+                    break
+                assert time.monotonic() < deadline, "the prune never blocked on the row lock"
+                time.sleep(0.05)
+        finally:
+            reviver.commit()  # releases the lock whatever happened above
+            t.join(timeout=20)
+        assert not t.is_alive()
+
+        owners = sorted(
+            r[0] for r in setup.execute("SELECT owner FROM assembler_replicas").fetchall()
+        )
+        assert owners == ["revived"], "the dead replica is pruned, the revived one is not"
+        assert outcome == [1]
 
 
 def test_liveness_ignores_the_clients_clock(pg_database: str) -> None:
