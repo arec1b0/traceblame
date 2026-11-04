@@ -1,9 +1,9 @@
 """The migrations against a real ClickHouse: tables, idempotency, checksums, N-1."""
 
 import os
-import time
 from collections.abc import Sequence
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,13 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.integration
 
-# The trace-assembler's watermark scan (ADR-0003). It reads trace_arrivals, new in this schema,
-# so it is not a contract statement yet: code N must run on schema N-1. The assembler (#35)
-# moves it into contract/.
-SCAN = (Path(__file__).parent / "trace_arrivals_scan.sql").read_text(encoding="utf-8")
-# Its grace (start value) and its lower bound, the watermark.
-WATERMARK_GRACE_S = 5
-SCAN_WATERMARK = "toDateTime64('2026-10-30 23:59:00.000', 3)"
+# Far beyond any arrival: the upper bound of a scan that wants everything after w0.
+FAR_MS = 4_102_444_800_000
 
 # The fault injector's write with injection_id, and the join of an injection to the span it
 # was applied at (#36). They use a column new in this schema, so they are not contract
@@ -150,20 +145,27 @@ def _index_section(plan: str, index: str) -> str:
     return plan.split(index, 1)[1].split("Granules", 1)[0]
 
 
-def _scan_sql(watermark: str) -> str:
-    """The watermark scan (trace_arrivals_scan.sql), after another watermark."""
-    assert SCAN.count(SCAN_WATERMARK) == 1
-    return SCAN.replace(SCAN_WATERMARK, watermark)
+def _scan_params(w0: int, w1: int = FAR_MS, count: int = 1, partition: int = 0) -> dict[str, int]:
+    return {"w0": w0, "w1": w1, "partition_count": count, "partition": partition}
 
 
-def _scan(client: Any, watermark: str) -> list[tuple[Any, ...]]:
-    """The scan once its window holds rows: arrivals show only once older than the grace."""
-    deadline = time.monotonic() + WATERMARK_GRACE_S + 10
-    rows = client.query_rows(_scan_sql(watermark))
-    while not rows and time.monotonic() < deadline:
-        time.sleep(0.5)
-        rows = client.query_rows(_scan_sql(watermark))
-    return rows
+def _scan(
+    client: Any, w0: int, w1: int = FAR_MS, count: int = 1, partition: int = 0
+) -> list[tuple[Any, ...]]:
+    """The watermark scan (contract/trace_arrivals_scan.sql) of one window of one partition."""
+    return client.query_rows(
+        _statement("trace_arrivals_scan.sql"), parameters=_scan_params(w0, w1, count, partition)
+    )
+
+
+def _arrive(client: Any, trace: str, at_ms: int, *, root: bool) -> None:
+    """A trace_arrivals row with an explicit arrival time (the view stamps the insert's own)."""
+    at = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(milliseconds=at_ms)
+    client.insert(
+        "trace_arrivals",
+        [[trace, at, root, "svc", "contract"]],
+        ["trace_id", "ingested_at", "is_root", "service", "tenant_id"],
+    )
 
 
 def _late_child_write() -> str:
@@ -177,28 +179,33 @@ def _late_child_write() -> str:
 def test_the_watermark_scan_finds_root_and_late_arrivals_by_primary_key(
     clickhouse: ClickHouseServer, database: str
 ) -> None:
-    """ADR-0003: one scan over (watermark, now - grace]; a root arrival is assembled, a later
-    non-root arrival re-assembles; the scan prunes on ingested_at, never a full scan."""
-    trace = b"0af7651916cd43dd8448eb211c80319c"
+    """ADR-0003: one scan over (w0, w1]; a root arrival is assembled, a later non-root arrival
+    re-assembles; the scan prunes on ingested_at, never a full scan."""
+    trace = "0af7651916cd43dd8448eb211c80319c"
     client = clickhouse.client(database)
     try:
         migrate(client, packaged())
         client.command(_statement("spans_write.sql"))
-        (first,) = _scan(client, SCAN_WATERMARK)
-        assert first[:4] == (trace, True, ["contract-check"], ["contract"]), "root: assemble"
-        watermark = f"toDateTime64('{first[4].isoformat(sep=' ', timespec='milliseconds')}', 3)"
+        (first,) = _scan(client, 0)
+        assert first[:2] == (trace, True), "root: assemble"
+        watermark = first[2]
 
         client.command(_late_child_write())
         (late,) = _scan(client, watermark)
         assert late[:2] == (trace, False), (
             "late non-root arrival of an assembled trace: re-assemble"
         )
-        assert late[4] > first[4], "a later revision"
-        (whole,) = _scan(client, SCAN_WATERMARK)
+        assert late[2] > watermark, "a later revision"
+        (whole,) = _scan(client, 0)
         assert whole[:2] == (trace, True)
+        assert whole[2] == late[2], "the revision is the newest arrival"
 
         plan = "\n".join(
-            str(r[0]) for r in client.query_rows(f"EXPLAIN indexes = 1 {_scan_sql(watermark)}")
+            str(r[0])
+            for r in client.query_rows(
+                f"EXPLAIN indexes = 1 {_statement('trace_arrivals_scan.sql')}",
+                parameters=_scan_params(watermark),
+            )
         )
         minmax = _index_section(plan, "Min-Max")
         assert "ingested_at" in minmax, plan
@@ -206,6 +213,67 @@ def test_the_watermark_scan_finds_root_and_late_arrivals_by_primary_key(
         primary = _index_section(plan, "PrimaryKey")
         assert "ingested_at" in primary, plan
         assert "Condition: true" not in primary, plan
+    finally:
+        client.close()
+
+
+def test_consecutive_windows_see_an_arrival_stamped_at_the_edge_once(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """(w0, w1] then (w1, w2]: an arrival stamped exactly at w1 is in the first window only."""
+    client = clickhouse.client(database)
+    try:
+        migrate(client, packaged())
+        _arrive(client, "a" * 32, 1_000, root=True)
+        _arrive(client, "b" * 32, 2_000, root=True)  # exactly w1
+        _arrive(client, "c" * 32, 2_001, root=True)
+        first = _scan(client, 0, 2_000)
+        second = _scan(client, 2_000, 3_000)
+        assert [r[0] for r in first] == ["a" * 32, "b" * 32]
+        assert [r[0] for r in second] == ["c" * 32]
+        assert first[1][2] == 2_000
+    finally:
+        client.close()
+
+
+def test_the_partitions_of_a_count_split_the_window_without_overlap(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """cityHash64(trace_id) % N: every trace is in exactly one of the N partition scans."""
+    client = clickhouse.client(database)
+    try:
+        migrate(client, packaged())
+        traces = [f"{i:032x}" for i in range(1, 41)]
+        for i, trace in enumerate(traces):
+            _arrive(client, trace, 100 + i, root=True)
+        count = 4
+        parts = [{r[0] for r in _scan(client, 0, FAR_MS, count, p)} for p in range(count)]
+        assert sorted(t for part in parts for t in part) == sorted(traces)
+        assert all(parts), "40 traces spread over 4 partitions"
+        assert sum(len(p) for p in parts) == len(traces), "no trace in two partitions"
+    finally:
+        client.close()
+
+
+def test_the_spans_read_finds_a_trace_by_id_in_every_service_within_the_look_back(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """The assembly read has no service filter: both halves of a trace come back."""
+    client = clickhouse.client(database)
+    try:
+        migrate(client, packaged())
+        client.command(_statement("spans_write.sql"))
+        client.command(_late_child_write())
+        sql = _statement("spans_by_trace_read.sql")
+        trace = "0af7651916cd43dd8448eb211c80319c"
+        rows = client.query_rows(sql, parameters={"trace_ids": [trace], "since": 0})
+        assert len(rows) == 2
+        assert {r[0] for r in rows} == {trace}
+        assert sorted(r[2] for r in rows) == ["", "b7ad6b7169203331"], "root and child"
+        none = client.query_rows(sql, parameters={"trace_ids": ["f" * 32], "since": 0})
+        assert none == []
+        future = client.query_rows(sql, parameters={"trace_ids": [trace], "since": FAR_MS})
+        assert future == [], "the look-back bound excludes older spans"
     finally:
         client.close()
 
@@ -223,7 +291,7 @@ def _run(
             if name.endswith("_write.sql"):
                 client.command(sql)
             else:
-                client.query_rows(sql)
+                client.query_rows(sql, parameters=contract.parameters(sql))
     finally:
         client.close()
 

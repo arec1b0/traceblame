@@ -1,6 +1,6 @@
 """Connections for the runners: clickhouse-connect over HTTP(S), psycopg for Postgres."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Any, LiteralString, cast
@@ -57,11 +57,14 @@ class ClickHouseClient:
             admin.close()
         self._client: Any = connect(target.database)
 
-    def command(self, sql: str) -> object:
-        return self._client.command(sql)
+    def command(self, sql: str, parameters: Mapping[str, Any] | None = None) -> object:
+        return self._client.command(sql, parameters=dict(parameters or {}))
 
-    def query_rows(self, sql: str) -> list[tuple[Any, ...]]:
-        rows: list[tuple[Any, ...]] = [tuple(r) for r in self._client.query(sql).result_rows]
+    def query_rows(
+        self, sql: str, parameters: Mapping[str, Any] | None = None
+    ) -> list[tuple[Any, ...]]:
+        result = self._client.query(sql, parameters=dict(parameters or {}))
+        rows: list[tuple[Any, ...]] = [tuple(r) for r in result.result_rows]
         return rows
 
     def insert(
