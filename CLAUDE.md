@@ -72,9 +72,13 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
 - `make contract`: builds `collector/cmd/normalize`, `traceblame-contracts gen-schema --check`
   (JSON Schema + the normalizer's profile copy), gap report in `.contract/`, `pytest -m contract`
   (profile <-> JSON Schema, semconv snapshot, golden fixtures through the Go normalizer)
-- `make integration`: ClickHouse (pinned 26.8 LTS) in a test container: migrations, N-1 test,
-  table-level no-content proof through the built collector (needs Docker; builds the collector)
-- `uv run traceblame-storage check|migrate|status`: forward-only ClickHouse migrations (ADR-0004)
+- `make integration`: ClickHouse (pinned 26.8 LTS), Postgres and NATS JetStream in test
+  containers: migrations of both databases, N-1 test, table-level no-content proof through the
+  built collector, the trace-assembler end to end (needs Docker; builds the collector and the
+  assembler)
+- `uv run traceblame-storage check|migrate|status`: forward-only ClickHouse and Postgres
+  migrations (ADR-0004, ADR-0007); the `--url` scheme (`http(s)://` or `postgres://`) picks the
+  database
 - `make security`: gitleaks (full history), Syft SBOM, Grype gate (0 critical without a
   waiver in .grype.yaml); scanner images pinned by digest, needs Docker
 - `make fixtures`: re-capture golden fixtures from Ollama (`OLLAMA_URL=...`)
@@ -88,6 +92,8 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   24 seeded tasks + one HTTP 404 task, report `evals/reports/sdk-ts-kind-*`, fixtures `runbook_*`
 - `uv run traceblame-contracts gen-schema`: regenerate the JSON Schema and the normalizer's
   embedded profile copy after editing the profile
+- `make assembler`: build the trace-assembler (`services/assembler/_build/assembler`;
+  `scripts/sync-assembler-sql.sh` keeps its embedded SQL equal to the storage contract)
 - `make collector`: ocb build of the collector distribution into `collector/_build/otelcol`
   (`GOWORK=off`; versions from tools/versions.env)
 - `make collector-smoke`: end-to-end tests of the built collector (`OTELCOL_BIN=...` to override)
@@ -95,12 +101,14 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   binary + Syft SBOM + Grype gate (needs Docker)
 - `make kind-up` / `make kind-down`: local kind cluster `traceblame` (kind-up also generates
   the TLS, htpasswd and ClickHouse Secrets; never committed)
-- `make kind-deploy`: images, ClickHouse via the Altinity operator, migrations, agent DaemonSet
-  and gateway Deployment into kind (deploy/kind/README.md)
+- `make kind-deploy`: images, ClickHouse via the Altinity operator, NATS JetStream, Postgres,
+  migrations of both databases, agent DaemonSet, gateway and trace-assembler Deployments into
+  kind (deploy/kind/README.md)
 - `make kind-runbook-up` / `make kind-runbook-down`: the runbook-agent sandbox and its
   monitoring (namespace-only RBAC, derived NetworkPolicy addresses, pinned upstream rules)
 - `make attribution`: no AI attribution trailers or footer phrases in origin/main..HEAD
   (scripts/attribution-check.sh [RANGE]; PR_TITLE and PR_BODY in the environment add the PR text)
 - `make bench-scaling`: gateway 2 -> 4 -> 2 under steady load; span loss / split-trace report
-  into evals/reports/ (RATE, LOAD, UP_AT, DOWN_AT override the defaults)
+  and the trace-assembler's lag (root end to `trace.completed`, p50/p95) and rejoined split
+  traces into evals/reports/ (RATE, LOAD, UP_AT, DOWN_AT override the defaults)
 - `make demo`: M3

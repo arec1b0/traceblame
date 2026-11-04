@@ -32,12 +32,13 @@ RUNBOOK_APP_DIR ?= $(CURDIR)/../runbook-agent
 # Collector distribution (collector/builder-config.yaml, ocb from tools/versions.env).
 COLLECTOR_BUILD := collector/_build
 OTELCOL_BIN ?= $(CURDIR)/$(COLLECTOR_BUILD)/otelcol/otelcol-traceblame
+ASSEMBLER_BIN ?= $(CURDIR)/services/assembler/_build/assembler
 # The normalizer as a CLI (collector/cmd/normalize): the contract stage runs fixtures through it.
 export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-normalize
 
 .PHONY: help bootstrap lint test contract integration security attribution fixtures fixtures-agentic-rag \
 	fixtures-runbook-agent kind-up kind-down kind-deploy kind-runbook-up kind-runbook-down \
-	bench-scaling collector collector-smoke collector-image
+	bench-scaling assembler collector collector-smoke collector-image
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  %-16s %s\n", $$1, $$2 }'
@@ -70,11 +71,15 @@ contract: ## Contract tests: profile/schema sync, semconv pin, fixtures through 
 	pnpm -C sdk/ts -s build
 	$(UV_RUN) pytest -m contract -rxX
 
-integration: collector ## Integration: ClickHouse in a test container, migrations, the built collector (needs Docker)
-	OTELCOL_BIN="$(OTELCOL_BIN)" $(UV_RUN) pytest -m integration -rs
+integration: collector assembler ## Integration: ClickHouse, Postgres and NATS in test containers, the built collector and assembler (needs Docker)
+	OTELCOL_BIN="$(OTELCOL_BIN)" ASSEMBLER_BIN="$(ASSEMBLER_BIN)" $(UV_RUN) pytest -m integration -rs
 
 security: ## gitleaks (full history), Syft SBOM, Grype gate; digest-pinned images (needs Docker)
 	@bash scripts/security.sh
+
+assembler: ## Build the trace-assembler (services/assembler/_build/assembler)
+	mkdir -p $(dir $(ASSEMBLER_BIN))
+	cd services/assembler && GOWORK=off CGO_ENABLED=0 go build -trimpath -o "$(ASSEMBLER_BIN)" ./cmd/assembler
 
 collector: ## Build the collector distribution with ocb (collector/_build/otelcol)
 	mkdir -p $(COLLECTOR_BUILD)

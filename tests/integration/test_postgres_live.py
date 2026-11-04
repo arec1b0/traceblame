@@ -1,0 +1,216 @@
+"""The Postgres migration runner and the assembler's watermark and lease statements, on a real
+Postgres (ADR-0007, ADR-0003 amendment, #35)."""
+
+import re
+import threading
+from pathlib import Path
+from typing import Any
+
+import psycopg
+import pytest
+
+from traceblame_storage.client import connect_postgres
+from traceblame_storage.migrations import POSTGRES, Migration, packaged, parse
+from traceblame_storage.pg_runner import ChecksumMismatchError, migrate, status
+
+pytestmark = pytest.mark.integration
+
+ROOT = Path(__file__).resolve().parents[2]
+STORE_SQL = ROOT / "services" / "assembler" / "internal" / "store" / "sql"
+
+
+def _stmt(name: str) -> str:
+    """A store statement with $n placeholders as psycopg's %(pn)s."""
+    text = (STORE_SQL / name).read_text(encoding="utf-8")
+    return re.sub(r"\$(\d+)", r"%(p\1)s", text)
+
+
+INIT, CLAIM, ADVANCE = _stmt("init.sql"), _stmt("claim.sql"), _stmt("advance.sql")
+
+
+def _bind(*values: object) -> dict[str, object]:
+    return {f"p{i}": v for i, v in enumerate(values, start=1)}
+
+
+@pytest.fixture
+def db(pg_database: str) -> Any:
+    """A migrated database: the packaged Postgres migrations applied."""
+    with connect_postgres(pg_database) as conn:
+        migrate(conn, packaged(POSTGRES))
+    with psycopg.connect(pg_database, autocommit=True) as c:
+        yield c
+
+
+def _rows(conn: psycopg.Connection[Any], count: int) -> dict[int, tuple[int, str | None, int]]:
+    cur = conn.execute(
+        "SELECT partition, watermark_ms, owner, epoch FROM assembler_partitions "
+        "WHERE partition_count = %s ORDER BY partition",
+        (count,),
+    )
+    return {int(p): (int(w), o, int(e)) for p, w, o, e in cur.fetchall()}
+
+
+# --- the runner ------------------------------------------------------------------------------
+
+
+def test_the_packaged_migrations_apply_once_and_record_their_hashes(pg_database: str) -> None:
+    migrations = packaged(POSTGRES)
+    with connect_postgres(pg_database) as conn:
+        assert [m.version for m in migrate(conn, migrations)] == [m.version for m in migrations]
+        assert migrate(conn, migrations) == [], "a second run applies nothing"
+        assert {s for _, s in status(conn, migrations)} == {"applied"}
+        rows = conn.execute("SELECT version, sha256 FROM schema_migrations ORDER BY version")
+        assert [(int(v), s) for v, s in rows.fetchall()] == [
+            (m.version, m.sha256) for m in migrations
+        ]
+        table = conn.execute("SELECT to_regclass('assembler_partitions')").fetchall()
+        assert table[0][0] == "assembler_partitions"
+
+
+def test_a_changed_applied_migration_is_refused(pg_database: str) -> None:
+    migrations = packaged(POSTGRES)
+    with connect_postgres(pg_database) as conn:
+        migrate(conn, migrations)
+        edited = [parse(migrations[0].filename, migrations[0].sql + "\n-- edited")]
+        with pytest.raises(ChecksumMismatchError, match=migrations[0].filename):
+            migrate(conn, edited)
+        assert status(conn, edited)[0][1] == "changed"
+
+
+def test_a_failing_migration_leaves_nothing_behind(pg_database: str) -> None:
+    good = parse("0001_expand_a.sql", "CREATE TABLE IF NOT EXISTS a (x integer)")
+    bad = parse(
+        "0002_expand_b.sql",
+        "CREATE TABLE IF NOT EXISTS b (x integer);\nCREATE TABLE IF NOT EXISTS a (x NOPE)",
+    )
+    with connect_postgres(pg_database) as conn:
+        with pytest.raises(psycopg.Error):
+            migrate(conn, [good, bad])
+        assert conn.execute("SELECT to_regclass('b')").fetchall()[0][0] is None, "rolled back"
+        assert [
+            v for v, _ in conn.execute("SELECT version, sha256 FROM schema_migrations").fetchall()
+        ] == [1]
+        # the lock was released: another run goes through
+        fixed = parse("0002_expand_b.sql", "CREATE TABLE IF NOT EXISTS b (x integer)")
+        assert [m.version for m in migrate(conn, [good, fixed])] == [2]
+
+
+def test_concurrent_runners_queue_on_the_advisory_lock(pg_database: str) -> None:
+    migrations: list[Migration] = [
+        parse(f"{i:04d}_expand_t{i}.sql", f"CREATE TABLE IF NOT EXISTS t{i} (x integer)")
+        for i in range(1, 6)
+    ]
+    applied: list[int] = []
+    errors: list[BaseException] = []
+    barrier = threading.Barrier(4)
+
+    def run() -> None:
+        try:
+            with connect_postgres(pg_database) as conn:
+                barrier.wait(timeout=10)
+                applied.append(len(migrate(conn, migrations)))
+        except BaseException as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=run) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
+    assert errors == []
+    assert sorted(applied) == [0, 0, 0, 5], "exactly one runner applied them"
+
+
+# --- assembler_partitions: init -------------------------------------------------------------
+
+
+def test_init_creates_every_partition_at_the_initial_watermark(db: Any) -> None:
+    db.execute(INIT, _bind(4, 1_000))
+    assert _rows(db, 4) == dict.fromkeys(range(4), (1000, None, 0))
+    db.execute(INIT, _bind(4, 9_999))
+    assert _rows(db, 4) == dict.fromkeys(range(4), (1000, None, 0)), "existing rows are kept"
+
+
+def test_a_new_partition_count_restarts_from_the_smallest_watermark_of_the_last_count(
+    db: Any,
+) -> None:
+    db.execute(INIT, _bind(2, 0))
+    db.execute("UPDATE assembler_partitions SET watermark_ms = 5000 WHERE partition = 0")
+    db.execute(
+        "UPDATE assembler_partitions SET watermark_ms = 9000, updated_at = now() "
+        "WHERE partition = 1"
+    )
+    db.execute(INIT, _bind(4, 1))
+    assert _rows(db, 4) == dict.fromkeys(range(4), (5000, None, 0))
+    # going back to a count that has rows resumes them: they are only ever behind, never ahead
+    db.execute(INIT, _bind(2, 7))
+    resumed = _rows(db, 2)
+    assert (resumed[0][0], resumed[1][0]) == (5_000, 9_000)
+
+
+# --- assembler_partitions: leases and the fenced advance -------------------------------------
+
+
+def _claim(db: Any, owner: str, ttl: float = 30, count: int = 1, partition: int = 0) -> Any:
+    return db.execute(CLAIM, _bind(count, partition, owner, ttl)).fetchone()
+
+
+def _advance(db: Any, owner: str, epoch: int, new: int, old: int, ttl: float = 30) -> int:
+    return int(db.execute(ADVANCE, _bind(1, 0, owner, epoch, new, ttl, old)).rowcount)
+
+
+def test_a_live_lease_excludes_other_owners_and_a_renewal_keeps_the_epoch(db: Any) -> None:
+    db.execute(INIT, _bind(1, 100))
+    assert _claim(db, "a") == (1, 100)
+    assert _claim(db, "b") is None, "a's lease is live"
+    assert _claim(db, "a") == (1, 100), "a renewal keeps the epoch"
+
+
+def test_an_expired_lease_is_taken_over_with_a_higher_epoch(db: Any) -> None:
+    db.execute(INIT, _bind(1, 100))
+    _claim(db, "a")
+    db.execute("UPDATE assembler_partitions SET lease_until = now() - interval '1 second'")
+    assert _claim(db, "b") == (2, 100)
+    assert _claim(db, "a") is None, "b holds it now"
+    db.execute("UPDATE assembler_partitions SET lease_until = now() - interval '1 second'")
+    assert _claim(db, "b") == (3, 100), "an owner whose own lease had expired is fenced too"
+
+
+def test_the_advance_is_a_compare_and_set_on_owner_epoch_and_watermark(db: Any) -> None:
+    db.execute(INIT, _bind(1, 100))
+    _claim(db, "a")
+    assert _advance(db, "b", 1, 200, 100) == 0, "wrong owner"
+    assert _advance(db, "a", 2, 200, 100) == 0, "wrong epoch"
+    assert _advance(db, "a", 1, 200, 50) == 0, "the window did not start there"
+    assert _rows(db, 1)[0][0] == 100
+    assert _advance(db, "a", 1, 200, 100) == 1
+    assert _rows(db, 1)[0][0] == 200
+    assert _advance(db, "a", 1, 300, 100) == 0, "a replayed advance does not move it again"
+
+
+def test_a_stale_owner_cannot_advance_after_a_takeover(db: Any) -> None:
+    db.execute(INIT, _bind(1, 100))
+    _claim(db, "a")  # epoch 1; a then stalls
+    db.execute("UPDATE assembler_partitions SET lease_until = now() - interval '1 second'")
+    assert _claim(db, "b") == (2, 100)
+    assert _advance(db, "a", 1, 200, 100) == 0, "a's late commit is fenced"
+    assert _advance(db, "b", 2, 200, 100) == 1
+    assert _rows(db, 1)[0] == (200, "b", 2)
+
+
+def test_the_advance_renews_the_lease(db: Any) -> None:
+    db.execute(INIT, _bind(1, 100))
+    _claim(db, "a", ttl=1)
+    assert _advance(db, "a", 1, 200, 100, ttl=60) == 1
+    (alive,) = db.execute(
+        "SELECT lease_until > now() + interval '30 seconds' FROM assembler_partitions"
+    ).fetchone()
+    assert alive
+
+
+def test_the_schema_rejects_a_partition_outside_its_count(db: Any) -> None:
+    with pytest.raises(psycopg.errors.CheckViolation):
+        db.execute(
+            "INSERT INTO assembler_partitions (partition_count, partition, watermark_ms) "
+            "VALUES (2, 2, 0)"
+        )
