@@ -62,20 +62,24 @@ not.
   - **No root in the window, not yet assembled:** wait. The root's arrival triggers the
     assembly, which reads all of the trace's spans. A trace whose root never arrives, such as
     a split trace whose root half was dropped, is counted as an orphan.
-  - **Assembly reads the trace's spans** from `spans` with `service IN (…) AND trace_id IN (…)`,
-    the leading key of `spans`.
+  - **Assembly reads the trace's spans** from `spans` with `trace_id IN (…)` and a look-back
+    bound on `start_ts` (config, start 2 days, the `trace_arrivals` TTL). It does not filter by
+    `service`: a trace whose non-root half arrived in an earlier window has services that the
+    window does not list (see the amendment).
 - **Idempotent writes.**
   - `trace_summary` is keyed by `(trace_id, assembler_version)`. Its `revision` is the trace's
-    last arrival, and serves as the version of a `ReplacingMergeTree`: an identical
-    re-assembly writes the same row, and one with more spans supersedes it.
+    last arrival (`max(ingested_at)` of its `trace_arrivals` rows; `spans` has no arrival
+    time), and serves as the version of a `ReplacingMergeTree`: an identical re-assembly writes
+    the same row, and one with more spans supersedes it.
   - `trace.completed` carries `trace_id`, `revision`, the span count and the assembler
     version. It is published with JetStream publish-ack and
     `Nats-Msg-Id = trace_id/assembler_version/revision`. The stream's duplicate window drops a
     repeated revision; a new revision is a new message.
 - **The watermark is persisted in Postgres**, which already holds control-plane state
   (replay_jobs).
-  - There is one row per assembler partition. The two replicas are leader-free and partition
-    by `cityHash64(trace_id) % N` (design §1.1 deployment).
+  - There is one row per assembler partition. The replicas are leader-free and partition
+    by `cityHash64(trace_id) % N` (design §1.1 deployment); the amendment says how they share
+    the partitions.
   - A row is updated only after the window's summaries are written and the messages acked
     (at-least-once).
   - Changing N restarts every partition from the smallest watermark; idempotency makes the
@@ -146,3 +150,53 @@ against this polling path, on lag and on ClickHouse load.
 - The assembler sees a trace about 35–40 s after its first span ended, which leaves about 20 s
   for the detectors and the attributor. The `end_ts` draft would have added another 30 s.
 - Re-assembled traces are the slow tail and are measured separately.
+
+## Amendment (#35, implementation)
+
+Settled while planning the trace-assembler. It refines the decision above and changes none of
+its other parts.
+
+**Revision.** `spans` has no arrival time, so `revision` is the trace's `last_arrival` from the
+watermark scan, as an integer of epoch milliseconds in the event and in `Nats-Msg-Id`. A trace
+is scanned again only when a newer arrival lands, so it is the newest arrival.
+
+**The assembly read has no `service` filter.** The window lists only the services that arrived
+in it. A trace whose non-root half arrived in an earlier window (a split trace, #38) would
+lose those spans on `service IN (…)`. The read is `trace_id IN (…)` with the look-back bound
+on `start_ts`, and relies on the bloom filter on `trace_id` (ADR-0004 D7). The integration
+test checks its `EXPLAIN`, and query duration and rows read are metrics.
+
+**Partition ownership: leases, not election.**
+- A Postgres row per partition has `owner`, `epoch` and `lease_until`. A replica claims a free
+  or expired partition in one statement that also increments `epoch`, and renews the lease on
+  each poll. No replica is special, so replicas of any number share the partitions.
+- Two replicas may briefly own the same partition (a pause longer than the lease, a takeover).
+  Both may assemble the same window: duplicate work, nothing more, because every output is
+  idempotent and the commit is fenced. The watermark advance is
+  `UPDATE … SET watermark = new WHERE partition = p AND epoch = mine AND watermark = old`; the
+  stale owner's update matches no row, so it drops the partition and claims again.
+  Exclusive ownership is an optimisation, never a condition of correctness.
+- Rows are keyed `(partition_count, partition)`. A replica started with a new N finds no rows
+  for it and starts every partition from the smallest watermark of the most recent other N.
+
+**The claim boundary.** Per partition and poll, in order:
+1. scan `(w0, w1]`, read the spans, compute the summaries (pure);
+2. insert `trace_summary` (idempotent: the same `(trace_id, assembler_version, revision)` is
+   the same row);
+3. publish `trace.completed` with publish-ack and `Nats-Msg-Id` (idempotent inside the
+   stream's duplicate window);
+4. advance the watermark with the fenced compare-and-set. **This is the commit point:** a
+   window is done only here.
+
+A crash before 4 replays 1 to 3 from `w0`; a crash between 3 and 4 republishes, and the stream
+drops the repeat. The summary is written before the publish, so a consumer that gets the event
+can read the row. The stream's `duplicate_window` (config, start 1 hour) must be at least the
+longest time between the first publish of a revision and its republish: lease TTL, poll
+interval and the publish retry budget, with margin. Beyond it (an outage longer than the
+window, or a change of N that replays old revisions) delivery is at-least-once. A repeated
+revision is harmless: consumers are idempotent by `(trace_id, detector, detector_version)`,
+and a new revision replaces the earlier findings.
+
+A retry of one revision can read a few more spans than the first attempt, so the table and the
+event may differ in `span_count` for that revision. The newer arrival always yields a later
+revision, so no consumer ends on a stale view.

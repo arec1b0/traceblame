@@ -29,3 +29,4 @@ improvising.
 | [0004](0004-clickhouse-schema-management.md) | ClickHouse schema management and the span ingest path | Proposed |
 | [0005](0005-tenant-identity-at-the-first-authenticated-hop.md) | Tenant identity at the first authenticated hop | Proposed |
 | [0006](0006-shim-side-content-handling.md) | Shim-side content handling: in-process features, sealed provider, export allowlist | Proposed |
+| [0007](0007-postgres-schema-management.md) | Postgres schema management: a second backend of the storage runner | Proposed |
