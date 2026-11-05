@@ -72,6 +72,13 @@ class Injection:
         self.calls: dict[str, int] = {}
 
     def fire(self, span: trace.Span, extra: dict[str, Any] | None = None) -> None:
+        """Mark the span, then count the fault as applied: if marking raises (a non-recording
+        span), nothing is recorded, and every caller fires before the fault's effect reaches
+        the app, so the error stops it too. applied therefore implies a marked span."""
+        span_id = span.get_span_context().span_id
+        if span_id not in self.marked:
+            traceblame_py.set_fault_injection_id(self.entry.injection_id, span)
+            self.marked[span_id] = getattr(span, "name", "")
         if self.applied is None:
             self.applied = {}
             self.injected_at = _now()
@@ -80,10 +87,6 @@ class Injection:
                 self.applied[key] = int(self.applied.get(key, 0)) + int(value)
             else:
                 self.applied[key] = value
-        span_id = span.get_span_context().span_id
-        if span_id not in self.marked:
-            traceblame_py.set_fault_injection_id(self.entry.injection_id, span)
-            self.marked[span_id] = getattr(span, "name", "")
 
     def record(self) -> ledger.Record:
         e, q = self.entry, self.query
