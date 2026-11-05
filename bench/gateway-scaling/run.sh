@@ -131,6 +131,13 @@ beyond() { # applied versions (from a schema list) without a migration file in t
   echo "${out:-none}"
 }
 
+# Provenance of the whole tree at the start (loadgen analyze would check collector/ only): the
+# reports this run writes and a worktree's local .tools link do not count.
+commit="$(git -C "${ROOT}" rev-parse HEAD)"
+dirty_files="$(git -C "${ROOT}" status --porcelain -- . ':(top,exclude)evals/reports' ':(top,exclude).tools' | tr '\n' ' ')"
+dirty="false"
+[[ -n "${dirty_files// /}" ]] && dirty="true: ${dirty_files}"
+
 step "schema: the applied migrations of ClickHouse and Postgres"
 ch_schema_start="$(ch_schema)" || { echo "run.sh: no schema_migrations in ClickHouse (data lost? #58): run make kind-deploy" >&2; exit 1; }
 pg_schema_start="$(pg_schema)" || { echo "run.sh: no schema_migrations in Postgres: run make kind-deploy" >&2; exit 1; }
@@ -336,6 +343,8 @@ python3 - "${WORK}/env.json" <<PY
 import json, sys
 json.dump({
     "date": "${DATE}",
+    "commit": "${commit}",
+    "dirty": "${dirty}",
     "cluster": "kind ${KIND_VERSION}, node image ${KIND_NODE_IMAGE}, Kubernetes ${k8s_version}, 1 control plane + 2 workers",
     "host": "WSL2 (Windows 11), Docker Desktop: ${docker_info}",
     "collector": "traceblame-otelcol:local (otelcol-contrib 0.164 module set), image $(image_id traceblame-otelcol:local)",
