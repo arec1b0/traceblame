@@ -20,7 +20,8 @@
 #
 # Before the load: no other bench or capture may be running (pods, jobs, processes) and the
 # agents must accept no spans for 15 s; the report records both. The agents and the gateways
-# are rolled with the run's overlays, and restored to their plain configs on exit.
+# are rolled with the run's overlays, and restored to their plain configs on exit; a run that
+# fails its checks before that exits without changing the cluster.
 # The report records both databases' applied migrations (schema_migrations) at the start and
 # whether they changed during the load; a run without the ClickHouse schema fails (#58). The
 # load waits for a quiet host (MAX_HOST_LOAD) and the report records the load average.
@@ -36,7 +37,8 @@ source "${ROOT}/tools/versions.env"
 export PATH="${ROOT}/.tools/bin:${PATH}"
 export GOTOOLCHAIN=local
 CLUSTER=traceblame
-KCTL=(kubectl --context "kind-${CLUSTER}")
+# KUBECTL overrides the client (tests/scripts/test_bench_run_restore.py passes a fake).
+KCTL=("${KUBECTL:-kubectl}" --context "kind-${CLUSTER}")
 PROFILE="${PROFILE:-stress}"
 STAMPS="${STAMPS:-0}"
 case "${PROFILE}" in
@@ -62,6 +64,10 @@ RUN_ID="$(( 0x$(openssl rand -hex 4) & 0x7fffffff ))"
 PREFIX="$(printf '%08x' "${RUN_ID}")"
 SCRAPER_PID=""
 NATS_PF=""
+# Set right before this invocation first changes the collectors (patch, scale, rollout). Until
+# then a failure, such as a preflight that finds another bench running, leaves the cluster as it
+# is: restoring would strip that bench's overlays and roll its collectors (#61).
+CHANGED_COLLECTORS=0
 
 step() { echo "==> $*" >&2; }
 now() { date +%s%N; }
@@ -82,9 +88,11 @@ restore() {
   local rc=$?
   [[ -n "${SCRAPER_PID}" ]] && kill "${SCRAPER_PID}" 2>/dev/null || true
   [[ -n "${NATS_PF}" ]] && kill "${NATS_PF}" 2>/dev/null || true
-  step "restoring the agents and the gateway (no bench overlay)"
-  set_args daemonset otel-agent '["--config=/etc/otelcol/config/agent.yaml"]' || true
-  set_args deployment otel-gateway '["--config=/etc/otelcol/config/gateway.yaml"]' || true
+  if [[ "${CHANGED_COLLECTORS}" == 1 ]]; then
+    step "restoring the agents and the gateway (no bench overlay)"
+    set_args daemonset otel-agent '["--config=/etc/otelcol/config/agent.yaml"]' || true
+    set_args deployment otel-gateway '["--config=/etc/otelcol/config/gateway.yaml"]' || true
+  fi
   rm -rf "${WORK}"
   exit "${rc}"
 }
@@ -153,8 +161,8 @@ bench_pods="$(awk '$1 == "bench" && $4 != "Completed" {print $2}' "${WORK}/pods.
 [[ -n "${bench_pods}" ]] && busy+="bench pods: ${bench_pods//$'\n'/ }; "
 # Processes outside this run's process group (its own subshells share it).
 pgid="$(ps -o pgid= -p $$ | tr -d ' ')"
-others="$(ps -eo pid=,pgid=,args= | awk -v g="${pgid}" '$2 != g' \
-  | grep -E 'tools/fixtures/|fixtures-agentic-rag|fixtures-runbook-agent|bench/gateway-scaling/run.sh' || true)"
+BUSY_PROCESSES="${BUSY_PROCESSES:-tools/fixtures/|fixtures-agentic-rag|fixtures-runbook-agent|bench/gateway-scaling/run.sh}"
+others="$(ps -eo pid=,pgid=,args= | awk -v g="${pgid}" '$2 != g' | grep -E "${BUSY_PROCESSES}" || true)"
 [[ -n "${others}" ]] && busy+="processes: ${others//$'\n'/; }; "
 if [[ -n "${busy}" ]]; then
   echo "run.sh: another bench or capture is running, the run would be invalid: ${busy}" >&2
@@ -174,6 +182,7 @@ done
 pods_summary="$(awk '{c[$1]++} END {for (n in c) printf "%s %d, ", n, c[n]}' "${WORK}/pods.txt" | sed 's/, $//')"
 
 step "agents and gateways with the run's overlays (stamps=${STAMPS}), 2 gateway replicas"
+CHANGED_COLLECTORS=1
 set_args daemonset otel-agent "${AGENT_ARGS}"
 set_args deployment otel-gateway "${GATEWAY_ARGS}"
 gw scale deployment/otel-gateway --replicas=2 >/dev/null
