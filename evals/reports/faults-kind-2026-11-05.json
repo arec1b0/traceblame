@@ -1,6 +1,12 @@
 {
   "date": "2026-11-05",
   "run_id": "faults-20261105-s7-b1b6b60",
+  "run": {
+    "run_id": "faults-20261105-s7-b1b6b60",
+    "seed": 7,
+    "traceblame_commit": "b1b6b6048b98258f3495a577e7d88d4209496e90",
+    "created_at": "2026-11-05T16:52:57Z"
+  },
   "config": {
     "seed": 7,
     "agentic_rag": {
