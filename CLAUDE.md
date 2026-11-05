@@ -121,7 +121,10 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   `RUNBOOK_APP_DIR`, `OLLAMA_URL`, `RUN_ID`; needs `make kind-deploy`, and `kind-runbook-up` for
   the second). Phases that touch kind run under `flock $(KIND_LOCK)` (`/tmp/traceblame-kind.lock`,
   shared with other sessions); never wrap the make target itself in the same lock. Ledger,
-  plan and checks in `.tools/faults/<run>/`; ground truth in `injections` and `eval_traces`
+  plan and checks in `.tools/faults/<run>/`; ground truth in `injections` and `eval_traces`.
+  A finished run's content check alone (every stored row of its traces, read-only):
+  `flock /tmp/traceblame-kind.lock uv run --frozen python tools/faults/run_agentic_rag.py content --run-id ...`
+  (same for `run_runbook_agent.py`)
 - `make faults-report RUN_ID=...` / `make faults-validate`: the validation report over both apps,
   `evals/reports/faults-kind-*`; thresholds in `tools/faults/validation.yaml`
 - `uv run traceblame-faults scenarios check|plan|check-ledger|record|digest`: the fault library's

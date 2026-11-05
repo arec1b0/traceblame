@@ -44,6 +44,24 @@ def test_remove_counts_only_when_a_golden_chunk_was_in_the_results() -> None:
     assert applied == []
 
 
+def test_remove_over_a_run_without_golden_in_any_top_k_never_applies() -> None:
+    # Every retrieval of the run: no golden chunk in any top-k, so the fault is not_reached
+    # (the driver records no injection id and record() writes no injections row).
+    applied: list[dict[str, Any]] = []
+    store = retrieval.GoldenRemoved(Store(RANKED), frozenset({"d5"}), on_applied=applied.append)
+    for n in (1, 2, 3, 4):
+        store.search("q", n_results=n)
+    assert applied == []
+
+
+def test_remove_over_a_run_applies_only_on_the_retrievals_it_changed() -> None:
+    applied: list[dict[str, Any]] = []
+    store = retrieval.GoldenRemoved(Store(RANKED), frozenset({"g2"}), on_applied=applied.append)
+    store.search("q", n_results=2)  # g1, d1: unchanged
+    store.search("q", n_results=3)  # g1, d1, g2: g2 removed
+    assert applied == [{"removed_n": 1}]
+
+
 def test_distractor_replaces_the_results_with_another_contract() -> None:
     applied: list[dict[str, Any]] = []
     other = Store([("x1", 0.2), ("x2", 0.1)])

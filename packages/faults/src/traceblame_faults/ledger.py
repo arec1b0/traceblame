@@ -8,6 +8,8 @@ call: no injections row, and #19 excludes it).
 """
 
 import json
+import math
+import os
 import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
@@ -48,6 +50,10 @@ class Record:
     seed: int = 0
     injected_at: str | None = None  # UTC, millisecond ISO 8601 with Z
     bundle_digest: str | None = None  # the aegis.bundle.digest the trace ran under
+    # The host's 1-minute load average when the trace ended (os.getloadavg; None where the
+    # platform has none, and in ledgers written before the field). Wall-time context for the
+    # D1 throughput numbers; never recorded into ClickHouse.
+    host_load1: float | None = None
 
 
 def status(rec: Record) -> Status:
@@ -83,6 +89,8 @@ def validate(rec: Record) -> None:
         raise _fail(rec, "golden_doc_ids are set exactly when golden_status is mapped")
     if rec.bundle_digest is not None and not kinds.DIGEST_PATTERN.fullmatch(rec.bundle_digest):
         raise _fail(rec, "bundle_digest is not a sha256 digest")
+    if rec.host_load1 is not None and not (math.isfinite(rec.host_load1) and rec.host_load1 >= 0):
+        raise _fail(rec, "host_load1 must be a finite load average >= 0")
     if rec.planned_fault_kind and rec.planned_fault_kind not in kinds.KINDS:
         raise _fail(rec, f"planned_fault_kind {rec.planned_fault_kind!r}")
     if not rec.injection_id:
@@ -132,6 +140,14 @@ def read(path: Path) -> list[Record]:
             raise LedgerError(f"{path}: line {n}: {exc}") from exc
         out.append(rec)
     return out
+
+
+def host_load1() -> float | None:
+    """The host's 1-minute load average, rounded to 0.01; None where there is none."""
+    try:
+        return round(os.getloadavg()[0], 2)
+    except OSError:
+        return None
 
 
 def now_iso(now: datetime) -> str:

@@ -6,8 +6,10 @@ throughput projection for D1 (#19), from the measured wall time per kind.
 """
 
 import argparse
+import hashlib
 import json
 import sys
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -15,12 +17,14 @@ from typing import Any, cast
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+import checks  # noqa: E402
 import faultslib  # noqa: E402
 
-from traceblame_faults import kinds  # noqa: E402
+from traceblame_faults import kinds, ledger, plan  # noqa: E402
 
 ROOT = faultslib.ROOT
 REPORTS = ROOT / "evals" / "reports"
+PRELOAD = ROOT / "packages" / "faults" / "preload" / "faults-preload.mjs"
 APPS = ("agentic-rag", "runbook-agent")
 # D1 as proposed on #19: (app, kind) -> traces; "clean" is the clean share.
 D1: dict[tuple[str, str], int] = {
@@ -51,6 +55,69 @@ def loop_gate(check: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def ledger_view(d: Path) -> dict[str, Any]:
+    """What the report takes from the run's ledger (the records `record` wrote to ClickHouse)
+    and its plan, not from check.json: each trace's planned mode and host load, and the
+    applied / not_reached / clean counts per kind, re-derived."""
+    path = d / "ledger.jsonl"
+    records = ledger.read(path)
+    planned = {
+        (e.query_ref, e.kind): e for e in plan.loads((d / "plan.jsonl").read_text(encoding="utf-8"))
+    }
+    modes: dict[str, str | None] = {}
+    for r in records:
+        e = planned.get((r.query_ref, r.planned_fault_kind))
+        mode = r.params.get("mode") if r.injection_id else None
+        modes[r.trace_id] = mode or (e.params.get("mode") if e is not None else None)
+    counts: dict[str, dict[str, int]] = {}
+    for r in records:
+        kind = r.planned_fault_kind or "clean"
+        counts.setdefault(kind, dict.fromkeys(("clean", "applied", "not_reached"), 0))
+        counts[kind][ledger.status(r)] += 1
+    return {
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "records": len(records),
+        "modes": modes,
+        "host_load1": {r.trace_id: r.host_load1 for r in records},
+        "counts": counts,
+    }
+
+
+def ledger_problems(check: dict[str, Any], view: dict[str, Any]) -> list[str]:
+    """The check's per-kind counts against the ones re-derived from the ledger."""
+    out: list[str] = []
+    for kind, k in check["per_kind"].items():
+        got = view["counts"].get(kind, {})
+        if (k["applied"], k["not_reached"]) != (got.get("applied", 0), got.get("not_reached", 0)):
+            out.append(f"{kind}: check.json and the ledger disagree on applied / not_reached")
+    return out
+
+
+def retrieval_rows(check: dict[str, Any], modes: dict[str, str | None]) -> list[dict[str, Any]]:
+    """golden_context_removed traces: the mode that ran (from the ledger, else the plan) and
+    whether D1 counts them (checks.retrieval_counted). A planned one that was not reached is
+    never counted."""
+    rows: list[dict[str, Any]] = []
+    for t in check["per_trace"]:
+        if t["kind"] != "golden_context_removed":
+            continue
+        sig = t.get("signal", {})
+        clean_hit, faulted_hit = sig.get("golden_in_topk", [None, t.get("golden_in_topk")])
+        mode = modes.get(t["trace_id"])
+        rows.append(
+            {
+                "query": t["query"],
+                "status": t["status"],
+                "mode": mode,
+                "golden_in_topk": [clean_hit, faulted_hit],
+                "max_score": sig.get("max_score", [None, t.get("max_score")]),
+                "moved": sig.get("moved"),
+                "counted": t["status"] == "applied" and checks.retrieval_counted(mode, clean_hit),
+            }
+        )
+    return rows
+
+
 def components() -> dict[str, int]:
     out: dict[str, int] = {}
     for (_, kind), n in D1.items():
@@ -77,6 +144,48 @@ def projection(checks: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+NEEDLES = {
+    "agentic-rag": "{queries} sampled CUAD questions: each question's text and every 48-character"
+    " window (step 16) of every chunk of its contract ({contract_chunks} chunks, {windows}"
+    " windows)",
+    "runbook-agent": "{alert} alert needles (32-character windows of each alert summary and the"
+    " task-unique label values) and {prompt_windows} 40-character windows of the triage prompt"
+    " and its variants",
+}
+
+
+def content_line(app: str, cc: dict[str, Any]) -> str:
+    if "needles" not in cc or "scanned" not in cc:  # a check.json from before the full scan
+        return f"content check (spans only): {cc}"
+    sc = cc["scanned"]
+    rows = ", ".join(f"{t} {n}" for t, n in sorted(sc["rows"].items()))
+    files = ", ".join(f"{f} ({n} line{'' if n == 1 else 's'})" for f, n in sc["files"].items())
+    ex = sc.get("id_fields_excluded")
+    excluded = (
+        f"; left out: only the dataset id fields {', '.join(ex['fields'])} ({ex['values']} values,"
+        " the dataset's own question or task ids; a runbook task id is also its workload's name,"
+        " which the alert needles hold)"
+        if ex
+        else ""
+    )
+    return (
+        f"content check: {cc['leaking']} leaking. Needles: "
+        + NEEDLES[app].format(**cc["needles"])
+        + f". Scanned: every stored row of the run's traces in every table with a trace_id,"
+        f" {sc['rows_total']} rows ({rows}); the {sc['exported_spans']} exported spans; the"
+        f" run's files {files}{excluded}"
+    )
+
+
+def loads_by_kind(check: dict[str, Any], view: dict[str, Any]) -> dict[str, float | None]:
+    out: dict[str, list[float]] = {}
+    for t in check["per_trace"]:
+        load = view["host_load1"].get(t["trace_id"])
+        if load is not None:
+            out.setdefault(t["kind"], []).append(float(load))
+    return {k: round(sorted(v)[len(v) // 2], 2) for k, v in out.items()}
+
+
 def markdown(report: dict[str, Any]) -> str:
     out = [
         f"# Fault injection through kind: validation run ({report['date']})",
@@ -94,45 +203,98 @@ def markdown(report: dict[str, Any]) -> str:
             out += [f"## {app}", "", "Not run.", ""]
             continue
         s = report["state"][app]
+        view = report["ledger"][app]
+        load = loads_by_kind(c, view)
         out += [
             f"## {app}",
             "",
             f"- run `{c['run_id']}`, traceblame `{s['traceblame_commit'][:12]}`, "
             f"app `{s['app_commit'][:12]}`",
             f"- plan sha256 `{s['plan']['sha256'][:16]}`, {s['plan']['entries']} entries, seed "
-            f"{s['seed']}",
+            f"{s['seed']}; ledger sha256 `{view['sha256'][:16]}`, {view['records']} records "
+            "(the counts below are re-derived from it)",
             f"- spans sent {c['spans']['sent']}, stored {c['spans']['stored']}; baseline digest "
             f"`{(c.get('baseline_digest') or '-')[:23]}`",
-            f"- content check: {c['content_check']}",
+            f"- {content_line(app, c['content_check'])}",
+            "- host 1-minute load average per trace: "
+            + (
+                f"in the tables below ({s.get('host_cpus') or '?'} CPUs)"
+                if load
+                else "not recorded in this run (it predates the field; the drivers record it"
+                " in the ledger from now on, and this run is not repeated for it)"
+            ),
         ]
         if app == "runbook-agent":
+            now = report.get("preload_sha256_now")
+            changed = (
+                f" (the committed file has changed since this run: `{now[:16]}`)"
+                if now and now != s["preload_sha256"]
+                else ""
+            )
             out.append(
-                f"- preload sha256 `{s['preload_sha256'][:16]}`; image guard {s['image_guard']}"
+                f"- preload sha256 `{s['preload_sha256'][:16]}`{changed}; image guard "
+                f"{s['image_guard']}"
             )
         if app == "agentic-rag":
             out.append(f"- golden chunks of the sampled answerable queries: {s['golden_coverage']}")
         out += [
             "",
             "| Kind | Component | Traces | Applied | Not reached | Marker on its span | Joined |"
-            " Signal moved | Assembled | Median s | p95 s |",
-            "|---|---|---|---|---|---|---|---|---|---|---|",
+            " Signal moved | Assembled | Median s | p95 s | Load1 median |",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|",
         ]
         for kind, k in c["per_kind"].items():
             if not k["traces"]:
                 continue
+            got = view["counts"].get(kind, {})
             out.append(
-                f"| {kind} | {k['component'] or '-'} | {k['traces']} | {k['applied']} | "
-                f"{k['not_reached']} | {k['marker_ok']} | {k['joined']} | {k['moved']} | "
-                f"{k['assembled']} | {k['seconds_median']} | {k['seconds_p95']} |"
+                f"| {kind} | {k['component'] or '-'} | {k['traces']} | "
+                f"{got.get('applied', 0)} | {got.get('not_reached', 0)} | {k['marker_ok']} | "
+                f"{k['joined']} | {k['moved']} | {k['assembled']} | {k['seconds_median']} | "
+                f"{k['seconds_p95']} | {load.get(kind, '-')} |"
             )
         out += ["", "Per trace (query = sha256 of the dataset id, first 12):", ""]
-        out += ["| Query | Kind | Status | Outcome | Signal |", "|---|---|---|---|---|"]
+        out += [
+            "| Query | Kind | Status | Outcome | Load1 | Signal |",
+            "|---|---|---|---|---|---|",
+        ]
         for t in c["per_trace"]:
             sig = {k: v for k, v in t.get("signal", {}).items() if k != "moved"}
             moved = t.get("signal", {}).get("moved")
             mark = "" if moved is None else ("moved " if moved else "NOT moved ")
+            t_load = view["host_load1"].get(t["trace_id"])
             out.append(
-                f"| {t['query']} | {t['kind']} | {t['status']} | {t['outcome']} | {mark}{sig} |"
+                f"| {t['query']} | {t['kind']} | {t['status']} | {t['outcome']} | "
+                f"{'-' if t_load is None else t_load} | {mark}{sig} |"
+            )
+        out.append("")
+    retrieval = report["retrieval"]
+    if retrieval:
+        out += [
+            "## golden_context_removed: mode and the D1 rule",
+            "",
+            "D1 (#19) counts a `golden_context_removed` trace as a retrieval fault only when",
+            "the golden set was in the clean run's top-k, or the mode is `distractor`. A",
+            "`remove` whose run never had a golden chunk in its results is `not_reached`: the",
+            "store wrapper reports nothing removed, the ledger gets no injection id, and",
+            "`injections` gets no row.",
+            "",
+            "| Query | Mode | Golden in clean top-k | Golden in faulted top-k | Max score clean -> "
+            "faulted | Signal moved | Counted |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        applied = [r for r in retrieval if r["status"] == "applied"]
+        modes = Counter(str(r["mode"]) for r in applied)
+        out[-2:-2] = [
+            f"In this run: {len(applied)} applied ({dict(sorted(modes.items()))}), "
+            f"{sum(r['counted'] for r in applied)} counted; the mode comes from the ledger.",
+            "",
+        ]
+        for r in retrieval:
+            out.append(
+                f"| {r['query']} | {r['mode']} | {r['golden_in_topk'][0]} | "
+                f"{r['golden_in_topk'][1]} | {r['max_score'][0]} -> {r['max_score'][1]} | "
+                f"{r['moved']} | {r['counted']} |"
             )
         out.append("")
     gate = report["loop_gate"]
@@ -207,23 +369,36 @@ def markdown(report: dict[str, Any]) -> str:
     return "\n".join(out)
 
 
+def run_date(states: dict[str, dict[str, Any]]) -> str:
+    """The run's own date (its first prepare or build), so a re-generated report keeps its
+    file; today only for a state without one."""
+    stamps = [str(s.get("prepared_at") or s.get("built_at") or "") for s in states.values()]
+    stamps = [t[:10] for t in stamps if t]
+    return min(stamps) if stamps else datetime.now(UTC).strftime("%Y-%m-%d")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=cast("str", __doc__).splitlines()[0])
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--blocker", action="append", default=[])
     args = parser.parse_args()
     cfg = faultslib.config()
-    checks: dict[str, dict[str, Any]] = {}
+    per_app: dict[str, dict[str, Any]] = {}
     states: dict[str, dict[str, Any]] = {}
+    views: dict[str, dict[str, Any]] = {}
     for app in APPS:
         d = faultslib.run_dir(args.run_id, app)
         if (d / "check.json").is_file():
-            checks[app] = json.loads((d / "check.json").read_text(encoding="utf-8"))
+            per_app[app] = json.loads((d / "check.json").read_text(encoding="utf-8"))
             states[app] = faultslib.load_state(d)
-    if not checks:
+            views[app] = ledger_view(d)
+    if not per_app:
         raise SystemExit(f"report: no check.json under .tools/faults/{args.run_id}/")
-    gate = loop_gate(checks.get("agentic-rag", {"per_kind": {}}), cfg)
-    problems = [f"{app}: {p}" for app, c in checks.items() for p in c["problems"]]
+    gate = loop_gate(per_app.get("agentic-rag", {"per_kind": {}}), cfg)
+    problems = [f"{app}: {p}" for app, c in per_app.items() for p in c["problems"]]
+    problems += [
+        f"{app}: {p}" for app, c in per_app.items() for p in ledger_problems(c, views[app])
+    ]
     if not gate["passed"]:
         problems.append("step_memory_loss: loop signal below the gate; redesign before D1")
     requests: list[Any] = []
@@ -233,23 +408,31 @@ def main() -> int:
             for req in json.loads(line).get("request", []):
                 fields = cast("dict[str, Any]", req or {})
                 requests.append({k: v for k, v in fields.items() if k != "seed"})
+    rag_view = views.get("agentic-rag", {"modes": {}})
     report = {
-        "date": datetime.now(UTC).strftime("%Y-%m-%d"),
+        "date": run_date(states),
         "run_id": args.run_id,
         "config": cfg,
-        "apps": checks,
+        "apps": per_app,
         "state": {
             app: {
                 k: v for k, v in s.items() if k not in ("app_dir", "archive", "embedding", "ollama")
             }
             for app, s in states.items()
         },
+        "ledger": {
+            app: {k: v for k, v in view.items() if k != "modes"} for app, view in views.items()
+        },
         "loop_gate": gate,
+        "retrieval": retrieval_rows(
+            per_app.get("agentic-rag", {"per_trace": []}), rag_view["modes"]
+        ),
         "d1_components": components(),
-        "projection": projection(checks),
+        "projection": projection(per_app),
         "runbook_requests": sorted({json.dumps(r, sort_keys=True) for r in requests}),
         "blockers": args.blocker,
         "problems": problems,
+        "preload_sha256_now": hashlib.sha256(PRELOAD.read_bytes()).hexdigest(),
     }
     stem = f"faults-kind-{report['date']}"
     REPORTS.mkdir(parents=True, exist_ok=True)

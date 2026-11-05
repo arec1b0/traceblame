@@ -7,7 +7,7 @@ app's own image and every non-eval manifest carry neither (tests/scripts/
 test_faults_preload_guard.py, and the image checks below). The preload is a no-op unless
 TRACEBLAME_FAULTS=1 and the tenant is an eval tenant.
 
-Phases (only run, record and check touch kind; run them under
+Phases (only run, record, check and content touch kind; run them under
 flock /tmp/traceblame-kind.lock -c '...'):
 
   build    (no kind)  capture image and eval image, image guard checks, the seeded plan
@@ -16,11 +16,14 @@ flock /tmp/traceblame-kind.lock -c '...'):
                       after it reads the preload's ledger lines; the injector's ledger
   record   (kind)     the ledger into eval_traces and injections
   check    (kind)     as for agentic-rag (faultslib.check_run), content: alert text and prompts
+  content  (kind)     only the content check of a finished run (read-only): every stored row
+                      of its traces in every table with a trace_id, and the run's files
 """
 
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -198,6 +201,7 @@ def build(args: argparse.Namespace) -> int:
         "app": APP,
         "app_dir": str(app_dir),
         "built_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "host_cpus": os.cpu_count(),
         "traceblame_commit": traceblame_commit,
         "app_commit": app_commit,
         "seed": seed,
@@ -285,6 +289,7 @@ def _record(
         "planned_fault_kind": entry.kind,
         "seed": entry.seed,
         "bundle_digest": digest,
+        "host_load1": ledger.host_load1(),  # the task has just ended
     }
     if not applied:
         return ledger.Record(
@@ -471,10 +476,10 @@ def record_phase(args: argparse.Namespace) -> int:
     return 0
 
 
-def check_phase(args: argparse.Namespace) -> int:
-    cfg = faultslib.config()
-    d = faultslib.run_dir(args.run_id, APP)
-    state = faultslib.load_state(d)
+def _content(d: Path, state: dict[str, Any]) -> faultslib.Content:
+    """The #13 needles (alert text windows and task-unique label values) and 40-character
+    windows of every triage prompt the run could send, against every stored row of the run and
+    the run's files."""
     needles = set(json.loads((d / "needles.json").read_text(encoding="utf-8")))
     prompts = [triage_prompt(Path(state["app_dir"]), state["app_commit"])]
     prompts += [
@@ -482,21 +487,37 @@ def check_phase(args: argparse.Namespace) -> int:
         for v in scenario.load_all()[("prompt_variant", APP)].variants.values()
     ]
     windows = {p[i : i + 40] for p in prompts for i in range(0, max(len(p) - 40, 0) + 1, 10)}
-    otlp = json.loads((d / "otlp.json").read_text(encoding="utf-8"))
 
-    def content(rows: list[dict[str, Any]]) -> dict[str, Any]:
-        alert = rb.leaks(needles, otlp, rows)
-        prompt = rb.leaks(windows, otlp, rows)
+    def content(tables: dict[str, list[dict[str, Any]]], files: list[Path]) -> dict[str, Any]:
+        docs = [faultslib.json_docs(f) for f in files]  # parsed: needles hold "\n" and quotes
+        alert = rb.leaks(needles, tables, docs)
+        prompt = rb.leaks(windows, tables, docs)
         return {
-            "alert_needles": len(needles),
-            "prompt_windows": len(windows),
+            "needles": {"alert": len(needles), "prompt_windows": len(windows)},
             "leaking": len(alert) + len(prompt),
         }
 
-    result = faultslib.check_run(APP, d, state, cfg, golden=lambda _: (), content=content, log=log)
+    return content
+
+
+def check_phase(args: argparse.Namespace) -> int:
+    cfg = faultslib.config()
+    d = faultslib.run_dir(args.run_id, APP)
+    state = faultslib.load_state(d)
+    result = faultslib.check_run(
+        APP, d, state, cfg, golden=lambda _: (), content=_content(d, state), log=log
+    )
     result["problems"] += state["run"].get("problems", [])
     (d / "check.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     log(f"check: {len(result['problems'])} problems")
+    return 0
+
+
+def content_phase(args: argparse.Namespace) -> int:
+    d = faultslib.run_dir(args.run_id, APP)
+    state = faultslib.load_state(d)
+    check = faultslib.recheck_content(d, _content(d, state), log)
+    log(f"content: {check['content_check']}")
     return 0
 
 
@@ -509,12 +530,17 @@ def main() -> int:
     r = sub.add_parser("run")
     r.add_argument("--run-id", required=True)
     r.add_argument("--ollama-url")
-    for name in ("record", "check"):
+    for name in ("record", "check", "content"):
         sub.add_parser(name).add_argument("--run-id", required=True)
     args = parser.parse_args()
-    return {"build": build, "run": run_phase, "record": record_phase, "check": check_phase}[
-        args.command
-    ](args)
+    phases = {
+        "build": build,
+        "run": run_phase,
+        "record": record_phase,
+        "check": check_phase,
+        "content": content_phase,
+    }
+    return phases[args.command](args)
 
 
 if __name__ == "__main__":

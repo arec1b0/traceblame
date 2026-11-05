@@ -95,6 +95,13 @@ def marked_rows(rows: Sequence[Mapping[str, Any]], injection_id: str) -> list[Ma
     return [r for r in rows if r["attrs"].get(MARKER) == injection_id]
 
 
+def retrieval_counted(mode: str | None, clean_golden_in_topk: bool | None) -> bool:
+    """Whether a golden_context_removed trace counts as a retrieval fault in D1 (#19): a
+    distractor replaces the results whatever they were; "remove" changes the retrieval only
+    when the golden set was in the clean run's top-k."""
+    return mode == "distractor" or clean_golden_in_topk is True
+
+
 def signal(
     kind: str,
     rows: Sequence[Mapping[str, Any]],
@@ -104,6 +111,7 @@ def signal(
     injection_id: str,
     bundle_digest: str | None = None,
     repeat_min: int = 3,
+    mode: str | None = None,
 ) -> dict[str, Any]:
     """{"moved": bool, ...the values compared}."""
     marked = marked_rows(rows, injection_id)
@@ -119,6 +127,8 @@ def signal(
             "moved": faulted.golden_in_topk is False and (clean_hit or lower),
             "golden_in_topk": [clean.golden_in_topk if clean else None, faulted.golden_in_topk],
             "max_score": [clean.max_score if clean else None, faulted.max_score],
+            "mode": mode,
+            "counted": retrieval_counted(mode, clean.golden_in_topk if clean else None),
         }
     if kind == "tool_failure":
         errored = [r for r in marked if r.get("status_code") in _ERROR]

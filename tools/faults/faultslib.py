@@ -7,6 +7,7 @@ TRACE_COMPLETED stream, the settle wait, the eval tenants. Run with the workspac
 import asyncio
 import base64
 import json
+import re
 import statistics
 import sys
 import time
@@ -172,11 +173,134 @@ def wait_assembled(
     return found
 
 
+_HEX32 = re.compile(r"^[0-9a-f]{32}$")
+_TABLE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
+# The run's own files that feed the report (never the content needles themselves).
+RUN_FILES = ("otlp.json", "ledger.jsonl", "outcomes.jsonl", "plan.jsonl", "queries.jsonl",
+             "state.json")  # fmt: skip
+Content = Callable[[dict[str, list[dict[str, Any]]], list[Path]], dict[str, Any]]
+# The dataset's own question / task ids (#14 decision): a runbook task id is also its sandbox
+# workload's name, which the #13 needles hold as a label value, so the id would match itself.
+# Only these fields are left out of the content scan; every other column and key is scanned.
+ID_FIELDS = frozenset({"query_ref", "ref"})
+
+
+def strip_ids(value: Any) -> tuple[Any, int]:
+    """The value without ID_FIELDS keys at any depth, and how many it dropped."""
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        dropped = 0
+        for k, v in cast("dict[str, Any]", value).items():
+            if k in ID_FIELDS:
+                dropped += 1
+                continue
+            out[k], n = strip_ids(v)
+            dropped += n
+        return out, dropped
+    if isinstance(value, list):
+        items = [strip_ids(v) for v in cast("list[Any]", value)]
+        return [v for v, _ in items], sum(n for _, n in items)
+    return value, 0
+
+
+def json_docs(path: Path) -> list[Any]:
+    """A JSON file, or a JSON-lines file, as parsed documents (the content check reads parsed
+    strings, so a needle with a newline or a quote matches its JSON-escaped occurrence)."""
+    text = path.read_text(encoding="utf-8")
+    try:
+        return [json.loads(text)]
+    except ValueError:
+        pass
+    docs: list[Any] = []
+    for line in text.splitlines():
+        try:
+            docs.append(json.loads(line))
+        except ValueError:
+            docs.append(line)  # a non-JSON line is scanned as it is
+    return docs
+
+
+def run_tables() -> list[str]:
+    """Every table of the traceblame database with a trace_id column (views excluded)."""
+    from kindlib import clickhouse
+
+    rows = clickhouse(
+        "SELECT DISTINCT c.table AS name FROM system.columns AS c"
+        " INNER JOIN system.tables AS t ON c.database = t.database AND c.table = t.name"
+        " WHERE c.database = currentDatabase() AND c.name = 'trace_id'"
+        " AND t.engine NOT LIKE '%View' ORDER BY name"
+    )
+    return [str(r["name"]) for r in rows if _TABLE.fullmatch(str(r["name"]))]
+
+
+def run_rows(trace_ids: Iterable[str]) -> dict[str, list[dict[str, Any]]]:
+    """Every stored row of these traces in every such table, without FINAL: versions that a
+    merge has not collapsed yet are scanned too."""
+    from kindlib import clickhouse
+
+    ids = ",".join(f"'{t}'" for t in sorted(set(trace_ids)) if _HEX32.fullmatch(t))
+    if not ids:
+        return {}
+    # Table names come from system.columns and match _TABLE; ids are checked hex.
+    return {
+        t: clickhouse(f"SELECT * FROM `{t}` WHERE toString(trace_id) IN ({ids})")  # noqa: S608
+        for t in run_tables()
+    }
+
+
+def content_scan(
+    d: Path, records: list[ledger.Record], content: Content, log: Callable[[str], None]
+) -> dict[str, Any]:
+    """The content check over every stored row of the run in every table and over the run's
+    files (parsed copies under content-scan/), all without the ID_FIELDS; the counts scanned go
+    into the result next to the app's needle counts."""
+    log("content check: every stored row of the run")
+    tables = run_rows({r.trace_id for r in records})
+    stripped, dropped = strip_ids(tables)
+    files = [d / name for name in RUN_FILES if (d / name).is_file()]
+    scan = d / "content-scan"
+    scan.mkdir(exist_ok=True)
+    copies: list[Path] = []
+    for f in files:
+        docs, n = strip_ids(json_docs(f))
+        dropped += n
+        copy = scan / f"{f.name}.json"
+        copy.write_text(json.dumps(docs), encoding="utf-8")
+        copies.append(copy)
+    out = content(cast("dict[str, list[dict[str, Any]]]", stripped), copies)
+    otlp = json.loads((d / "otlp.json").read_text(encoding="utf-8"))
+    out["scanned"] = {
+        "rows": {t: len(rows) for t, rows in tables.items()},
+        "rows_total": sum(len(rows) for rows in tables.values()),
+        "exported_spans": len(spans_of(otlp)),
+        "files": {f.name: len(f.read_text(encoding="utf-8").splitlines()) for f in files},
+        "id_fields_excluded": {"fields": sorted(ID_FIELDS), "values": dropped},
+    }
+    return out
+
+
+def recheck_content(d: Path, content: Content, log: Callable[[str], None]) -> dict[str, Any]:
+    """Only the content check of a finished run, over what is stored now (read-only; the
+    caller holds the kind lock): replaces check.json's content_check and its content problem."""
+    check = cast("dict[str, Any]", json.loads((d / "check.json").read_text(encoding="utf-8")))
+    result = content_scan(d, ledger.read(d / "ledger.jsonl"), content, log)
+    check["content_check"] = result
+    check["problems"] = [p for p in check["problems"] if not p.startswith("content found")]
+    if result.get("leaking"):
+        check["problems"].append(f"content found: {result}")
+    (d / "check.json").write_text(json.dumps(check, indent=2) + "\n", encoding="utf-8")
+    return check
+
+
 def _percentile(values: list[float], q: float) -> float | None:
     if not values:
         return None
     ordered = sorted(values)
     return ordered[min(len(ordered) - 1, round(q * (len(ordered) - 1)))]
+
+
+def _median(values: list[float]) -> float | None:
+    return round(statistics.median(values), 2) if values else None
 
 
 def _tid(value: Any) -> str:
@@ -190,7 +314,7 @@ def check_run(
     cfg: dict[str, Any],
     *,
     golden: Callable[[str], Iterable[str]],
-    content: Callable[[list[dict[str, Any]]], dict[str, Any]],
+    content: Content,
     log: Callable[[str], None],
 ) -> dict[str, Any]:
     """Per trace and per kind: stored spans, markers on the intended span kind, the join, the
@@ -274,6 +398,7 @@ def check_run(
             "golden_in_topk": feats.golden_in_topk,
             "max_score": feats.max_score,
             "loop_max": feats.loop_max,
+            "host_load1": rec.host_load1,
         }
         ev = stored_eval.get(rec.trace_id)
         if ev is None or str(ev[9]) != rec.injection_id or str(ev[8]) != rec.planned_fault_kind:
@@ -292,6 +417,7 @@ def check_run(
                 injection_id=rec.injection_id,
                 bundle_digest=rec.params.get("bundle_digest"),
                 repeat_min=int(cfg["loop"]["repeat_min"]),
+                mode=rec.params.get("mode"),
             )
             params_ok = True
             try:
@@ -344,6 +470,9 @@ def check_run(
             "assembled": sum(bool(e["trace_summary"] and e["trace_completed"]) for e in items),
             "seconds_median": round(statistics.median(seconds), 1) if seconds else None,
             "seconds_p95": _percentile(seconds, 0.95),
+            "host_load1_median": _median(
+                [float(e["host_load1"]) for e in items if e.get("host_load1") is not None]
+            ),
             "outcomes": dict(Counter(str(e["outcome"]) for e in items)),
         }
     result: dict[str, Any] = {
@@ -358,8 +487,7 @@ def check_run(
         "per_trace": per_trace,
         "problems": problems,
     }
-    log("content check")
-    result["content_check"] = content(rows)
+    result["content_check"] = content_scan(d, records, content, log)
     if result["content_check"].get("leaking"):
         problems.append(f"content found: {result['content_check']}")
     (d / "check.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

@@ -100,6 +100,7 @@ class Injection:
             "planned_fault_kind": e.kind,
             "seed": e.seed,
             "bundle_digest": self.bundle_digest,
+            "host_load1": ledger.host_load1(),  # recorded when the trace has ended
         }
         if self.applied is None:
             return ledger.Record(

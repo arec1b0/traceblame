@@ -49,6 +49,10 @@ D1 per component: orchestration 150, retrieval, tool, model and prompt 75 each. 
 carries only model and prompt (25 + 25 of D1's 75 each), because those fire on every task.
 #19 reports per component, per app and pooled, and names both imbalances.
 
+A `golden_context_removed` trace counts as a retrieval fault in D1 only when the golden set
+was in the clean run's top-k, or the mode is `distractor`. A `remove` that finds no golden
+chunk in any result is `not_reached` (section 3).
+
 `output_budget_exhausted` moves `parse_ok` too: a truncated generation does not parse. The
 attributor has to prefer orchestration when finish_reason=length explains the parse failure.
 That overlap is real, not an artefact.
@@ -91,6 +95,9 @@ That overlap is real, not an artefact.
   - judge scores, latencies, trace and span ids, and sandbox alert timing.
 - **A planned fault whose point never comes is `not_reached`**: no injections row, and #19
   excludes it.
+- **Each ledger record carries the host's 1-minute load average** when its trace ended
+  (`host_load1`, ledger only). Wall time per trace depends on it, so the D1 throughput
+  numbers come with it.
 
 ### 4. Ground truth
 

@@ -246,19 +246,38 @@ def _check_content(args: argparse.Namespace) -> int:
     exported: set[str] = set()
     for path in args.files:
         text = Path(path).read_text(encoding="utf-8")
+        docs: list[Any]
         try:
             docs = [json.loads(text)]
         except ValueError:  # JSON lines, as the collector writes them
-            docs = [json.loads(line) for line in text.splitlines() if line.strip()]
+            docs = []
+            for line in text.splitlines():
+                try:
+                    docs.append(json.loads(line))
+                except ValueError:  # a non-JSON line is scanned as it is
+                    docs.append(line)
         for s in _strings(docs):
             exported.update(s[i : i + WINDOW] for i in range(max(len(s) - WINDOW, 0) + 1))
     found: list[str] = []
+    n_chunks = n_windows = 0
     for item in items:
         texts = [item.question] + [c.content for c in chunks(item)]
-        if any(w in exported for t in texts for w in _windows(t)):
+        windows = [w for t in texts for w in _windows(t)]
+        n_chunks += len(texts) - 1
+        n_windows += len(windows)
+        if any(w in exported for w in windows):
             found.append(item.qid)
-    # Only the qids, never the text found.
-    print(json.dumps({"checked_qids": len(items), "leaking_qids": found}))
+    # Only the qids and counts, never the text found.
+    print(
+        json.dumps(
+            {
+                "checked_qids": len(items),
+                "chunks": n_chunks,
+                "windows": n_windows,
+                "leaking_qids": found,
+            }
+        )
+    )
     return 1 if found else 0
 
 

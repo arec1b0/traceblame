@@ -10,6 +10,8 @@ Phases, each its own command so that only the ones that touch kind run under the
   record   (kind)      the ledger into eval_traces and injections (traceblame-faults record)
   check    (kind)      stored spans, markers, the join, the signal per kind against the clean
                        trace of the same query, trace_summary and trace.completed, content
+  content  (kind)      only the content check of a finished run (read-only): every stored row
+                       of its traces in every table with a trace_id, and the run's files
 
 The report over both apps is tools/faults/report.py. Run from WSL2 or Linux after
 `make kind-up kind-deploy`, with both checkouts committed (provenance).
@@ -118,6 +120,7 @@ def prepare(args: argparse.Namespace) -> int:
         "app": APP,
         "app_dir": str(app_dir),
         "prepared_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "host_cpus": os.cpu_count(),
         "traceblame_commit": traceblame_commit,
         "app_commit": app_commit,
         "ollama": ollama,
@@ -236,32 +239,62 @@ def record_phase(args: argparse.Namespace) -> int:
 # check ------------------------------------------------------------------------------------
 
 
-def check_phase(args: argparse.Namespace) -> int:
-    cfg = faultslib.config()
-    d = _dir(args.run_id)
-    state = _state(d)
-    queries = {
-        q.ref: q for q in plan.load_queries((d / "queries.jsonl").read_text(encoding="utf-8"))
-    }
+def _content(d: Path, state: dict[str, Any], qids: list[str]) -> faultslib.Content:
+    """The #12 needles (each query's question and every 48-character window of every chunk of
+    its contract) against every stored row of the run and the run's files."""
 
-    def content(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    def content(tables: dict[str, list[dict[str, Any]]], files: list[Path]) -> dict[str, Any]:
         dump = d / "stored.check.json"
-        dump.write_text(json.dumps(rows, default=str), encoding="utf-8")
+        dump.write_text(json.dumps(tables, default=str), encoding="utf-8")
         result = subprocess.run(  # noqa: S603 - fixed argv
             [
                 str(rag.VENV / "bin" / "python"), "-I", str(rag.RUN_SCRIPT), "check-content",
-                "--archive", state["archive"], "--qids", *sorted(queries),
-                "--files", str(d / "otlp.json"), str(dump),
+                "--archive", state["archive"], "--qids", *qids,
+                "--files", *map(str, files), str(dump),
             ],
             capture_output=True, text=True, env=_env(state), check=False,
         )  # fmt: skip
         out = cast("dict[str, Any]", json.loads(result.stdout.splitlines()[-1]))
-        return {"checked": out["checked_qids"], "leaking": len(out["leaking_qids"])}
+        return {
+            "needles": {
+                "queries": out["checked_qids"],
+                "contract_chunks": out["chunks"],
+                "windows": out["windows"],
+            },
+            "leaking": len(out["leaking_qids"]),
+        }
 
+    return content
+
+
+def _queries(d: Path) -> dict[str, plan.Query]:
+    text = (d / "queries.jsonl").read_text(encoding="utf-8")
+    return {q.ref: q for q in plan.load_queries(text)}
+
+
+def check_phase(args: argparse.Namespace) -> int:
+    cfg = faultslib.config()
+    d = _dir(args.run_id)
+    state = _state(d)
+    queries = _queries(d)
     result = faultslib.check_run(
-        APP, d, state, cfg, golden=lambda ref: queries[ref].golden_doc_ids, content=content, log=log
+        APP,
+        d,
+        state,
+        cfg,
+        golden=lambda ref: queries[ref].golden_doc_ids,
+        content=_content(d, state, sorted(queries)),
+        log=log,
     )
     log(f"check: {len(result['problems'])} problems")
+    return 0
+
+
+def content_phase(args: argparse.Namespace) -> int:
+    d = _dir(args.run_id)
+    state = _state(d)
+    check = faultslib.recheck_content(d, _content(d, state, sorted(_queries(d))), log)
+    log(f"content: {check['content_check']}")
     return 0
 
 
@@ -272,12 +305,17 @@ def main() -> int:
     p.add_argument("--app-dir", type=Path, required=True)
     p.add_argument("--ollama-url")
     p.add_argument("--run-id", help="default: faults-<date>-s<seed>-<commit7>")
-    for name in ("run", "record", "check"):
+    for name in ("run", "record", "check", "content"):
         sub.add_parser(name).add_argument("--run-id", required=True)
     args = parser.parse_args()
-    return {"prepare": prepare, "run": run_phase, "record": record_phase, "check": check_phase}[
-        args.command
-    ](args)
+    phases = {
+        "prepare": prepare,
+        "run": run_phase,
+        "record": record_phase,
+        "check": check_phase,
+        "content": content_phase,
+    }
+    return phases[args.command](args)
 
 
 if __name__ == "__main__":

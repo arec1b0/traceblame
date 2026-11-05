@@ -87,6 +87,22 @@ def test_every_trace_goes_to_eval_traces_and_applied_ones_to_injections() -> Non
     assert inserts[1][1]["injection_id"] == FAULTED.injection_id
 
 
+def test_a_not_reached_retrieval_fault_gets_an_eval_trace_and_no_injection() -> None:
+    # golden_context_removed in mode "remove" whose run never had a golden chunk to remove.
+    not_reached = replace(
+        CLEAN,
+        trace_id="6bf92f3577b34da6a3ce929d0e0e4736",
+        planned_fault_kind="golden_context_removed",
+    )
+    assert ledger.status(not_reached) == "not_reached"
+    client = FakeClient({"injections", "eval_traces"})
+    assert record.record(client, [not_reached]) == {"eval_traces": 1, "injections": 0}
+    (sql, params), *rest = client.commands
+    assert sql.split("(")[0].split()[-1] == "eval_traces"
+    assert (params["planned_fault_kind"], params["injection_id"]) == ("golden_context_removed", "")
+    assert rest == []
+
+
 def test_the_statements_are_the_contract_ones() -> None:
     client = FakeClient({"injections", "eval_traces"})
     record.record(client, [FAULTED])

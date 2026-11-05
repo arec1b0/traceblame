@@ -42,6 +42,42 @@ def test_golden_removed_does_not_move_when_golden_stays() -> None:
     assert not checks.signal("golden_context_removed", rows, f, f, injection_id=ID)["moved"]
 
 
+@pytest.mark.parametrize(
+    ("mode", "clean_hit", "counted"),
+    [
+        ("remove", True, True),
+        ("remove", False, False),
+        ("remove", None, False),
+        ("distractor", True, True),
+        ("distractor", False, True),
+        ("distractor", None, True),
+    ],
+)
+def test_a_retrieval_fault_counts_with_golden_in_the_clean_top_k_or_as_a_distractor(
+    mode: str, clean_hit: bool | None, counted: bool
+) -> None:
+    assert checks.retrieval_counted(mode, clean_hit) is counted
+
+
+def test_golden_removed_records_its_mode_and_whether_it_counts() -> None:
+    # The clean run never had the golden chunk in its top-k: a distractor still replaces the
+    # results (lower scores), so it counts; the same trace as "remove" would not.
+    clean_rows = [_retrieval("01.000", ["d1", "d2"], [0.5, 0.4])]
+    fault_rows = [_retrieval("01.000", ["x1", "x2"], [0.1, 0.0], attrs={checks.MARKER: ID})]
+    clean = checks.features(clean_rows, {"g1"})
+    faulted = checks.features(fault_rows, {"g1"})
+    out = checks.signal(
+        "golden_context_removed", fault_rows, faulted, clean, injection_id=ID, mode="distractor"
+    )
+    assert out["moved"]
+    assert out["golden_in_topk"] == [False, False]
+    assert (out["mode"], out["counted"]) == ("distractor", True)
+    out = checks.signal(
+        "golden_context_removed", fault_rows, faulted, clean, injection_id=ID, mode="remove"
+    )
+    assert (out["mode"], out["counted"]) == ("remove", False)
+
+
 def test_tool_failure_needs_an_error_tool_span_consumed_by_a_later_llm_step() -> None:
     rows = [
         _row("tool", "01.000", status="Error", tool_name="retriever", args_hash="a",

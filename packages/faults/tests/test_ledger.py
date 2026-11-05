@@ -1,5 +1,7 @@
 """The ledger the injector writes in-process: one record per eval trace, content-free."""
 
+import json
+import os
 from dataclasses import replace
 from pathlib import Path
 
@@ -83,6 +85,9 @@ def test_status() -> None:
         (replace(FAULTED, params={**FAULTED.params, "note": "free text"}), "note"),
         (replace(FAULTED, injection_id="other:malformed_output:0123456789ab"), "injection_id"),
         (replace(NOT_REACHED, fault_kind="tool_failure"), "fault_kind"),
+        (replace(CLEAN, host_load1=-0.5), "host_load1"),
+        (replace(CLEAN, host_load1=float("nan")), "host_load1"),
+        (replace(CLEAN, host_load1=float("inf")), "host_load1"),
     ],
 )
 def test_invalid_records_are_refused(rec: ledger.Record, match: str) -> None:
@@ -95,3 +100,29 @@ def test_read_validates_every_line(tmp_path: Path) -> None:
     path.write_text(ledger.dumps(CLEAN) + "\n" + '{"trace_id": "x"}\n', encoding="utf-8")
     with pytest.raises(ledger.LedgerError, match="line 2"):
         ledger.read(path)
+
+
+def test_host_load1_rides_along_and_old_lines_load_without_it(tmp_path: Path) -> None:
+    rec = replace(FAULTED, host_load1=12.34)
+    path = tmp_path / "ledger.jsonl"
+    ledger.append(path, rec)
+    old = json.loads(ledger.dumps(CLEAN))
+    del old["host_load1"]  # a line written before the field existed (the #14 validation run)
+    path.write_text(path.read_text(encoding="utf-8") + json.dumps(old) + "\n", encoding="utf-8")
+    assert ledger.read(path) == [rec, CLEAN]
+    assert CLEAN.host_load1 is None
+
+
+def test_host_load1_samples_the_one_minute_load_average(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(os, "getloadavg", lambda: (7.256, 5.0, 4.0))
+    assert ledger.host_load1() == 7.26
+
+
+def test_host_load1_is_none_where_the_platform_has_no_load_average(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable() -> tuple[float, float, float]:
+        raise OSError("no load average")
+
+    monkeypatch.setattr(os, "getloadavg", unavailable)
+    assert ledger.host_load1() is None
