@@ -410,7 +410,9 @@ def _percentile(values: list[float], q: float) -> float | None:
     return ordered[min(len(ordered) - 1, round(q * (len(ordered) - 1)))]
 
 
-def _median(values: list[float]) -> float | None:
+def median(values: list[float]) -> float | None:
+    """statistics.median rounded to 0.01, None for no values: the one median of host load in
+    check.json (host_load1_median) and in the report (report.loads_by_kind)."""
     return round(statistics.median(values), 2) if values else None
 
 
@@ -584,7 +586,7 @@ def check_run(
             "assembled": sum(bool(e["trace_summary"] and e["trace_completed"]) for e in items),
             "seconds_median": round(statistics.median(seconds), 1) if seconds else None,
             "seconds_p95": _percentile(seconds, 0.95),
-            "host_load1_median": _median(
+            "host_load1_median": median(
                 [float(e["host_load1"]) for e in items if e.get("host_load1") is not None]
             ),
             "outcomes": dict(Counter(str(e["outcome"]) for e in items)),

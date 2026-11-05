@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+import faultslib
 import pytest
 import report  # tools/faults, on pytest's pythonpath as at the driver's run time
 
@@ -134,7 +135,8 @@ def test_retrieval_rows_apply_the_d1_rule(tmp_path: Path) -> None:
         ("q2", "applied", "remove", True),  # golden was in the clean top-k
         ("q3", "not_reached", "remove", False),
     ]
-    assert report.loads_by_kind(_check(), view) == {"clean": 3.5, KIND: 9.0}
+    # KIND has loads 7.25 and 9.0 (the not_reached trace has none): the true median.
+    assert report.loads_by_kind(_check(), view) == {"clean": 3.5, KIND: 8.12}
 
 
 def test_the_content_line_names_needles_and_everything_scanned() -> None:
@@ -291,3 +293,17 @@ def test_the_preload_provenance_reads_git(monkeypatch: pytest.MonkeyPatch) -> No
         "commits_since": ["38dd2b8 build(faults): lint"],
         "lines_added_removed": [5, 5],
     }
+
+
+def test_load_medians_are_true_medians_shared_with_check_json() -> None:
+    check = {
+        "per_trace": [
+            {"trace_id": _trace_id(n), "kind": KIND, "status": "applied"} for n in range(4)
+        ]
+    }
+    view = {"host_load1": {_trace_id(n): float(n + 1) for n in range(4)}}  # 1, 2, 3, 4
+    assert report.loads_by_kind(check, view) == {KIND: 2.5}
+    # The same helper as check_run's host_load1_median.
+    assert faultslib.median([1.0, 2.0, 3.0, 4.0]) == 2.5
+    assert faultslib.median([3.0, 1.0, 2.0]) == 2.0
+    assert faultslib.median([]) is None

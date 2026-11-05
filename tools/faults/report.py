@@ -219,12 +219,13 @@ def preload_lines(pre: dict[str, Any] | None) -> list[str]:
 
 
 def loads_by_kind(check: dict[str, Any], view: dict[str, Any]) -> dict[str, float | None]:
+    """The median host load per kind, with check_run's helper (faultslib.median)."""
     out: dict[str, list[float]] = {}
     for t in check["per_trace"]:
         load = view["host_load1"].get(t["trace_id"])
         if load is not None:
             out.setdefault(t["kind"], []).append(float(load))
-    return {k: round(sorted(v)[len(v) // 2], 2) for k, v in out.items()}
+    return {k: faultslib.median(v) for k, v in out.items()}
 
 
 def markdown(report: dict[str, Any]) -> str:
