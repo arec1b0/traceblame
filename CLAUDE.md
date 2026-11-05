@@ -45,8 +45,9 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 ## Workflow
 - One GitHub issue = one branch = one PR. Conventional Commits.
 - Parallel sessions: each issue works in its own worktree
-  (`git worktree add ../traceblame-<issue> -b <branch> origin/main`); never run git in another
-  session's worktree; stage files by explicit path, never `git add -A`.
+  (`git worktree add --no-track ../traceblame-<issue> -b <branch> origin/main`; first push with
+  `git push -u origin <branch>`); never run git in another session's worktree; stage files by
+  explicit path, never `git add -A`.
 - Before any `make kind-deploy`: `git fetch origin && git merge origin/main` (no rebase), so the
   cluster never gets an older manifest than main.
 - Every command that sends traffic to kind or redeploys it runs under
