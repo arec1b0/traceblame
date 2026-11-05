@@ -106,6 +106,16 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   kind (deploy/kind/README.md)
 - `make kind-runbook-up` / `make kind-runbook-down`: the runbook-agent sandbox and its
   monitoring (namespace-only RBAC, derived NetworkPolicy addresses, pinned upstream rules)
+- `make faults-agentic-rag` / `make faults-runbook-agent`: the six fault kinds (ADR-0008) injected
+  into real agentic-rag runs on CUAD and real runbook-agent sandbox tasks (`APP_DIR`,
+  `RUNBOOK_APP_DIR`, `OLLAMA_URL`, `RUN_ID`; needs `make kind-deploy`, and `kind-runbook-up` for
+  the second). Phases that touch kind run under `flock $(KIND_LOCK)` (`/tmp/traceblame-kind.lock`,
+  shared with other sessions); never wrap the make target itself in the same lock. Ledger,
+  plan and checks in `.tools/faults/<run>/`; ground truth in `injections` and `eval_traces`
+- `make faults-report RUN_ID=...` / `make faults-validate`: the validation report over both apps,
+  `evals/reports/faults-kind-*`; thresholds in `tools/faults/validation.yaml`
+- `uv run traceblame-faults scenarios check|plan|check-ledger|record|digest`: the fault library's
+  CLI (`packages/faults`; scenarios in `src/traceblame_faults/scenarios/`)
 - `make attribution`: no AI attribution trailers or footer phrases in origin/main..HEAD
   (scripts/attribution-check.sh [RANGE]; PR_TITLE and PR_BODY in the environment add the PR text)
 - `make bench-scaling`: gateway 2 -> 4 -> 2 under steady load; span loss / split-trace report
