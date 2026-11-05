@@ -1,0 +1,322 @@
+{
+ "name": "low-nostamps",
+ "run": "0409b1b1",
+ "profile": "low",
+ "stamps": false,
+ "total_rate": 20.0,
+ "stages": {
+  "generator_to_agent": {
+   "n": 0,
+   "p50": NaN,
+   "p95": NaN,
+   "share": NaN,
+   "budget": 1.0,
+   "status": "n/a"
+  },
+  "agent_to_gateway": {
+   "n": 0,
+   "p50": NaN,
+   "p95": NaN,
+   "share": NaN,
+   "budget": 1.0,
+   "status": "n/a"
+  },
+  "gateway_to_decided": {
+   "n": 0,
+   "p50": NaN,
+   "p95": NaN,
+   "share": NaN,
+   "budget": 31.0,
+   "status": "n/a"
+  },
+  "decided_to_enqueue": {
+   "n": 0,
+   "p50": NaN,
+   "p95": NaN,
+   "share": NaN,
+   "budget": 0.1,
+   "status": "n/a"
+  },
+  "enqueue_to_clickhouse": {
+   "n": 0,
+   "p50": NaN,
+   "p95": NaN,
+   "share": NaN,
+   "budget": 1.0,
+   "status": "n/a"
+  }
+ },
+ "root_end_to_clickhouse_s": {
+  "n": 0,
+  "p50": NaN,
+  "p95": NaN
+ },
+ "excluded": {
+  "split": 0,
+  "missing_stamp": 5911,
+  "no_arrival": 0
+ },
+ "to_clickhouse_s": {
+  "p50": 23.066,
+  "p95": 30.753
+ },
+ "e2e_s": {
+  "p50": 29.404,
+  "p95": 37.367
+ },
+ "e2e_status": "ok",
+ "generator_backlog_p95_s": 0.021898592,
+ "generator_saturated": false,
+ "buckets": [],
+ "trend": [
+  {
+   "start_s": -30,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 0.0,
+    "gateway exporter queue (requests)": 0.0,
+    "ClickHouse pending async inserts": 0.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 0.0
+   }
+  },
+  {
+   "start_s": 0,
+   "values": {
+    "agent loadbalancing queue (bytes)": 761.0,
+    "gateway traces in tail_sampling": 434.0,
+    "gateway exporter queue (requests)": 0.0,
+    "gateway decision timer run (ms, mean)": 0.0,
+    "ClickHouse pending async inserts": 0.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 0.0
+   }
+  },
+  {
+   "start_s": 30,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 1017.0,
+    "gateway exporter queue (requests)": 7.0,
+    "gateway decision timer run (ms, mean)": 0.07017543859649122,
+    "ClickHouse pending async inserts": 11.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 426.0
+   }
+  },
+  {
+   "start_s": 60,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 1696.0,
+    "gateway exporter queue (requests)": 11.0,
+    "gateway decision timer run (ms, mean)": 0.07352941176470588,
+    "ClickHouse pending async inserts": 11.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 592.0
+   }
+  },
+  {
+   "start_s": 90,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 2271.0,
+    "gateway exporter queue (requests)": 2.0,
+    "gateway decision timer run (ms, mean)": 0.19298245614035087,
+    "ClickHouse pending async inserts": 11.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 564.0
+   }
+  },
+  {
+   "start_s": 120,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 2856.0,
+    "gateway exporter queue (requests)": 6.0,
+    "gateway decision timer run (ms, mean)": 0.9661016949152542,
+    "ClickHouse pending async inserts": 11.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 611.0
+   }
+  },
+  {
+   "start_s": 150,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 3458.0,
+    "gateway exporter queue (requests)": 8.0,
+    "gateway decision timer run (ms, mean)": 1.0327868852459017,
+    "ClickHouse pending async inserts": 10.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 573.0
+   }
+  },
+  {
+   "start_s": 180,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 4113.0,
+    "gateway exporter queue (requests)": 10.0,
+    "gateway decision timer run (ms, mean)": 1.4923076923076923,
+    "ClickHouse pending async inserts": 13.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 562.0
+   }
+  },
+  {
+   "start_s": 210,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 4714.0,
+    "gateway exporter queue (requests)": 12.0,
+    "gateway decision timer run (ms, mean)": 0.1694915254237288,
+    "ClickHouse pending async inserts": 12.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 556.0
+   }
+  },
+  {
+   "start_s": 240,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 5212.0,
+    "gateway exporter queue (requests)": 13.0,
+    "gateway decision timer run (ms, mean)": 2.9607843137254903,
+    "ClickHouse pending async inserts": 13.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 604.0
+   }
+  },
+  {
+   "start_s": 270,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 5894.0,
+    "gateway exporter queue (requests)": 8.0,
+    "gateway decision timer run (ms, mean)": 0.014925373134328358,
+    "ClickHouse pending async inserts": 10.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 588.0
+   }
+  },
+  {
+   "start_s": 300,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 6452.0,
+    "gateway exporter queue (requests)": 9.0,
+    "gateway decision timer run (ms, mean)": 0.0,
+    "ClickHouse pending async inserts": 11.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 585.0
+   }
+  },
+  {
+   "start_s": 330,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 7002.0,
+    "gateway exporter queue (requests)": 4.0,
+    "gateway decision timer run (ms, mean)": 0.03571428571428571,
+    "ClickHouse pending async inserts": 11.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 585.0
+   }
+  },
+  {
+   "start_s": 360,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 7200.0,
+    "gateway exporter queue (requests)": 8.0,
+    "gateway decision timer run (ms, mean)": 0.015151515151515152,
+    "ClickHouse pending async inserts": 10.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 577.0
+   }
+  },
+  {
+   "start_s": 390,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 7200.0,
+    "gateway exporter queue (requests)": 2.0,
+    "gateway decision timer run (ms, mean)": 0.0,
+    "ClickHouse pending async inserts": 9.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 158.0
+   }
+  },
+  {
+   "start_s": 420,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 7200.0,
+    "gateway exporter queue (requests)": 0.0,
+    "gateway decision timer run (ms, mean)": 0.0,
+    "ClickHouse pending async inserts": 0.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 1.0
+   }
+  },
+  {
+   "start_s": 450,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 7200.0,
+    "gateway exporter queue (requests)": 0.0,
+    "gateway decision timer run (ms, mean)": 0.0,
+    "ClickHouse pending async inserts": 0.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 0.0
+   }
+  },
+  {
+   "start_s": 480,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 7200.0,
+    "gateway exporter queue (requests)": 0.0,
+    "gateway decision timer run (ms, mean)": 0.0,
+    "ClickHouse pending async inserts": 0.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 0.0
+   }
+  },
+  {
+   "start_s": 510,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 7200.0,
+    "gateway exporter queue (requests)": 0.0,
+    "gateway decision timer run (ms, mean)": 0.0,
+    "ClickHouse pending async inserts": 0.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 0.0
+   }
+  },
+  {
+   "start_s": 540,
+   "values": {
+    "agent loadbalancing queue (bytes)": 0.0,
+    "gateway traces in tail_sampling": 7200.0,
+    "gateway exporter queue (requests)": 0.0,
+    "gateway decision timer run (ms, mean)": 0.0,
+    "ClickHouse pending async inserts": 0.0,
+    "ClickHouse failed async inserts": 0.0,
+    "ClickHouse inserts": 0.0
+   }
+  }
+ ],
+ "counters": {
+  "agent accepted spans": 28442.0,
+  "agent refused spans (memory_limiter)": 0.0,
+  "agent export failed spans": 0,
+  "gateway refused spans (memory_limiter)": 0.0,
+  "gateway exported spans": 23342.0,
+  "gateway export failed spans": 0,
+  "gateway traces dropped too early": 0.0
+ },
+ "events": []
+}

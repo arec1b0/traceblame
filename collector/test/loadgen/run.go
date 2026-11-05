@@ -10,6 +10,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"slices"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -62,6 +63,30 @@ type Summary struct {
 	SpansPer     int     `json:"spans_per_trace"`
 	ErrorEvery   int     `json:"error_every"`
 	Seed         uint64  `json:"seed"`
+	// Backlog is how far behind its schedule the generator sent (#57): per span, the start
+	// of its export call minus the span's end. The bench judges stage 1 (span end -> agent)
+	// a pipeline measurement only while this stays small.
+	Backlog Backlog `json:"backlog_ms"`
+}
+
+// Backlog summarizes the send delays of a run, in milliseconds (nearest-rank percentiles).
+type Backlog struct {
+	P50 float64 `json:"p50"`
+	P95 float64 `json:"p95"`
+	Max float64 `json:"max"`
+}
+
+func backlogStats(ns []int64) Backlog {
+	if len(ns) == 0 {
+		return Backlog{}
+	}
+	sorted := slices.Clone(ns)
+	slices.Sort(sorted)
+	rank := func(q float64) float64 {
+		i := max(1, int(math.Ceil(q*float64(len(sorted))))) - 1
+		return float64(sorted[i]) / 1e6
+	}
+	return Backlog{P50: rank(0.5), P95: rank(0.95), Max: float64(sorted[len(sorted)-1]) / 1e6}
 }
 
 type pending []bench.Batch
@@ -108,6 +133,7 @@ func run(args []string, out io.Writer) error {
 	s.T0 = t0
 	interval := float64(time.Second) / *rate
 	var queue pending
+	var backlog []int64
 	next := uint32(0)
 	deadline := t0 + duration.Nanoseconds() + giveUp.Nanoseconds()
 	ticker := time.NewTicker(20 * time.Millisecond)
@@ -124,15 +150,21 @@ func run(args []string, out io.Writer) error {
 			next++
 		}
 		batch := ptrace.NewTraces()
+		var ends []int64
 		for queue.Len() > 0 {
 			if queue.nextAt() > now {
 				break
 			}
 			b := heap.Pop(&queue).(bench.Batch)
+			ends = append(ends, b.SendAt)
 			b.Traces.ResourceSpans().MoveAndAppendTo(batch.ResourceSpans())
 		}
 		if batch.SpanCount() == 0 {
 			continue
+		}
+		sendAt := time.Now().UnixNano()
+		for _, end := range ends {
+			backlog = append(backlog, sendAt-end)
 		}
 		n := batch.SpanCount()
 		backoff := 200 * time.Millisecond
@@ -152,6 +184,7 @@ func run(args []string, out io.Writer) error {
 		}
 	}
 	s.FinishedNS = time.Now().UnixNano()
+	s.Backlog = backlogStats(backlog)
 	return json.NewEncoder(out).Encode(s)
 }
 

@@ -1,0 +1,31 @@
+{
+ "run": "0409b1b1",
+ "events": 5914,
+ "first_assembly_s": {
+  "n": 5911,
+  "p50": 29.404,
+  "p95": 37.367
+ },
+ "re_assembly_s": {
+  "n": 3,
+  "p50": 7.565,
+  "p95": 7.586
+ },
+ "root_end_to_first_arrival_s": {
+  "n": 5911,
+  "p50": 23.066,
+  "p95": 30.753
+ },
+ "last_arrival_to_summary_s": {
+  "n": 5911,
+  "p50": 6.212,
+  "p95": 7.223
+ },
+ "split_traces": {
+  "split_kept": 0,
+  "rejoined": 0,
+  "no_root": 0,
+  "unassembled": 0,
+  "mismatched": 0
+ }
+}

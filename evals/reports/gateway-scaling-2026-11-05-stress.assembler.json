@@ -1,0 +1,31 @@
+{
+ "run": "257f6002",
+ "events": 59782,
+ "first_assembly_s": {
+  "n": 59187,
+  "p50": 116.409,
+  "p95": 242.052
+ },
+ "re_assembly_s": {
+  "n": 595,
+  "p50": 107.889,
+  "p95": 142.445
+ },
+ "root_end_to_first_arrival_s": {
+  "n": 59187,
+  "p50": 108.519,
+  "p95": 235.122
+ },
+ "last_arrival_to_summary_s": {
+  "n": 59187,
+  "p50": 6.131,
+  "p95": 7.109
+ },
+ "split_traces": {
+  "split_kept": 1206,
+  "rejoined": 1206,
+  "no_root": 0,
+  "unassembled": 0,
+  "mismatched": 0
+ }
+}
