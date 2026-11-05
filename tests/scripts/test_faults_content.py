@@ -163,3 +163,44 @@ def test_the_run_ids_are_the_queries_and_plan_refs(tmp_path: Path) -> None:
     d = _run(tmp_path)
     (d / "queries.jsonl").write_text('{"ref": "oom-2@s7"}\n', encoding="utf-8")
     assert faultslib.run_ids(d) == frozenset({"oom-1@s7", "oom-2@s7"})
+
+
+def _result(needles: dict[str, int], leaking: int, rows: int, spans: int) -> dict[str, Any]:
+    scanned = {"rows_total": rows, "exported_spans": spans}
+    return {"needles": needles, "leaking": leaking, "scanned": scanned}
+
+
+@pytest.mark.parametrize(
+    ("result", "problem"),
+    [
+        (_result({"n": 3}, 0, 5, 2), None),
+        (_result({"n": 3}, 1, 5, 2), "content found"),
+        (_result({"n": 3}, 0, 0, 2), "content check: nothing scanned"),
+        (_result({"n": 3}, 0, 5, 0), "content check: nothing scanned"),
+        (_result({"a": 0, "b": 0}, 0, 5, 2), "content check: no needles"),
+    ],
+)
+def test_a_content_check_that_checked_nothing_fails(
+    result: dict[str, Any], problem: str | None
+) -> None:
+    problems = faultslib.content_problems(result)
+    if problem is None:
+        assert problems == []
+    else:
+        assert len(problems) == 1
+        assert problems[0].startswith(problem)
+
+
+def test_a_recheck_over_no_rows_is_a_problem(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    d = _run(tmp_path)
+
+    def run_rows(_ids: Any) -> dict[str, list[dict[str, Any]]]:
+        return {"spans": []}
+
+    monkeypatch.setattr(faultslib, "run_rows", run_rows)
+    check = faultslib.recheck_content(
+        d, lambda _t, _f: {"needles": {"n": 1}, "leaking": 0}, lambda _: None
+    )
+    assert check["problems"] == ["other", "content check: nothing scanned (0 rows, 1 spans)"]

@@ -390,15 +390,31 @@ def content_scan(
     return out
 
 
+def content_problems(result: dict[str, Any]) -> list[str]:
+    """A leak, and a check that checked nothing (no rows or spans scanned, no needles), are
+    problems: the check must be able to fail."""
+    out: list[str] = []
+    if result.get("leaking"):
+        out.append(f"content found: {result}")
+    scanned = result.get("scanned", {})
+    rows, spans = int(scanned.get("rows_total", 0)), int(scanned.get("exported_spans", 0))
+    if not rows or not spans:
+        out.append(f"content check: nothing scanned ({rows} rows, {spans} spans)")
+    if not sum(int(n) for n in result.get("needles", {}).values()):
+        out.append("content check: no needles")
+    return out
+
+
 def recheck_content(d: Path, content: Content, log: Callable[[str], None]) -> dict[str, Any]:
     """Only the content check of a finished run, over what is stored now (read-only; the
     caller holds the kind lock): replaces check.json's content_check and its content problem."""
     check = cast("dict[str, Any]", json.loads((d / "check.json").read_text(encoding="utf-8")))
     result = content_scan(d, ledger.read(d / "ledger.jsonl"), content, log)
     check["content_check"] = result
-    check["problems"] = [p for p in check["problems"] if not p.startswith("content found")]
-    if result.get("leaking"):
-        check["problems"].append(f"content found: {result}")
+    check["problems"] = [
+        p for p in check["problems"] if not p.startswith(("content found", "content check:"))
+    ]
+    check["problems"] += content_problems(result)
     (d / "check.json").write_text(json.dumps(check, indent=2) + "\n", encoding="utf-8")
     return check
 
@@ -604,8 +620,7 @@ def check_run(
         "problems": problems,
     }
     result["content_check"] = content_scan(d, records, content, log)
-    if result["content_check"].get("leaking"):
-        problems.append(f"content found: {result['content_check']}")
+    problems += content_problems(result["content_check"])
     (d / "check.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
 

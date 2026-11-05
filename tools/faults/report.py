@@ -471,6 +471,12 @@ def main() -> int:
         f"{app}: {p}" for app, c in per_app.items() for p in ledger_problems(c, views[app])
     ]
     problems += [f"{app}: {p}" for app, c in per_app.items() for p in signal_problems(c)]
+    problems += [
+        f"{app}: {p}"
+        for app, c in per_app.items()
+        for p in faultslib.content_problems(c["content_check"])
+        if p not in c["problems"]
+    ]
     if not gate["passed"]:
         problems.append("step_memory_loss: loop signal below the gate; redesign before D1")
     requests: list[Any] = []
