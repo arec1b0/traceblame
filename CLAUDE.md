@@ -14,7 +14,8 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 - Data plane: Go (OTel Collector custom distro via ocb, normalizer processor, trace-assembler)
 - Analysis/control: Python 3.12, uv workspace, FastAPI (api, detectors, attributor, replayer, faults)
 - SDK shims: Python + TypeScript over OpenInference / OpenLLMetry
-- Storage: ClickHouse (spans, findings, blame, injections), Postgres (replay_jobs state machine)
+- Storage: ClickHouse (spans, trace_arrivals, trace_summary, findings, blame, injections,
+  eval_traces), Postgres (assembler partitions/replicas, replay_jobs)
 - Messaging: NATS JetStream (trace.completed, traceblame.finding.v1, traceblame.blame.v1)
 - Deploy: kind locally, Helm + Argo CD; Grafana/Alertmanager dashboards-as-code, Sloth SLOs
 - Supply chain: cosign keyless, Syft SBOM, scanners pinned by digest, release-please
@@ -34,12 +35,19 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 6. Every alert links to docs/runbooks/<alert>.md. Every release has a documented rollback.
 7. Self-telemetry pipeline is separate from the analysed pipeline (no recursion).
 8. Thresholds in the design are starting hypotheses: keep them in config, not hardcoded.
+9. Ground truth never feeds attribution: detectors and the attributor must not read
+   aegis.eval.run.id, aegis.fault.injection.id, injections or eval_traces. golden_doc_ids are
+   read only by explicitly eval-only features; reports show metrics with and without them,
+   and production config excludes them.
+10. No silent-loss settings: inserts stay acknowledged (never wait_for_async_insert=0, never
+    fire-and-forget exporters); a fix that trades acknowledgement for speed needs an ADR.
 
 ## Workflow
 - One GitHub issue = one branch = one PR. Conventional Commits.
 - Parallel sessions: each issue works in its own worktree
-  (`git worktree add ../traceblame-<issue> -b <branch> origin/main`); never run git in another
-  session's worktree; stage files by explicit path, never `git add -A`.
+  (`git worktree add --no-track ../traceblame-<issue> -b <branch> origin/main`; first push with
+  `git push -u origin <branch>`); never run git in another session's worktree; stage files by
+  explicit path, never `git add -A`.
 - Before any `make kind-deploy`: `git fetch origin && git merge origin/main` (no rebase), so the
   cluster never gets an older manifest than main.
 - Every command that sends traffic to kind or redeploys it runs under
@@ -63,6 +71,30 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 - Never start long-running host services (Ollama, Docker, DBs) yourself; use the running instance (e.g. `OLLAMA_URL`) or ask me.
 - If a design decision is missing or contradicts reality (library API, semconv change),
   stop and write it as an ADR draft in docs/adr/ instead of improvising.
+- Numbers are assigned at merge, not in plans: profile revision (max(main) + minor, then
+  gen-schema), ClickHouse/Postgres migration number, ADR number, normalizer Version. Plans
+  say "next minor" / "next free".
+- An Accepted ADR is never edited; change a decision with a new ADR (docs/adr/README.md).
+  A Proposed ADR may be edited in place.
+- Stacked PRs: no rebase, no force-push; I update branches with "Update branch" in the UI
+  and merge bottom-up.
+- Review-bot threads (Codex, Cursor Bugbot) block merge (ruleset): fix real findings tests
+  first, reply with the fixing commit, resolve the thread; say why if a finding is wrong.
+- Verification must be able to fail: every check reports how many items it checked (zero
+  checked = fail), and a new gate or proof test is shown failing once (sabotage/mutation)
+  before it is trusted.
+- Measure before changing settings: performance or config changes need measured numbers
+  and their own issue; no tuning on a guess.
+- Versions, APIs, metric names and config keys come from the pinned source or a live
+  scrape, never from memory.
+- Benches and capture reports record commit, dirty flag, image IDs, applied migrations and
+  host load; don't run them while other sessions run heavy gates (results invalid).
+- Tools: run through make, or .tools/bin/... (pnpm, go, uv are pinned there, not global).
+- GPG signing via Windows pinentry may block: wait and tell me; never retry in a loop,
+  never bypass signing.
+- A failed CI job after push (e.g. sign): "Re-run failed jobs" only, so the image digest
+  stays the same; never re-run the whole workflow for a signing failure.
+- Project rules go into this file, not into session memory.
 
 ## Commands (fill in as they appear)
 Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows in this checkout.
