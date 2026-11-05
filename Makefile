@@ -112,7 +112,7 @@ kind-up: ## Create the local kind cluster, namespaces and generated Secrets (nee
 kind-deploy: ## Deploy ClickHouse, the migrations and the agent/gateway tiers into kind (after kind-up)
 	@bash scripts/kind-deploy.sh
 
-bench-scaling: ## Measure span loss and split traces while scaling the gateway 2->4->2 (evals/reports/)
+bench-scaling: ## Gateway 2->4->2 span loss and split traces; per-stage lag with STAMPS=1, PROFILE=stress|low|steady (evals/reports/)
 	@bash bench/gateway-scaling/run.sh
 
 kind-down: ## Delete the local kind cluster
