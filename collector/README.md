@@ -50,3 +50,7 @@ repository's `go.work`, and reaches the normalizer through a `replace` that ocb 
   Desktop's mountinfo entry. The smoke tests use fixed `limit_mib`; inside containers the
   percentage limits work.
 - The image is linux/amd64 only, like the pinned ocb release binary.
+- `transform` (contrib `transformprocessor`, beta for traces) is compiled in for the bench
+  overlays only: `deploy/kind/collector/*-bench-stamps.yaml` stamp the wall clock per stage
+  (#57). No normal deployment uses it; `tests/scripts/test_bench_overlays.py` fails if any
+  config, manifest or smoke config outside those overlays names it.
