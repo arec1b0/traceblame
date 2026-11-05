@@ -43,7 +43,7 @@ One kind per component, and two for orchestration, which has two MVP detectors.
 | `malformed_output` | model | both | response content of the k-th LLM call truncated, fenced or prefixed with prose; finish_reason as returned (TS: truncation only) | the LLM span | `schema_violation`: `parse_ok=false` |
 | `output_budget_exhausted` | orchestration | agentic-rag | `max_tokens` (8–32) added to the k-th request, so Ollama really stops (finish_reason=length) | the LLM span | `context_truncation`: finish_reason=length (parse_ok=false follows) |
 | `step_memory_loss` | orchestration | agentic-rag | from iteration k on, the loop hands the model no previous steps and the initial observation | the AGENT span | `loop`: one (tool_name, args_hash) at least 3 times |
-| `prompt_variant` | prompt | both | a different prompt template for the whole run (TS: the triage request's system message) | AGENT (Py), doGenerate (TS) | none in the MVP set (see Consequences); `aegis.bundle.digest` differs from the baseline |
+| `prompt_variant` | prompt | both | a different prompt template for the whole run (TS: the triage request's system message) | AGENT (Py), doGenerate (TS) | `prompt_regression` (moved into the MVP set, see Consequences): `aegis.bundle.digest` differs from the baseline |
 
 D1 per component: orchestration 150, retrieval, tool, model and prompt 75 each. TypeScript
 carries only model and prompt (25 + 25 of D1's 75 each), because those fire on every task.
@@ -154,10 +154,11 @@ That overlap is real, not an artefact.
 
 **Negative and risks**
 
-- **The prompt class has no MVP detector.** `prompt_regression` is Full-stage, so prompt
-  recall is about 0 and macro-F1 cannot reach 0.75. #16 and #17 have a proposal to move
-  `prompt_regression` (digest change against the baseline plus an outcome shift) into the
-  MVP set before D1 is collected.
+- **The prompt class had no MVP detector.** `prompt_regression` was Full-stage, so prompt
+  recall would be about 0 and macro-F1 could not reach 0.75. Decided on #16: it moves into
+  the MVP set (digest change against the run's baseline plus an outcome shift). This ADR
+  records what it needs: the run's `baseline_digest` in `injections.params`, and clean
+  traces that carry the baseline digest.
 - **`step_memory_loss` depends on the model repeating itself.** It is collected for D1 only
   if the loop signal fires on at least 60% of applied injections in the validation run
   (`tools/faults/validation.yaml`); otherwise the kind is redesigned first.

@@ -176,8 +176,8 @@ def markdown(report: dict[str, Any]) -> str:
         "",
         "Wall time per trace measured here (median per kind) times the D1 composition proposed",
         "on #19. Orchestration has two kinds, so D1 holds "
-        f"{comp.get('orchestration', 0)} orchestration traces against "
-        f"{comp.get('retrieval', 0)} for each other component; #19 reports macro-F1 by",
+        f"{comp.get('orchestration', 0)} orchestration traces",
+        f"against {comp.get('retrieval', 0)} for each other component; #19 reports macro-F1 by",
         "component and per app as well as pooled.",
         "",
         "| App | Kind | Traces | Median s | Hours |",
@@ -195,7 +195,7 @@ def markdown(report: dict[str, Any]) -> str:
         "",
         "## Blockers",
         "",
-        *[f"- {b}" for b in report["blockers"]],
+        *([f"- {b}" for b in report["blockers"]] or ["None recorded."]),
         "",
         "## Result",
         "",
