@@ -1,0 +1,12 @@
+scenario: tool_failure-agentic-rag
+version: 1
+kind: tool_failure
+app: agentic-rag
+description: >-
+  The vector store behind the call_index-th retriever tool call raises a connection error or a
+  timeout (a fixed message, no content). The app's retriever turns it into a FAILURE result,
+  which the loop feeds back to the model as the observation. Marker on the TOOL span.
+params:
+  mode: {choice: [backend_error, backend_timeout]}
+  tool: {value: retriever}
+  call_index: {value: 1}

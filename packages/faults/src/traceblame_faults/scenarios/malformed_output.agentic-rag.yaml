@@ -1,0 +1,14 @@
+scenario: malformed_output-agentic-rag
+version: 1
+kind: malformed_output
+app: agentic-rag
+description: >-
+  The call_index-th reasoning call's response content is truncated, wrapped in a markdown
+  fence, or prefixed with prose, in the transport under the OpenAI client; finish_reason stays
+  as the server returned it. The shim sets aegis.output.parse_ok=false on that LLM span, and
+  the app's retry makes a new call. Marker on the LLM span.
+params:
+  mode: {choice: [truncate, fence, prose]}
+  cut_fraction: {float: [0.2, 0.8]}
+  call_index: {int: [1, 2]}
+  persist: {value: once}

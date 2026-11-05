@@ -1,0 +1,24 @@
+scenario: prompt_variant-runbook-agent
+version: 1
+kind: prompt_variant
+app: runbook-agent
+description: >-
+  The triage request carries a different system prompt, rewritten in the eval image's fetch
+  preload; aegis.bundle.digest is set to the variant's digest for the block of tasks
+  (TRACEBLAME_BUNDLE_DIGEST), and the preload records the digest of what it sent. The output
+  schema still applies, so the JSON contract holds. Marker on the doGenerate span.
+params:
+  variant: {choice: [no-decline-rule, no-candidate-rule]}
+variants:
+  no-decline-rule:
+    templates: {system: prompts/runbook_agent/no-decline-rule-system.txt}
+    source: arec1b0/runbook-agent TRIAGE_SYSTEM_PROMPT without rule 2, renumbered
+    rationale: >-
+      Drops "Prefer declining over guessing": more runbooks are applied, so more remediation
+      steps and approvals, where the app prompt asks for escalation.
+  no-candidate-rule:
+    templates: {system: prompts/runbook_agent/no-candidate-rule-system.txt}
+    source: arec1b0/runbook-agent TRIAGE_SYSTEM_PROMPT without rule 1, renumbered
+    rationale: >-
+      Drops "only choose a runbook id from the provided candidates": invented ids, which the
+      app turns into declines.

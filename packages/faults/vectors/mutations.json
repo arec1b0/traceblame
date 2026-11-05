@@ -1,0 +1,543 @@
+{
+  "with_fields": [
+    {
+      "name": "seed",
+      "body": {
+        "model": "qwen2.5:7b",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful AI assistant."
+          },
+          {
+            "role": "user",
+            "content": "Query: q"
+          }
+        ],
+        "temperature": 0.2,
+        "response_format": {
+          "type": "json_object"
+        }
+      },
+      "fields": {
+        "seed": 123
+      },
+      "want": {
+        "model": "qwen2.5:7b",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful AI assistant."
+          },
+          {
+            "role": "user",
+            "content": "Query: q"
+          }
+        ],
+        "temperature": 0.2,
+        "response_format": {
+          "type": "json_object"
+        },
+        "seed": 123
+      }
+    },
+    {
+      "name": "seed_and_max_tokens_override",
+      "body": {
+        "model": "qwen2.5:7b",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful AI assistant."
+          },
+          {
+            "role": "user",
+            "content": "Query: q"
+          }
+        ],
+        "temperature": 0.2,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512
+      },
+      "fields": {
+        "seed": 5,
+        "max_tokens": 16
+      },
+      "want": {
+        "model": "qwen2.5:7b",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful AI assistant."
+          },
+          {
+            "role": "user",
+            "content": "Query: q"
+          }
+        ],
+        "temperature": 0.2,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 16,
+        "seed": 5
+      }
+    }
+  ],
+  "with_system": [
+    {
+      "name": "first_system",
+      "body": {
+        "model": "qwen2.5:7b",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful AI assistant."
+          },
+          {
+            "role": "user",
+            "content": "Query: q"
+          }
+        ],
+        "temperature": 0.2,
+        "response_format": {
+          "type": "json_object"
+        }
+      },
+      "text": "Rules:\n1. Decline.\n\"quoted\" ü",
+      "want": {
+        "model": "qwen2.5:7b",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Rules:\n1. Decline.\n\"quoted\" ü"
+          },
+          {
+            "role": "user",
+            "content": "Query: q"
+          }
+        ],
+        "temperature": 0.2,
+        "response_format": {
+          "type": "json_object"
+        }
+      }
+    },
+    {
+      "name": "system_after_user",
+      "body": {
+        "model": "m",
+        "messages": [
+          {
+            "role": "user",
+            "content": "u"
+          },
+          {
+            "role": "system",
+            "content": "s"
+          },
+          {
+            "role": "system",
+            "content": "s2"
+          }
+        ]
+      },
+      "text": "Rules:\n1. Decline.\n\"quoted\" ü",
+      "want": {
+        "model": "m",
+        "messages": [
+          {
+            "role": "user",
+            "content": "u"
+          },
+          {
+            "role": "system",
+            "content": "Rules:\n1. Decline.\n\"quoted\" ü"
+          },
+          {
+            "role": "system",
+            "content": "s2"
+          }
+        ]
+      }
+    }
+  ],
+  "malform": [
+    {
+      "name": "truncate_half",
+      "body": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"action_input\": {\"query\": \"governing law\"}, \"confidence\": 0.8}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "mode": "truncate",
+      "cut_fraction": 0.5,
+      "want": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"ac"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      }
+    },
+    {
+      "name": "truncate_low",
+      "body": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"action_input\": {\"query\": \"governing law\"}, \"confidence\": 0.8}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "mode": "truncate",
+      "cut_fraction": 0.05,
+      "want": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"tho"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      }
+    },
+    {
+      "name": "truncate_high",
+      "body": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"action_input\": {\"query\": \"governing law\"}, \"confidence\": 0.8}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "mode": "truncate",
+      "cut_fraction": 0.95,
+      "want": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"action_input\": {\"query\": \"governing law\"}, \"confidence\""
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      }
+    },
+    {
+      "name": "fence",
+      "body": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"action_input\": {\"query\": \"governing law\"}, \"confidence\": 0.8}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "mode": "fence",
+      "cut_fraction": 0.5,
+      "want": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "```json\n{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"action_input\": {\"query\": \"governing law\"}, \"confidence\": 0.8}\n```"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      }
+    },
+    {
+      "name": "prose",
+      "body": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"action_input\": {\"query\": \"governing law\"}, \"confidence\": 0.8}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "mode": "prose",
+      "cut_fraction": 0.5,
+      "want": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "Here is my next step:\n{\"thought\": \"Need the clause.\", \"action\": \"retriever\", \"action_input\": {\"query\": \"governing law\"}, \"confidence\": 0.8}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      }
+    },
+    {
+      "name": "truncate_non_ascii",
+      "body": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"answer\": \"Größe 😀 ok\"}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "mode": "truncate",
+      "cut_fraction": 0.6,
+      "want": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"answer\": \"Gr"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      }
+    },
+    {
+      "name": "truncate_parsable_prefix",
+      "body": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{} {\"a\": 1}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "mode": "truncate",
+      "cut_fraction": 0.3,
+      "want": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "qwen2.5:7b",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "total_tokens": 15
+        }
+      }
+    }
+  ],
+  "request_seed": [
+    {
+      "args": [
+        7,
+        "q1",
+        1
+      ],
+      "want": 1750813245
+    },
+    {
+      "args": [
+        7,
+        "q1",
+        2
+      ],
+      "want": 132499946
+    },
+    {
+      "args": [
+        7,
+        "LIMEENERGYCO_09_09_1999-EX-10-DISTRIBUTOR AGREEMENT__Document Name",
+        1
+      ],
+      "want": 507189552
+    },
+    {
+      "args": [
+        0,
+        "oom-3@s7",
+        1
+      ],
+      "want": 556391077
+    }
+  ],
+  "digest": [
+    {
+      "name": "runbook_system",
+      "app": "runbook-agent",
+      "templates": {
+        "system": "You are an SRE triage assistant.\n\nRules:\n1. \"apply\": false"
+      },
+      "want": "sha256:f2c21c0cff28d196ac71ad0689eeeb0404ce468d8fa6f36cec666fb4b0d9f617"
+    },
+    {
+      "name": "agentic_two",
+      "app": "agentic-rag",
+      "templates": {
+        "system": "S ü",
+        "reasoning": "Query: {query}\n{{\"a\": 1}}"
+      },
+      "want": "sha256:8b2c6ea25e04c546229d3f8d4bbf70d4bf387cba63dd9778ce4e37b2f8628ba9"
+    },
+    {
+      "name": "empty",
+      "app": "runbook-agent",
+      "templates": {},
+      "want": "sha256:430f0bb2edc8aa9236e0b3a1c5446b73e37a2122e1c8fc62f8a06b0865900e36"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+Given the query and available information, generate your next thought and action.
+
+Query: {query}
+
+Previous steps:
+{previous_steps}
+
+Available tools: {available_tools}
+
+Current observation: {observation}
+
+What should you do next? Think step by step:
+1. What have we learned so far?
+2. What information is still needed?
+3. Which tool should be used next (or should we provide final answer)?
+
+Respond with JSON:
+{{
+    "thought": "<your reasoning>",
+    "action": "<tool_name or 'final_answer'>",
+    "action_input": {{"<parameter>": "<value>"}},
+    "confidence": <float 0-1>
+}}
+
+Respond ONLY with valid JSON.

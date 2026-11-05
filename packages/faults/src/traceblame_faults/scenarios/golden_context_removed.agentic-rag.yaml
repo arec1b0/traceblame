@@ -1,0 +1,15 @@
+scenario: golden_context_removed-agentic-rag
+version: 1
+kind: golden_context_removed
+app: agentic-rag
+description: >-
+  Every retrieval of the run loses the question's golden chunks. remove: the retriever gets the
+  next nearest chunks of the same contract instead. distractor: it gets the nearest chunks of
+  another contract (seeded). The marker goes on each retriever span whose results changed.
+eligible:
+  strata: [answerable]
+  golden: [mapped]
+params:
+  mode: {choice: [remove, distractor]}
+  # The app's retriever default; the wrapper keeps whatever n_results the model asks for.
+  top_k: {value: 5}

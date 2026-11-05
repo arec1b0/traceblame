@@ -1009,8 +1009,23 @@ source = { editable = "services/detectors" }
 
 [[package]]
 name = "traceblame-faults"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/faults" }
+dependencies = [
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+store = [
+    { name = "traceblame-storage" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "traceblame-storage", marker = "extra == 'store'", editable = "packages/storage" },
+]
+provides-extras = ["store"]
 
 [[package]]
 name = "traceblame-py"
