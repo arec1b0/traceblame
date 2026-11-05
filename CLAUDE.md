@@ -37,6 +37,13 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 
 ## Workflow
 - One GitHub issue = one branch = one PR. Conventional Commits.
+- Parallel sessions: each issue works in its own worktree
+  (`git worktree add ../traceblame-<issue> -b <branch> origin/main`); never run git in another
+  session's worktree; stage files by explicit path, never `git add -A`.
+- Before any `make kind-deploy`: `git fetch origin && git merge origin/main` (no rebase), so the
+  cluster never gets an older manifest than main.
+- Every command that sends traffic to kind or redeploys it runs under
+  `flock /tmp/traceblame-kind.lock`.
 - pre-push hook enforces the PR-state rule and the attribution rule; never bypass with
   --no-verify. CI repeats the attribution check (job "attribution (no AI trailers or
   phrases)") on the PR's commits, title and body.
@@ -104,6 +111,9 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
 - `make kind-deploy`: images, ClickHouse via the Altinity operator, NATS JetStream, Postgres,
   migrations of both databases, agent DaemonSet, gateway and trace-assembler Deployments into
   kind (deploy/kind/README.md)
+- `make kind-clickhouse-persistence`: the CHI pod mounts a Bound PVC at /var/lib/clickhouse and a
+  marker survives a pod deletion (`MODE=write`, then `MODE=verify TOKEN=...` around a manual
+  Docker Desktop restart; deploy/kind/README.md)
 - `make kind-runbook-up` / `make kind-runbook-down`: the runbook-agent sandbox and its
   monitoring (namespace-only RBAC, derived NetworkPolicy addresses, pinned upstream rules)
 - `make faults-agentic-rag` / `make faults-runbook-agent`: the six fault kinds (ADR-0008) injected
