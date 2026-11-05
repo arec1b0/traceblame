@@ -55,6 +55,16 @@ repos:
         language: unsupported
         files: ^sdk/ts/
         pass_filenames: false
+      # The fault preload (#14) is plain ESM: sdk/ts's pinned eslint with the preload's own
+      # config (js recommended, Node globals), run in its directory.
+      - id: faults-preload-eslint
+        name: eslint (packages/faults/preload)
+        entry: >-
+          bash -c 'cd packages/faults/preload &&
+          ../../../.tools/bin/node ../../../sdk/ts/node_modules/eslint/bin/eslint.js .'
+        language: unsupported
+        files: ^(packages/faults/preload/|sdk/ts/(package\.json|pnpm-lock\.yaml)$)
+        pass_filenames: false
       - id: sdk-ts-tsc
         name: tsc --noEmit (sdk/ts)
         entry: .tools/bin/pnpm -C sdk/ts -s typecheck

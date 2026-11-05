@@ -75,7 +75,7 @@ export function digest(app, templates) {
   return `sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`;
 }
 
-function obj(body) {
+function parseObject(body) {
   const data = JSON.parse(body);
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("body is not a JSON object");
@@ -84,7 +84,7 @@ function obj(body) {
 }
 
 export function withFields(body, fields) {
-  return JSON.stringify({ ...obj(body), ...fields });
+  return JSON.stringify({ ...parseObject(body), ...fields });
 }
 
 function systemIndex(data) {
@@ -95,7 +95,7 @@ function systemIndex(data) {
 export function systemText(body) {
   let data;
   try {
-    data = obj(body);
+    data = parseObject(body);
   } catch {
     return null;
   }
@@ -106,7 +106,7 @@ export function systemText(body) {
 }
 
 export function withSystem(body, text) {
-  const data = obj(body);
+  const data = parseObject(body);
   const i = systemIndex(data);
   if (i < 0) throw new Error("request has no system message");
   const messages = data.messages.slice();
@@ -135,7 +135,7 @@ function truncate(text, cutFraction) {
 }
 
 export function malform(body, mode, cutFraction) {
-  const data = obj(body);
+  const data = parseObject(body);
   if (!Array.isArray(data.choices) || data.choices.length === 0) {
     throw new Error("response has no choices");
   }
