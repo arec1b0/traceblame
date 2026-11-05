@@ -179,26 +179,47 @@ _TABLE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 RUN_FILES = ("otlp.json", "ledger.jsonl", "outcomes.jsonl", "plan.jsonl", "queries.jsonl",
              "state.json")  # fmt: skip
 Content = Callable[[dict[str, list[dict[str, Any]]], list[Path]], dict[str, Any]]
-# The dataset's own question / task ids (#14 decision): a runbook task id is also its sandbox
-# workload's name, which the #13 needles hold as a label value, so the id would match itself.
-# Only these fields are left out of the content scan; every other column and key is scanned.
+# The dataset's own question / task ids (#14 decision) in these fields are left out of the
+# content scan, and only when a value is exactly one of the run's ids in its dataset's format:
+# a runbook task id is also its sandbox workload's name, which the #13 alert needles hold, so
+# the id would match itself. Any other value in these fields is scanned like everything else.
 ID_FIELDS = frozenset({"query_ref", "ref"})
+ID_FORMATS = (
+    re.compile(r"^[a-z0-9-]+@s\d+$"),  # runbook task: <task>@s<seed>
+    re.compile(r"^[^\x00-\x1f\x7f]+__[A-Za-z][A-Za-z /-]*$"),  # CUAD qid: <title>__<category>
+)
 
 
-def strip_ids(value: Any) -> tuple[Any, int]:
-    """The value without ID_FIELDS keys at any depth, and how many it dropped."""
+def run_ids(d: Path) -> frozenset[str]:
+    """The run's dataset ids: its queries' refs and its plan's query refs."""
+    out: set[str] = set()
+    for name, key in (("queries.jsonl", "ref"), ("plan.jsonl", "query_ref")):
+        if (d / name).is_file():
+            for doc in json_docs(d / name):
+                if isinstance(doc, dict) and key in doc:
+                    out.add(str(cast("dict[str, Any]", doc)[key]))
+    return frozenset(out)
+
+
+def is_dataset_id(value: Any, ids: frozenset[str]) -> bool:
+    return isinstance(value, str) and value in ids and any(f.fullmatch(value) for f in ID_FORMATS)
+
+
+def strip_ids(value: Any, ids: frozenset[str]) -> tuple[Any, int]:
+    """The value without the ID_FIELDS entries whose value is exactly one of the run's dataset
+    ids, at any depth, and how many it dropped."""
     if isinstance(value, dict):
         out: dict[str, Any] = {}
         dropped = 0
         for k, v in cast("dict[str, Any]", value).items():
-            if k in ID_FIELDS:
+            if k in ID_FIELDS and is_dataset_id(v, ids):
                 dropped += 1
                 continue
-            out[k], n = strip_ids(v)
+            out[k], n = strip_ids(v, ids)
             dropped += n
         return out, dropped
     if isinstance(value, list):
-        items = [strip_ids(v) for v in cast("list[Any]", value)]
+        items = [strip_ids(v, ids) for v in cast("list[Any]", value)]
         return [v for v, _ in items], sum(n for _, n in items)
     return value, 0
 
@@ -256,13 +277,14 @@ def content_scan(
     into the result next to the app's needle counts."""
     log("content check: every stored row of the run")
     tables = run_rows({r.trace_id for r in records})
-    stripped, dropped = strip_ids(tables)
+    ids = run_ids(d)
+    stripped, dropped = strip_ids(tables, ids)
     files = [d / name for name in RUN_FILES if (d / name).is_file()]
     scan = d / "content-scan"
     scan.mkdir(exist_ok=True)
     copies: list[Path] = []
     for f in files:
-        docs, n = strip_ids(json_docs(f))
+        docs, n = strip_ids(json_docs(f), ids)
         dropped += n
         copy = scan / f"{f.name}.json"
         copy.write_text(json.dumps(docs), encoding="utf-8")

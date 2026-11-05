@@ -8,6 +8,7 @@ throughput projection for D1 (#19), from the measured wall time per kind.
 import argparse
 import hashlib
 import json
+import subprocess
 import sys
 from collections import Counter
 from datetime import UTC, datetime
@@ -162,9 +163,10 @@ def content_line(app: str, cc: dict[str, Any]) -> str:
     files = ", ".join(f"{f} ({n} line{'' if n == 1 else 's'})" for f, n in sc["files"].items())
     ex = sc.get("id_fields_excluded")
     excluded = (
-        f"; left out: only the dataset id fields {', '.join(ex['fields'])} ({ex['values']} values,"
-        " the dataset's own question or task ids; a runbook task id is also its workload's name,"
-        " which the alert needles hold)"
+        f"; left out: {ex['values']} values of {', '.join(ex['fields'])} that are exactly one of"
+        " the run's own dataset ids in its format (`<task>@s<seed>`, CUAD `<title>__<category>`;"
+        " a runbook task id is also its workload's name, which the alert needles hold). Any"
+        " other value in those fields is scanned"
         if ex
         else ""
     )
@@ -175,6 +177,46 @@ def content_line(app: str, cc: dict[str, Any]) -> str:
         f" {sc['rows_total']} rows ({rows}); the {sc['exported_spans']} exported spans; the"
         f" run's files {files}{excluded}"
     )
+
+
+def retrieval_answer(rows: list[dict[str, Any]]) -> list[str]:
+    applied = [r for r in rows if r["status"] == "applied"]
+    not_reached = [r for r in rows if r["status"] == "not_reached"]
+    modes = Counter(str(r["mode"]) for r in applied)
+    no_golden = [r for r in applied if r["golden_in_topk"][0] is not True]
+    ran = ", ".join(f"`{r['query']}` ran `{r['mode']}`" for r in no_golden) or "none"
+    return [
+        f"Re-derived from the ledger: {len(applied)} applied "
+        f"({', '.join(f'{m} {n}' for m, n in sorted(modes.items()))}), {len(not_reached)} "
+        f"not_reached; {sum(r['counted'] for r in applied)} counted for D1.",
+        "",
+        f"Queries with no golden chunk in the clean top-k: {len(no_golden)}; {ran}.",
+    ]
+
+
+def preload_lines(pre: dict[str, Any] | None) -> list[str]:
+    if pre is None:
+        return []
+    out = [
+        f"- preload used by this run: sha256 `{pre['run_sha256']}` "
+        + (
+            "(equal to the file at the run's commit)"
+            if pre["run_commit_matches"]
+            else "(**not** the file at the run's commit)"
+        )
+    ]
+    if pre["committed_sha256"] == pre["run_sha256"]:
+        out.append("- the committed preload is the same file")
+        return out
+    added, removed = pre["lines_added_removed"]
+    since = "; ".join(f"`{c}`" for c in pre["commits_since"]) or "none"
+    out.append(
+        f"- the committed preload differs: sha256 `{pre['committed_sha256']}`, changed since the"
+        f" run by {since} ({added} lines added, {removed} removed). D1 runs with the committed"
+        " preload: the build phase refuses a dirty checkout and records the file's sha256 in the"
+        " run's provenance (`preload_sha256`)"
+    )
+    return out
 
 
 def loads_by_kind(check: dict[str, Any], view: dict[str, Any]) -> dict[str, float | None]:
@@ -225,16 +267,8 @@ def markdown(report: dict[str, Any]) -> str:
             ),
         ]
         if app == "runbook-agent":
-            now = report.get("preload_sha256_now")
-            changed = (
-                f" (the committed file has changed since this run: `{now[:16]}`)"
-                if now and now != s["preload_sha256"]
-                else ""
-            )
-            out.append(
-                f"- preload sha256 `{s['preload_sha256'][:16]}`{changed}; image guard "
-                f"{s['image_guard']}"
-            )
+            out.append(f"- image guard {s['image_guard']}")
+            out += preload_lines(report.get("preload"))
         if app == "agentic-rag":
             out.append(f"- golden chunks of the sampled answerable queries: {s['golden_coverage']}")
         out += [
@@ -283,13 +317,7 @@ def markdown(report: dict[str, Any]) -> str:
             "faulted | Signal moved | Counted |",
             "|---|---|---|---|---|---|---|",
         ]
-        applied = [r for r in retrieval if r["status"] == "applied"]
-        modes = Counter(str(r["mode"]) for r in applied)
-        out[-2:-2] = [
-            f"In this run: {len(applied)} applied ({dict(sorted(modes.items()))}), "
-            f"{sum(r['counted'] for r in applied)} counted; the mode comes from the ledger.",
-            "",
-        ]
+        out[-2:-2] = [*retrieval_answer(retrieval), ""]
         for r in retrieval:
             out.append(
                 f"| {r['query']} | {r['mode']} | {r['golden_in_topk'][0]} | "
@@ -355,6 +383,11 @@ def markdown(report: dict[str, Any]) -> str:
         f"Total about {proj['hours']} h of serial run time (Ollama serves one request at a time),"
         f" plus settle and assembly; M2 is due {DUE}.",
         "",
+        *(
+            ["## Notes", "", *[f"- {n}" for n in report.get("notes", [])], ""]
+            if report.get("notes")
+            else []
+        ),
         "## Blockers",
         "",
         *([f"- {b}" for b in report["blockers"]] or ["None recorded."]),
@@ -369,6 +402,32 @@ def markdown(report: dict[str, Any]) -> str:
     return "\n".join(out)
 
 
+def _git(*argv: str) -> bytes:
+    return subprocess.run(  # noqa: S603 - fixed argv
+        ["git", "-C", str(ROOT), *argv],  # noqa: S607 - git from PATH, as the drivers use it
+        capture_output=True,
+        check=True,
+    ).stdout
+
+
+def preload_provenance(run_commit: str, run_sha256: str) -> dict[str, Any]:
+    """The preload the run used against the committed one, from git: the file at the run's
+    commit must have the run's sha256; what changed since is listed by commit and lines."""
+    rel = str(PRELOAD.relative_to(ROOT))
+    at_run = hashlib.sha256(_git("show", f"{run_commit}:{rel}")).hexdigest()
+    committed = hashlib.sha256(_git("show", f"HEAD:{rel}")).hexdigest()
+    numstat = _git("diff", "--numstat", run_commit, "HEAD", "--", rel).decode().split()
+    return {
+        "run_sha256": run_sha256,
+        "run_commit_matches": at_run == run_sha256,
+        "committed_sha256": committed,
+        "commits_since": _git("log", "--format=%h %s", f"{run_commit}..HEAD", "--", rel)
+        .decode()
+        .splitlines(),
+        "lines_added_removed": [int(numstat[0]), int(numstat[1])] if numstat else [0, 0],
+    }
+
+
 def run_date(states: dict[str, dict[str, Any]]) -> str:
     """The run's own date (its first prepare or build), so a re-generated report keeps its
     file; today only for a state without one."""
@@ -381,6 +440,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=cast("str", __doc__).splitlines()[0])
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--blocker", action="append", default=[])
+    parser.add_argument("--note", action="append", default=[])
     args = parser.parse_args()
     cfg = faultslib.config()
     per_app: dict[str, dict[str, Any]] = {}
@@ -432,7 +492,12 @@ def main() -> int:
         "runbook_requests": sorted({json.dumps(r, sort_keys=True) for r in requests}),
         "blockers": args.blocker,
         "problems": problems,
-        "preload_sha256_now": hashlib.sha256(PRELOAD.read_bytes()).hexdigest(),
+        "preload": preload_provenance(
+            states["runbook-agent"]["traceblame_commit"], states["runbook-agent"]["preload_sha256"]
+        )
+        if "runbook-agent" in states
+        else None,
+        "notes": args.note,
     }
     stem = f"faults-kind-{report['date']}"
     REPORTS.mkdir(parents=True, exist_ok=True)

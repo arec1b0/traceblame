@@ -2,9 +2,11 @@
 (modes, counts, host load), the D1 rule for golden_context_removed, and the content-check line.
 Ledgers, plans and check.json entries here are test doubles, never eval data."""
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
+import pytest
 import report  # tools/faults, on pytest's pythonpath as at the driver's run time
 
 from traceblame_faults import ids, ledger, plan
@@ -153,7 +155,8 @@ def test_the_content_line_names_needles_and_everything_scanned() -> None:
     assert "the 366 exported spans" in line
     assert "ledger.jsonl (28 lines)" in line
     assert "otlp.json (1 line)" in line
-    assert "left out: only the dataset id fields query_ref, ref (56 values" in line
+    assert "left out: 56 values of query_ref, ref that are exactly one of the run's own" in line
+    assert "Any other value in those fields is scanned" in line
     assert report.content_line("agentic-rag", {"checked": 4, "leaking": 0}).startswith(
         "content check (spans only)"
     )
@@ -185,5 +188,56 @@ def test_the_markdown_states_the_rule_and_the_empty_blockers(tmp_path: Path) -> 
     )
     assert "| q1 | distractor | False | False | 0.2 -> -0.2 | True | True |" in md
     assert "| q3 | remove | None | None | None -> None | None | False |" in md
-    assert "In this run: 2 applied ({'distractor': 1, 'remove': 1}), 2 counted" in md
+    assert (
+        "Re-derived from the ledger: 2 applied (distractor 1, remove 1), 1 not_reached;"
+        " 2 counted for D1." in md
+    )
+    assert "Queries with no golden chunk in the clean top-k: 1; `q1` ran `distractor`." in md
     assert "None recorded." in md
+
+
+def test_the_preload_lines_name_both_digests_and_what_changed() -> None:
+    pre = {
+        "run_sha256": "a" * 64,
+        "run_commit_matches": True,
+        "committed_sha256": "b" * 64,
+        "commits_since": ["38dd2b8 build(faults): lint the Node preload with eslint (#14)"],
+        "lines_added_removed": [5, 5],
+    }
+    used, changed = report.preload_lines(pre)
+    assert used.startswith(f"- preload used by this run: sha256 `{'a' * 64}`")
+    assert used.endswith("(equal to the file at the run's commit)")
+    assert f"sha256 `{'b' * 64}`" in changed
+    assert (
+        "`38dd2b8 build(faults): lint the Node preload with eslint (#14)` (5 lines added" in changed
+    )
+    assert "D1 runs with the committed preload" in changed
+    same = pre | {"committed_sha256": "a" * 64}
+    assert report.preload_lines(same)[1] == "- the committed preload is the same file"
+    assert "**not**" in report.preload_lines(pre | {"run_commit_matches": False})[0]
+    assert report.preload_lines(None) == []
+
+
+def test_the_preload_provenance_reads_git(monkeypatch: pytest.MonkeyPatch) -> None:
+    files = {
+        "run1:" + str(report.PRELOAD.relative_to(report.ROOT)): b"old",
+        "HEAD:" + str(report.PRELOAD.relative_to(report.ROOT)): b"new",
+    }
+
+    def git(*argv: str) -> bytes:
+        if argv[0] == "show":
+            return files[argv[1]]
+        if argv[0] == "diff":
+            return b"5\t5\tpackages/faults/preload/faults-preload.mjs\n"
+        return b"38dd2b8 build(faults): lint\n"
+
+    monkeypatch.setattr(report, "_git", git)
+    old = hashlib.sha256(b"old").hexdigest()
+    pre = report.preload_provenance("run1", old)
+    assert pre == {
+        "run_sha256": old,
+        "run_commit_matches": True,
+        "committed_sha256": hashlib.sha256(b"new").hexdigest(),
+        "commits_since": ["38dd2b8 build(faults): lint"],
+        "lines_added_removed": [5, 5],
+    }
