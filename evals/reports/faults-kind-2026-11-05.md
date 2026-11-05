@@ -11,7 +11,7 @@ signal the #16 detector reads moved against a clean trace, and the trace reaches
 - run `faults-20261105-s7-b1b6b60`, traceblame `b1b6b6048b98`, app `5370b067fdd1`
 - plan sha256 `76aae3c66e04d97b`, 28 entries, seed 7; ledger sha256 `1b6096c914266269`, 28 records (the counts below are re-derived from it)
 - spans sent 366, stored 366; baseline digest `sha256:3d5cd7f97e85e17b`
-- content check: 0 leaking. Needles: 4 sampled CUAD questions: each question's text and every 48-character window (step 16) of every chunk of its contract (567 chunks, 12632 windows). Scanned: every stored row of the run's traces in every table with a trace_id, 623 rows (blame 0, eval_traces 28, findings 0, injections 24, spans 366, trace_arrivals 177, trace_summary 28); the 366 exported spans; the run's files otlp.json (1 line), ledger.jsonl (28 lines), outcomes.jsonl (28 lines), plan.jsonl (28 lines), queries.jsonl (4 lines), state.json (94 lines); left out: only the dataset id fields query_ref, ref (116 values, the dataset's own question or task ids; a runbook task id is also its workload's name, which the alert needles hold)
+- content check: 0 leaking. Needles: 4 sampled CUAD questions: each question's text and every 48-character window (step 16) of every chunk of its contract (567 chunks, 12632 windows). Scanned: every stored row of the run's traces in every table with a trace_id, 623 rows (blame 0, eval_traces 28, findings 0, injections 24, spans 366, trace_arrivals 177, trace_summary 28); the 366 exported spans; the run's files otlp.json (1 line), ledger.jsonl (28 lines), outcomes.jsonl (28 lines), plan.jsonl (28 lines), queries.jsonl (4 lines), state.json (94 lines); left out: 116 values of query_ref, ref that are exactly one of the run's own dataset ids in its format (`<task>@s<seed>`, CUAD `<title>__<category>`; a runbook task id is also its workload's name, which the alert needles hold). Any other value in those fields is scanned
 - host 1-minute load average per trace: not recorded in this run (it predates the field; the drivers record it in the ledger from now on, and this run is not repeated for it)
 - golden chunks of the sampled answerable queries: {'mapped': 12, 'answerable_sampled': 12}
 
@@ -63,9 +63,11 @@ Per trace (query = sha256 of the dataset id, first 12):
 - run `faults-20261105-s7-b1b6b60`, traceblame `b1b6b6048b98`, app `92fb6f8fcbcf`
 - plan sha256 `4fd1295b28bb9283`, 9 entries, seed 7; ledger sha256 `67046eb87588627b`, 9 records (the counts below are re-derived from it)
 - spans sent 33, stored 33; baseline digest `sha256:1b5b700607ed7cf7`
-- content check: 0 leaking. Needles: 30 alert needles (32-character windows of each alert summary and the task-unique label values) and 153 40-character windows of the triage prompt and its variants. Scanned: every stored row of the run's traces in every table with a trace_id, 66 rows (blame 0, eval_traces 9, findings 0, injections 6, spans 33, trace_arrivals 9, trace_summary 9); the 33 exported spans; the run's files otlp.json (1 line), ledger.jsonl (9 lines), outcomes.jsonl (9 lines), plan.jsonl (9 lines), queries.jsonl (12 lines), state.json (99 lines); left out: only the dataset id fields query_ref, ref (48 values, the dataset's own question or task ids; a runbook task id is also its workload's name, which the alert needles hold)
+- content check: 0 leaking. Needles: 30 alert needles (32-character windows of each alert summary and the task-unique label values) and 153 40-character windows of the triage prompt and its variants. Scanned: every stored row of the run's traces in every table with a trace_id, 66 rows (blame 0, eval_traces 9, findings 0, injections 6, spans 33, trace_arrivals 9, trace_summary 9); the 33 exported spans; the run's files otlp.json (1 line), ledger.jsonl (9 lines), outcomes.jsonl (9 lines), plan.jsonl (9 lines), queries.jsonl (12 lines), state.json (99 lines); left out: 48 values of query_ref, ref that are exactly one of the run's own dataset ids in its format (`<task>@s<seed>`, CUAD `<title>__<category>`; a runbook task id is also its workload's name, which the alert needles hold). Any other value in those fields is scanned
 - host 1-minute load average per trace: not recorded in this run (it predates the field; the drivers record it in the ledger from now on, and this run is not repeated for it)
-- preload sha256 `48ec262641600789` (the committed file has changed since this run: `99165cf4425ea58a`); image guard {'base_node_options': False, 'base_has_preload': False, 'eval_node_options': True, 'eval_has_preload': True, 'fetch_without_switch': 'fetch', 'fetch_other_tenant': 'fetch', 'fetch_eval_tenant': 'handle'}
+- image guard {'base_node_options': False, 'base_has_preload': False, 'eval_node_options': True, 'eval_has_preload': True, 'fetch_without_switch': 'fetch', 'fetch_other_tenant': 'fetch', 'fetch_eval_tenant': 'handle'}
+- preload used by this run: sha256 `48ec262641600789dae90867a1ab881ccf4c393c38855957c60957fd1b530b1a` (equal to the file at the run's commit)
+- the committed preload differs: sha256 `99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4`, changed since the run by `38dd2b8 build(faults): lint the Node preload with eslint (#14)` (5 lines added, 5 removed). D1 runs with the committed preload: the build phase refuses a dirty checkout and records the file's sha256 in the run's provenance (`preload_sha256`)
 
 | Kind | Component | Traces | Applied | Not reached | Marker on its span | Joined | Signal moved | Assembled | Median s | p95 s | Load1 median |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -95,7 +97,9 @@ the golden set was in the clean run's top-k, or the mode is `distractor`. A
 store wrapper reports nothing removed, the ledger gets no injection id, and
 `injections` gets no row.
 
-In this run: 4 applied ({'distractor': 3, 'remove': 1}), 4 counted; the mode comes from the ledger.
+Re-derived from the ledger: 4 applied (distractor 3, remove 1), 0 not_reached; 4 counted for D1.
+
+Queries with no golden chunk in the clean top-k: 2; `9465608b62ea` ran `distractor`, `c6b82487fd31` ran `distractor`.
 
 | Query | Mode | Golden in clean top-k | Golden in faulted top-k | Max score clean -> faulted | Signal moved | Counted |
 |---|---|---|---|---|---|---|
@@ -144,6 +148,10 @@ component and per app as well as pooled.
 | runbook-agent | clean | 40 | 113.6 | 1.3 |
 
 Total about 13.5 h of serial run time (Ollama serves one request at a time), plus settle and assembly; M2 is due 2026-11-22.
+
+## Notes
+
+- Preload: the committed faults-preload.mjs differs from the run's only by the eslint fix in 38dd2b8, the rename of the internal helper obj() to parseObject() (no-shadow): with the name mapped back, every removed line has an identical added line. Behaviour and the shared vectors are unchanged (27 node tests). D1 runs with the committed preload, and its sha256 is in D1's provenance.
 
 ## Blockers
 

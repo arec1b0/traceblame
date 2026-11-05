@@ -2168,5 +2168,19 @@
     "D1 itself (#19) still needs about 13.5 h of serial run time (projection above) in slots on the shared kind cluster (flock), plus the frozen snapshot export under evals/datasets/."
   ],
   "problems": [],
-  "preload_sha256_now": "99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4"
+  "preload": {
+    "run_sha256": "48ec262641600789dae90867a1ab881ccf4c393c38855957c60957fd1b530b1a",
+    "run_commit_matches": true,
+    "committed_sha256": "99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4",
+    "commits_since": [
+      "38dd2b8 build(faults): lint the Node preload with eslint (#14)"
+    ],
+    "lines_added_removed": [
+      5,
+      5
+    ]
+  },
+  "notes": [
+    "Preload: the committed faults-preload.mjs differs from the run's only by the eslint fix in 38dd2b8, the rename of the internal helper obj() to parseObject() (no-shadow): with the name mapped back, every removed line has an identical added line. Behaviour and the shared vectors are unchanged (27 node tests). D1 runs with the committed preload, and its sha256 is in D1's provenance."
+  ]
 }
