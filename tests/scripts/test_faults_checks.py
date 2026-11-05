@@ -6,6 +6,8 @@ from typing import Any
 import checks  # tools/faults, on pytest's pythonpath as at the driver's run time
 import pytest
 
+from traceblame_faults import kinds
+
 ID = "run:kind:abc"
 
 
@@ -117,6 +119,36 @@ def test_malformed_output_reads_parse_ok_on_the_marked_span() -> None:
         injection_id=ID,
     )
     assert out == {"moved": True, "parse_ok": [["true"], ["false"]]}
+
+
+def test_a_marked_malformed_output_that_still_parses_is_a_problem() -> None:
+    clean_rows = [_row("llm", "01.000", attrs={"aegis.output.parse_ok": "true"})]
+    rows = [_row("llm", "01.000", attrs={"aegis.output.parse_ok": "true", checks.MARKER: ID})]
+    sig = checks.signal(
+        "malformed_output",
+        rows,
+        checks.features(rows),
+        checks.features(clean_rows),
+        injection_id=ID,
+    )
+    assert sig["moved"] is False
+    problem = checks.signal_problem("malformed_output", sig, "t1")
+    assert problem == "t1 malformed_output: applied, but its signal did not move"
+
+
+@pytest.mark.parametrize("kind", sorted(set(checks.KINDS_WITH_SIGNAL) - {"step_memory_loss"}))
+def test_every_kind_but_step_memory_loss_needs_its_signal_per_trace(kind: str) -> None:
+    assert checks.signal_problem(kind, {"moved": False}, "t") is not None
+    assert checks.signal_problem(kind, {"moved": True}, "t") is None
+
+
+def test_every_fault_kind_has_a_signal_check() -> None:
+    assert set(checks.KINDS_WITH_SIGNAL) == set(kinds.KINDS)
+
+
+def test_step_memory_loss_keeps_its_aggregate_gate_instead() -> None:
+    assert checks.signal_problem("step_memory_loss", {"moved": False}, "t") is None
+    assert frozenset({"step_memory_loss"}) == checks.AGGREGATE_GATED
 
 
 def test_output_budget_reads_finish_reason_length() -> None:

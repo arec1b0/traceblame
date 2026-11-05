@@ -132,9 +132,13 @@ faults-report: ## The fault validation report over both apps (RUN_ID=...) into e
 	@test -n "$(RUN_ID)" || { echo "faults-report: set RUN_ID" >&2; exit 1; }
 	$(UV_RUN) python tools/faults/report.py --run-id "$(RUN_ID)"
 
-faults-validate: faults-agentic-rag faults-runbook-agent ## Both fault runs, then the report (#14)
-	@$(MAKE) --no-print-directory faults-report \
-	  RUN_ID="$${RUN_ID:-faults-$$(date -u +%Y%m%d)-s7-$$(git rev-parse --short=7 HEAD)}"
+# One run id for all three: RUN_ID, or a new run (tools/faults/run_id.py new writes its run.json,
+# which every phase and the report resolve the run through; nothing recomputes it).
+faults-validate: ## Both fault runs, then the report, under one run id (#14)
+	@run_id="$${RUN_ID:-$$($(UV_RUN) python tools/faults/run_id.py new)}"; \
+	$(MAKE) --no-print-directory faults-agentic-rag RUN_ID="$$run_id"; \
+	$(MAKE) --no-print-directory faults-runbook-agent RUN_ID="$$run_id"; \
+	$(MAKE) --no-print-directory faults-report RUN_ID="$$run_id"
 
 attribution: ## No AI attribution in the commits of this branch (origin/main..HEAD); the pre-push hook and CI run the same script
 	@bash scripts/attribution-check.sh origin/main..HEAD

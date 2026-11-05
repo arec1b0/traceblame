@@ -14,6 +14,7 @@ import time
 from collections import Counter
 from collections.abc import Awaitable, Callable, Generator, Iterable
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import quote
@@ -25,7 +26,7 @@ import checks  # noqa: E402
 import yaml  # noqa: E402
 from kindlib import NAMESPACE, PortForward, kubectl, spans_of, stored  # noqa: E402
 
-from traceblame_faults import kinds, ledger, record  # noqa: E402
+from traceblame_faults import ids, kinds, ledger, record  # noqa: E402
 from traceblame_storage.client import ClickHouseClient, parse_url  # noqa: E402
 
 ROOT = HERE.parents[1]
@@ -43,8 +44,96 @@ def run_dir(run_id: str, app: str) -> Path:
     return WORK / run_id / app
 
 
+class RunError(SystemExit):
+    pass
+
+
+RUN_FILE = "run.json"
+
+
+def _run_file(run_id: str) -> Path:
+    return WORK / run_id / RUN_FILE
+
+
+def _write_run(run: dict[str, Any]) -> dict[str, Any]:
+    path = _run_file(str(run["run_id"]))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(run, indent=2) + "\n", encoding="utf-8")
+    return run
+
+
+def new_run(*, seed: int, commit: str, now: datetime) -> str:
+    """The one place a run id is computed: faults-<UTC date>-s<seed>-<commit7>, written to
+    .tools/faults/<run>/run.json with its seed, commit and creation time."""
+    run_id = f"faults-{now.astimezone(UTC):%Y%m%d}-s{seed}-{commit[:7]}"
+    return ensure_run(run_id, seed=seed, commit=commit, now=now)
+
+
+def ensure_run(run_id: str | None, *, seed: int, commit: str, now: datetime) -> str:
+    """The run a prepare/build phase belongs to: a new one without an id; with an id, its
+    run.json (written now if the id is new), whose seed and commit must be this phase's."""
+    if run_id is None:
+        return new_run(seed=seed, commit=commit, now=now)
+    ids.check(run_id, "run id")
+    if not _run_file(run_id).is_file():
+        stamp = now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        _write_run(
+            {"run_id": run_id, "seed": seed, "traceblame_commit": commit, "created_at": stamp}
+        )
+        return run_id
+    run = open_run(run_id)
+    if int(run["seed"]) != seed:
+        raise RunError(f"faults: run {run_id} has seed {run['seed']}, this phase {seed}")
+    if run["traceblame_commit"] != commit:
+        raise RunError(
+            f"faults: run {run_id} is at commit {run['traceblame_commit'][:12]}, this checkout"
+            f" at {commit[:12]}: start a new run"
+        )
+    return run_id
+
+
+def open_run(run_id: str) -> dict[str, Any]:
+    """The run's run.json; every phase and the report resolve the run through it."""
+    path = _run_file(run_id)
+    if not path.is_file():
+        raise RunError(f"faults: no run.json for {run_id} under {WORK}")
+    return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
+
+
+def adopt_run(run_id: str) -> dict[str, Any]:
+    """run.json for a run recorded before it existed, from its apps' state.json: they must agree
+    on the run id, seed and commit; created_at is the earliest prepare/build time."""
+    states = [
+        cast("dict[str, Any]", json.loads(p.read_text(encoding="utf-8")))
+        for p in sorted((WORK / run_id).glob("*/state.json"))
+    ]
+    if not states:
+        raise RunError(f"faults: no state.json under {WORK / run_id}")
+    for key in ("run_id", "seed", "traceblame_commit"):
+        values = {str(s.get(key)) for s in states}
+        if len(values) != 1:
+            raise RunError(f"faults: the states of {run_id} disagree on {key}: {sorted(values)}")
+    if states[0]["run_id"] != run_id:
+        raise RunError(f"faults: the states under {run_id} are of run {states[0]['run_id']}")
+    stamps = [str(s.get("prepared_at") or s.get("built_at")) for s in states]
+    return _write_run(
+        {
+            "run_id": run_id,
+            "seed": int(states[0]["seed"]),
+            "traceblame_commit": str(states[0]["traceblame_commit"]),
+            "created_at": min(stamps),
+        }
+    )
+
+
 def load_state(d: Path) -> dict[str, Any]:
-    return cast("dict[str, Any]", json.loads((d / "state.json").read_text(encoding="utf-8")))
+    """An app's state of the run d belongs to (<work>/<run>/<app>), resolved through the run's
+    run.json: a state of another run is refused."""
+    run = open_run(d.parent.name)
+    state = cast("dict[str, Any]", json.loads((d / "state.json").read_text(encoding="utf-8")))
+    if state.get("run_id") != run["run_id"] or int(state.get("seed", -1)) != int(run["seed"]):
+        raise RunError(f"faults: {d / 'state.json'} is not of run {run['run_id']}")
+    return state
 
 
 def save_state(d: Path, state: dict[str, Any]) -> None:
@@ -461,6 +550,9 @@ def check_run(
             }
             if not ok:
                 problems.append(f"{rec.trace_id} {rec.fault_kind}: marker on {seen}")
+            sig_problem = checks.signal_problem(rec.fault_kind, sig, rec.trace_id)
+            if sig_problem is not None:
+                problems.append(sig_problem)
             if outcome.get("marked_spans") is not None and len(seen) != outcome["marked_spans"]:
                 problems.append(
                     f"{rec.trace_id}: {outcome['marked_spans']} spans marked, {len(seen)} stored"

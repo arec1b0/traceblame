@@ -126,7 +126,9 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   `flock /tmp/traceblame-kind.lock uv run --frozen python tools/faults/run_agentic_rag.py content --run-id ...`
   (same for `run_runbook_agent.py`)
 - `make faults-report RUN_ID=...` / `make faults-validate`: the validation report over both apps,
-  `evals/reports/faults-kind-*`; thresholds in `tools/faults/validation.yaml`
+  `evals/reports/faults-kind-*`; thresholds in `tools/faults/validation.yaml`. A run id is
+  computed once (`RUN_ID`, or `tools/faults/run_id.py new`) into `.tools/faults/<run>/run.json`;
+  every phase and the report resolve the run through it (`run_id.py adopt` for older runs)
 - `uv run traceblame-faults scenarios check|plan|check-ledger|record|digest`: the fault library's
   CLI (`packages/faults`; scenarios in `src/traceblame_faults/scenarios/`)
 - `make attribution`: no AI attribution trailers or footer phrases in origin/main..HEAD

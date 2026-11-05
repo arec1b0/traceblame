@@ -111,8 +111,9 @@ def prepare(args: argparse.Namespace) -> int:
     packages = rag.installed_versions(python)
     embedding = rag.ensure_embedding_model(python)
     archive = cuad.ensure_archive(rag.CACHE / "cuad")
-    day = datetime.now(UTC).strftime("%Y%m%d")
-    run_id = args.run_id or f"faults-{day}-s{seed}-{traceblame_commit[:7]}"
+    run_id = faultslib.ensure_run(
+        args.run_id, seed=seed, commit=traceblame_commit, now=datetime.now(UTC)
+    )
     d = _dir(run_id)
     d.mkdir(parents=True, exist_ok=True)
     state: dict[str, Any] = {
@@ -304,7 +305,7 @@ def main() -> int:
     p = sub.add_parser("prepare")
     p.add_argument("--app-dir", type=Path, required=True)
     p.add_argument("--ollama-url")
-    p.add_argument("--run-id", help="default: faults-<date>-s<seed>-<commit7>")
+    p.add_argument("--run-id", help="default: a new run (tools/faults/run_id.py new)")
     for name in ("run", "record", "check", "content"):
         sub.add_parser(name).add_argument("--run-id", required=True)
     args = parser.parse_args()

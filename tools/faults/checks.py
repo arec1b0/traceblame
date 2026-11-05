@@ -15,6 +15,18 @@ MARKER = "aegis.fault.injection.id"
 # The span the marker goes on (traceblame_faults.kinds marker names) -> spans.span_kind.
 SPAN_KIND = {"retriever": "retrieval", "tool": "tool", "llm": "llm", "agent": "agent"}
 _ERROR = {"Error", "STATUS_CODE_ERROR"}
+# The kinds signal() checks. Each applied injection must move its signal (PR #64): a miss is a
+# validation problem, except for the kinds in AGGREGATE_GATED, whose per-trace signal depends on
+# the model and is gated by a hit rate over the run instead (validation.yaml, loop.hit_rate_min).
+KINDS_WITH_SIGNAL = (
+    "golden_context_removed",
+    "tool_failure",
+    "malformed_output",
+    "output_budget_exhausted",
+    "step_memory_loss",
+    "prompt_variant",
+)
+AGGREGATE_GATED = frozenset({"step_memory_loss"})
 
 
 def _list(row: Mapping[str, Any], key: str) -> list[Any]:
@@ -167,6 +179,13 @@ def signal(
             "bundle_digest": [clean_digests, sorted(faulted.digests)],
         }
     raise ValueError(f"unknown fault kind {kind!r}")
+
+
+def signal_problem(kind: str, sig: Mapping[str, Any], trace_id: str) -> str | None:
+    """The validation problem of an applied injection whose signal did not move, if any."""
+    if kind in AGGREGATE_GATED or sig.get("moved"):
+        return None
+    return f"{trace_id} {kind}: applied, but its signal did not move"
 
 
 def marker_kinds_ok(

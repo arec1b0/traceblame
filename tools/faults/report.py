@@ -11,7 +11,6 @@ import json
 import subprocess
 import sys
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -428,12 +427,22 @@ def preload_provenance(run_commit: str, run_sha256: str) -> dict[str, Any]:
     }
 
 
-def run_date(states: dict[str, dict[str, Any]]) -> str:
-    """The run's own date (its first prepare or build), so a re-generated report keeps its
-    file; today only for a state without one."""
-    stamps = [str(s.get("prepared_at") or s.get("built_at") or "") for s in states.values()]
-    stamps = [t[:10] for t in stamps if t]
-    return min(stamps) if stamps else datetime.now(UTC).strftime("%Y-%m-%d")
+def run_date(run: dict[str, Any]) -> str:
+    """The run's own date, from its run.json, so a re-generated report keeps its file."""
+    return str(run["created_at"])[:10]
+
+
+def signal_problems(check: dict[str, Any]) -> list[str]:
+    """Applied injections whose signal did not move (checks.signal_problem), re-derived from the
+    per-trace results, so a check.json written before check_run reported them cannot pass."""
+    out: list[str] = []
+    for t in check["per_trace"]:
+        if t["status"] != "applied":
+            continue
+        problem = checks.signal_problem(t["kind"], t.get("signal", {}), t["trace_id"])
+        if problem is not None and problem not in check["problems"]:
+            out.append(problem)
+    return out
 
 
 def main() -> int:
@@ -443,6 +452,7 @@ def main() -> int:
     parser.add_argument("--note", action="append", default=[])
     args = parser.parse_args()
     cfg = faultslib.config()
+    run = faultslib.open_run(args.run_id)
     per_app: dict[str, dict[str, Any]] = {}
     states: dict[str, dict[str, Any]] = {}
     views: dict[str, dict[str, Any]] = {}
@@ -459,6 +469,7 @@ def main() -> int:
     problems += [
         f"{app}: {p}" for app, c in per_app.items() for p in ledger_problems(c, views[app])
     ]
+    problems += [f"{app}: {p}" for app, c in per_app.items() for p in signal_problems(c)]
     if not gate["passed"]:
         problems.append("step_memory_loss: loop signal below the gate; redesign before D1")
     requests: list[Any] = []
@@ -470,8 +481,9 @@ def main() -> int:
                 requests.append({k: v for k, v in fields.items() if k != "seed"})
     rag_view = views.get("agentic-rag", {"modes": {}})
     report = {
-        "date": run_date(states),
+        "date": run_date(run),
         "run_id": args.run_id,
+        "run": run,
         "config": cfg,
         "apps": per_app,
         "state": {

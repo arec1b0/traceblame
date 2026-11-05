@@ -162,12 +162,62 @@ def test_the_content_line_names_needles_and_everything_scanned() -> None:
     )
 
 
-def test_the_report_keeps_the_run_date() -> None:
-    states = {
-        "agentic-rag": {"prepared_at": "2026-11-05T15:00:00Z"},
-        "runbook-agent": {"built_at": "2026-11-06T01:00:00Z"},
+def test_the_report_takes_its_date_from_run_json() -> None:
+    run = {"run_id": "faults-x", "created_at": "2026-11-05T23:59:59Z"}
+    assert report.run_date(run) == "2026-11-05"
+
+
+def _malformed_check(moved: bool, kind: str = "malformed_output") -> dict[str, Any]:
+    return {
+        "problems": [],
+        "per_trace": [
+            {
+                "trace_id": _trace_id(1),
+                "query": "q1",
+                "kind": kind,
+                "status": "applied",
+                "signal": {
+                    "moved": moved,
+                    "parse_ok": [["true"], ["true" if not moved else "false"]],
+                },
+            }
+        ],
+        "per_kind": {},
     }
-    assert report.run_date(states) == "2026-11-05"
+
+
+def test_a_marked_malformed_output_with_parse_ok_true_fails_the_report() -> None:
+    # check.json written before check_run reported it: the report re-derives the problem.
+    problems = report.signal_problems(_malformed_check(moved=False))
+    assert problems == [f"{_trace_id(1)} malformed_output: applied, but its signal did not move"]
+    md = report.markdown(_minimal(problems=problems))
+    assert "All checks passed." not in md
+    assert "malformed_output: applied, but its signal did not move" in md
+
+
+def test_a_moved_signal_and_step_memory_loss_misses_are_not_per_trace_problems() -> None:
+    assert report.signal_problems(_malformed_check(moved=True)) == []
+    assert report.signal_problems(_malformed_check(False, kind="step_memory_loss")) == []
+
+
+def test_the_report_never_says_all_passed_with_a_problem() -> None:
+    assert "All checks passed." in report.markdown(_minimal(problems=[]))
+    assert "All checks passed." not in report.markdown(_minimal(problems=["x"]))
+
+
+def _minimal(problems: list[str]) -> dict[str, Any]:
+    return {
+        "date": "2026-11-06",
+        "apps": {},
+        "retrieval": [],
+        "loop_gate": report.loop_gate(
+            {"per_kind": {}}, {"loop": {"hit_rate_min": 0.6, "repeat_min": 3}}
+        ),
+        "projection": report.projection({}),
+        "d1_components": report.components(),
+        "blockers": [],
+        "problems": problems,
+    }
 
 
 def test_the_markdown_states_the_rule_and_the_empty_blockers(tmp_path: Path) -> None:

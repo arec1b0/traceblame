@@ -154,8 +154,9 @@ def build(args: argparse.Namespace) -> int:
     app_dir: Path = args.app_dir.resolve()
     traceblame_commit = require_clean(ROOT)
     app_commit = require_clean(app_dir)
-    day = datetime.now(UTC).strftime("%Y%m%d")
-    run_id = args.run_id or f"faults-{day}-s{seed}-{traceblame_commit[:7]}"
+    run_id = faultslib.ensure_run(
+        args.run_id, seed=seed, commit=traceblame_commit, now=datetime.now(UTC)
+    )
     d = faultslib.run_dir(run_id, APP)
     d.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
@@ -526,7 +527,7 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     b = sub.add_parser("build")
     b.add_argument("--app-dir", type=Path, required=True)
-    b.add_argument("--run-id", help="default: faults-<date>-s<seed>-<commit7>")
+    b.add_argument("--run-id", help="default: a new run (tools/faults/run_id.py new)")
     r = sub.add_parser("run")
     r.add_argument("--run-id", required=True)
     r.add_argument("--ollama-url")
