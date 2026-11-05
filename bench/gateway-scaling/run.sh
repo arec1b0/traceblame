@@ -22,7 +22,8 @@
 # agents must accept no spans for 15 s; the report records both. The agents and the gateways
 # are rolled with the run's overlays, and restored to their plain configs on exit.
 # The report records both databases' applied migrations (schema_migrations) at the start and
-# whether they changed during the load; a run without the ClickHouse schema fails (#58).
+# whether they changed during the load; a run without the ClickHouse schema fails (#58). The
+# load waits for a quiet host (MAX_HOST_LOAD) and the report records the load average.
 #
 # Run it under the shared kind lock: flock /tmp/traceblame-kind.lock -c 'make bench-scaling'.
 # Needs `make kind-up kind-deploy`. The report goes to
@@ -49,6 +50,10 @@ LOAD="${LOAD:-360}"
 UP_AT="${UP_AT:-120}"
 DOWN_AT="${DOWN_AT:-240}"
 SCRAPE_EVERY=5
+# The host is shared (kind, other sessions' builds and tests): the load starts only when the
+# 1-minute load average is at most this, waited for up to HOST_LOAD_WAIT s.
+MAX_HOST_LOAD="${MAX_HOST_LOAD:-4}"
+HOST_LOAD_WAIT="${HOST_LOAD_WAIT:-600}"
 DATE="$(date -u +%F)"
 NAME="gateway-scaling-${DATE}${RUN_NAME:+-${RUN_NAME}}"
 OUT="${ROOT}/evals/reports"
@@ -148,6 +153,17 @@ if [[ -n "${busy}" ]]; then
   echo "run.sh: another bench or capture is running, the run would be invalid: ${busy}" >&2
   exit 1
 fi
+load1() { cut -d' ' -f1 /proc/loadavg; }
+step "host load: waiting for a 1-minute load average <= ${MAX_HOST_LOAD} (up to ${HOST_LOAD_WAIT} s)"
+for ((waited = 0; ; waited += 10)); do
+  awk -v l="$(load1)" -v m="${MAX_HOST_LOAD}" 'BEGIN {exit !(l <= m)}' && break
+  if (( waited >= HOST_LOAD_WAIT )); then
+    echo "run.sh: host load $(load1) stayed above ${MAX_HOST_LOAD} for ${HOST_LOAD_WAIT} s; top processes:" >&2
+    ps -eo pcpu,args --sort=-pcpu | head -6 >&2
+    exit 1
+  fi
+  sleep 10
+done
 pods_summary="$(awk '{c[$1]++} END {for (n in c) printf "%s %d, ", n, c[n]}' "${WORK}/pods.txt" | sed 's/, $//')"
 
 step "agents and gateways with the run's overlays (stamps=${STAMPS}), 2 gateway replicas"
@@ -179,6 +195,7 @@ if (( a1 != a0 )); then
   exit 1
 fi
 idle="0 spans accepted by the agents in 15 s before the load"
+host_load_start="$(cut -d' ' -f1-3 /proc/loadavg) ($(nproc) CPUs)"
 
 step "scraping the collectors' metrics every ${SCRAPE_EVERY} s"
 metrics="${WORK}/metrics.txt"
@@ -234,6 +251,7 @@ fi
 
 step "waiting for the generators to finish"
 "${KCTL[@]}" -n bench wait job -l app=loadgen --for=condition=Complete --timeout="$((LOAD + 900))s" >/dev/null
+host_load_end="$(cut -d' ' -f1-3 /proc/loadavg) ($(nproc) CPUs)"
 ch_schema_end="$(ch_schema)"
 pg_schema_end="$(pg_schema)"
 schema_changed="no"
@@ -334,6 +352,8 @@ json.dump({
     "metrics scrape": "every ${SCRAPE_EVERY} s through the API server's pod proxy (:8888); ClickHouse system.metric_log",
     "preflight (${preflight_at})": "no active job, no bench pod, no capture process; pods: ${pods_summary}",
     "idle check": "${idle}",
+    "host load average (1/5/15 min) at the load's start": "${host_load_start}",
+    "host load average (1/5/15 min) at the load's end": "${host_load_end}",
     "ClickHouse schema_migrations at the start": "${ch_schema_start}",
     "ClickHouse migrations applied beyond this checkout": "$(beyond clickhouse "${ch_schema_start}")",
     "Postgres schema_migrations at the start": "${pg_schema_start}",
