@@ -36,6 +36,7 @@ TABLES = (
     "findings",
     "blame",
     "injections",
+    "eval_traces",
     "schema_migrations",
 )
 # Tenant variants of one fixture, with fresh trace ids: the shim sets aegis.tenant.id on the

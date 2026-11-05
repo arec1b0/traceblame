@@ -1,6 +1,7 @@
 # source: arec1b0/agentic-rag at 0e3780d (the commit of the #12 fixtures): src/agents/rag_agent.py
-#   and src/agents/base_agent.py, only what tools/fixtures/agentic_rag/run.py uses. The app
-#   checkout is on sys.path only when the driver runs (CAPTURE_APP_DIR).
+#   and src/agents/base_agent.py, only what tools/fixtures/agentic_rag/run.py and
+#   tools/faults/agentic_rag_app.py use. The app checkout is on sys.path only when the driver
+#   runs (CAPTURE_APP_DIR).
 from typing import Any
 
 class AgentStep:
@@ -15,6 +16,8 @@ class _ToolSelector:
     def get_tool(self, tool_name: str) -> Any: ...
 
 class RAGAgent:
+    SYSTEM_PROMPT: str
+    REASONING_PROMPT: str
     vector_store: Any
     tool_selector: _ToolSelector
     def __init__(

@@ -1,0 +1,33 @@
+# The #14 validation run: a small real run per fault kind through kind as tenant-eval
+# (tools/faults/run_agentic_rag.py, run_runbook_agent.py, report.py). The numbers are starting
+# values kept in config (CLAUDE.md hard rule 8).
+seed: 7
+
+agentic_rag:
+  # CUAD queries: cuad.sample(n, seed, ratio), answerable ones whose golden chunks map, the
+  # first `queries` of them. Each runs clean and with every fault kind (paired comparison).
+  n: 24
+  ratio: 0.5
+  queries: 4
+
+runbook_agent:
+  # Fast sandbox scenarios only (crash tasks wait 7-11 min for their alert).
+  scenarios: [latency, oom]
+  per_scenario: 6
+  clean: 3
+  malformed_output: 3
+  prompt_variant: 3
+  approval_timeout_ms: 30000
+
+loop:
+  # The loop detector's signal (design §1.1): one (tool_name, args_hash) at least this often
+  # in the agent span.
+  repeat_min: 3
+  # step_memory_loss is collected for D1 only if the loop signal fires on at least this share
+  # of its applied injections here; below it, the kind is redesigned first (#14 approval).
+  hit_rate_min: 0.6
+
+# tail_sampling decision_wait (30 s) plus the exporters' flush, with room to spare; then the
+# trace-assembler's grace and poll interval.
+settle_seconds: 300
+assemble_seconds: 300

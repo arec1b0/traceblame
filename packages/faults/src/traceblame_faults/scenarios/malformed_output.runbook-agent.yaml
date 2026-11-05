@@ -1,0 +1,14 @@
+scenario: malformed_output-runbook-agent
+version: 1
+kind: malformed_output
+app: runbook-agent
+description: >-
+  The triage call's response content is truncated in the eval image's fetch preload. The AI
+  SDK raises AI_NoObjectGeneratedError; the shim sets aegis.output.parse_ok=false on the
+  doGenerate span and the app declines. Truncation only: the AI SDK may strip a markdown fence
+  before parsing, which would leave the output valid. Marker on the doGenerate span.
+params:
+  mode: {value: truncate}
+  cut_fraction: {float: [0.2, 0.8]}
+  call_index: {value: 1}
+  persist: {value: once}

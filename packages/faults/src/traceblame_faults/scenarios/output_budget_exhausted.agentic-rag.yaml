@@ -1,0 +1,13 @@
+scenario: output_budget_exhausted-agentic-rag
+version: 1
+kind: output_budget_exhausted
+app: agentic-rag
+description: >-
+  The call_index-th reasoning request gets a max_tokens far below what a step needs, in the
+  transport under the OpenAI client: Ollama really stops the generation (finish_reason=length)
+  and the truncated JSON does not parse. An orchestration fault (the output budget), not a
+  model one: context_truncation fires, and schema_violation with it. Marker on the LLM span.
+params:
+  max_tokens: {int: [8, 32]}
+  call_index: {int: [1, 2]}
+  persist: {value: once}

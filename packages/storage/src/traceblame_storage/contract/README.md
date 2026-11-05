@@ -21,7 +21,14 @@ new in this schema, so they are not here yet (code N must run on schema N-1): th
 ones live in `tests/integration/` and the Postgres ones in `services/assembler/internal/store/sql/`.
 The first reader of `trace_summary` (#15) moves its statements here once the table is on main.
 
-The fault injector's write with `injections.injection_id`, and the join of an injection to the
-span it was applied at (`spans.attrs['aegis.fault.injection.id']`, #36), are not here either:
-the column is new in this schema. They live in `tests/integration/injections_by_id_write.sql`
-and `injections_by_id_read.sql`, and `faults/` (#14) moves them here once the column is on main.
+The fault injector (#14) runs two of these:
+- `injections_write.sql` writes one injection with its `injection_id`, the value of
+  `aegis.fault.injection.id` on the span it was applied at (#36). It inserts only when no row
+  with the same `(trace_id, injection_id)` exists, so re-recording a ledger adds nothing.
+- `injections_spans_read.sql` joins an injection to that span on
+  `(trace_id, spans.attrs['aegis.fault.injection.id'] = injection_id)`.
+
+Its statements on `eval_traces`, new in this schema, are not here yet: they live in
+`tests/integration/eval_traces_write.sql` and `eval_traces_read.sql`. `traceblame-faults`
+embeds a copy of each (`packages/faults/src/traceblame_faults/sql/`, checked by
+`tests/contract/test_faults_sql_copies.py`). They move here once the table is on main.

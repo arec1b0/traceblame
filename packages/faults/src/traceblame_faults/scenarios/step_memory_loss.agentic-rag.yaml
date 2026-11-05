@@ -1,0 +1,11 @@
+scenario: step_memory_loss-agentic-rag
+version: 1
+kind: step_memory_loss
+app: agentic-rag
+description: >-
+  From iteration from_iteration on, the loop hands the model no previous steps and the initial
+  observation: the real model restarts from scratch each step, and usually repeats its first
+  tool call until max_iterations. Marker on the AGENT span. Kept for D1 only if the loop signal
+  fires on at least the configured share of applied runs in the validation run.
+params:
+  from_iteration: {value: 2}

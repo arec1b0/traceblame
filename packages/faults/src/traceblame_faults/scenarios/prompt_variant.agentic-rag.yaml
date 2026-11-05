@@ -1,0 +1,25 @@
+scenario: prompt_variant-agentic-rag
+version: 1
+kind: prompt_variant
+app: agentic-rag
+description: >-
+  The agent runs a different prompt template for the whole run; aegis.bundle.digest is the
+  digest of the templates it ran (bundle.digest), the baseline digest that of the app's own.
+  Variants keep the JSON contract of a step, so they do not overlap with malformed_output.
+  Marker on the AGENT span.
+params:
+  variant: {choice: [pre-abc8838-reasoning, direct-answer]}
+variants:
+  pre-abc8838-reasoning:
+    templates: {reasoning: prompts/agentic_rag/pre-abc8838-reasoning.txt}
+    source: arec1b0/agentic-rag REASONING_PROMPT at f2e18f3a6b3b (the parent of abc8838)
+    rationale: >-
+      A real regression: the template before abc8838 names neither the final_answer action's
+      argument nor the citation rule, so final answers come back without an "answer" key
+      (empty answers) and without document ids.
+  direct-answer:
+    templates: {system: prompts/agentic_rag/direct-answer-system.txt}
+    source: written for #14
+    rationale: >-
+      A plausible simplification of the system prompt that drops the instructions to use tools
+      and reason step by step: the model tends to answer without retrieving.

@@ -31,6 +31,8 @@ class Item:
     question: str
     answerable: bool
     context: str
+    # The answer texts (CUAD's answers[].text), for the golden chunks of #14; () if unanswerable.
+    answers: tuple[str, ...] = ()
 
 
 def _sha256(path: Path) -> str:
@@ -67,6 +69,7 @@ def load_test_split(archive: Path) -> list[Item]:
             question=qa["question"],
             answerable=bool(qa["answers"]),
             context=paragraph["context"],
+            answers=tuple(a["text"] for a in qa["answers"]),
         )
         for entry in data["data"]
         for paragraph in entry["paragraphs"]

@@ -1,0 +1,2192 @@
+{
+  "date": "2026-11-05",
+  "run_id": "faults-20261105-s7-b1b6b60",
+  "run": {
+    "run_id": "faults-20261105-s7-b1b6b60",
+    "seed": 7,
+    "traceblame_commit": "b1b6b6048b98258f3495a577e7d88d4209496e90",
+    "created_at": "2026-11-05T16:52:57Z"
+  },
+  "config": {
+    "seed": 7,
+    "agentic_rag": {
+      "n": 24,
+      "ratio": 0.5,
+      "queries": 4
+    },
+    "runbook_agent": {
+      "scenarios": [
+        "latency",
+        "oom"
+      ],
+      "per_scenario": 6,
+      "clean": 3,
+      "malformed_output": 3,
+      "prompt_variant": 3,
+      "approval_timeout_ms": 30000
+    },
+    "loop": {
+      "repeat_min": 3,
+      "hit_rate_min": 0.6
+    },
+    "settle_seconds": 300,
+    "assemble_seconds": 300
+  },
+  "apps": {
+    "agentic-rag": {
+      "app": "agentic-rag",
+      "run_id": "faults-20261105-s7-b1b6b60",
+      "baseline_digest": "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965",
+      "spans": {
+        "sent": 366,
+        "stored": 366
+      },
+      "per_kind": {
+        "clean": {
+          "component": "",
+          "traces": 4,
+          "applied": 0,
+          "not_reached": 0,
+          "marker_ok": 0,
+          "joined": 0,
+          "moved": 0,
+          "assembled": 4,
+          "seconds_median": 58.9,
+          "seconds_p95": 93.21,
+          "outcomes": {
+            "answered": 4
+          }
+        },
+        "golden_context_removed": {
+          "component": "retrieval",
+          "traces": 4,
+          "applied": 4,
+          "not_reached": 0,
+          "marker_ok": 4,
+          "joined": 4,
+          "moved": 4,
+          "assembled": 4,
+          "seconds_median": 57.5,
+          "seconds_p95": 65.14,
+          "outcomes": {
+            "answered": 4
+          }
+        },
+        "malformed_output": {
+          "component": "model",
+          "traces": 4,
+          "applied": 4,
+          "not_reached": 0,
+          "marker_ok": 4,
+          "joined": 4,
+          "moved": 4,
+          "assembled": 4,
+          "seconds_median": 72.3,
+          "seconds_p95": 77.95,
+          "outcomes": {
+            "answered": 4
+          }
+        },
+        "output_budget_exhausted": {
+          "component": "orchestration",
+          "traces": 4,
+          "applied": 4,
+          "not_reached": 0,
+          "marker_ok": 4,
+          "joined": 4,
+          "moved": 4,
+          "assembled": 4,
+          "seconds_median": 60.3,
+          "seconds_p95": 118.81,
+          "outcomes": {
+            "answered": 4
+          }
+        },
+        "prompt_variant": {
+          "component": "prompt",
+          "traces": 4,
+          "applied": 4,
+          "not_reached": 0,
+          "marker_ok": 4,
+          "joined": 4,
+          "moved": 4,
+          "assembled": 4,
+          "seconds_median": 67.8,
+          "seconds_p95": 183.41,
+          "outcomes": {
+            "answered": 2,
+            "empty_answer": 2
+          }
+        },
+        "step_memory_loss": {
+          "component": "orchestration",
+          "traces": 4,
+          "applied": 4,
+          "not_reached": 0,
+          "marker_ok": 4,
+          "joined": 4,
+          "moved": 4,
+          "assembled": 4,
+          "seconds_median": 174.2,
+          "seconds_p95": 187.88,
+          "outcomes": {
+            "answered": 4
+          }
+        },
+        "tool_failure": {
+          "component": "tool",
+          "traces": 4,
+          "applied": 4,
+          "not_reached": 0,
+          "marker_ok": 4,
+          "joined": 4,
+          "moved": 4,
+          "assembled": 4,
+          "seconds_median": 64.3,
+          "seconds_p95": 87.33,
+          "outcomes": {
+            "answered": 4
+          }
+        }
+      },
+      "per_trace": [
+        {
+          "trace_id": "d0748f4838f3f855a48ee0e8acc2efc2",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 12,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 93.21,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.1586613,
+          "loop_max": 2
+        },
+        {
+          "trace_id": "ab6e58a5f304b543784945406749fe13",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "golden_context_removed",
+          "status": "applied",
+          "spans_stored": 12,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 57.6,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": -0.2219435,
+          "loop_max": 2,
+          "marker_spans": [
+            "retrieval",
+            "retrieval",
+            "retrieval"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 3,
+          "joined_spans": 3,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "golden_in_topk": [
+              false,
+              false
+            ],
+            "max_score": [
+              0.1586613,
+              -0.2219435
+            ]
+          }
+        },
+        {
+          "trace_id": "aece804aabe308f6f44b674e0ffddf5b",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 13,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 77.95,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.15013492,
+          "loop_max": 2,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "c2a6d5c5d62a0ff31e84dd1c1c747848",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "output_budget_exhausted",
+          "status": "applied",
+          "spans_stored": 13,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 66.85,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.15013492,
+          "loop_max": 2,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "finish_reasons": [
+              [
+                "stop"
+              ],
+              [
+                "length"
+              ]
+            ],
+            "parse_ok": [
+              "false"
+            ]
+          }
+        },
+        {
+          "trace_id": "ba083eb6fb364c50d82445165f1cd685",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 32,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 183.41,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever"
+          ],
+          "bundle_digest": [
+            "sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7"
+          ],
+          "golden_in_topk": false,
+          "max_score": null,
+          "loop_max": 4,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+              ],
+              [
+                "sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "8b4cbbe9bb0c2c108d9486b24d6c38c4",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "step_memory_loss",
+          "status": "applied",
+          "spans_stored": 32,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 136.53,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.1586613,
+          "loop_max": 7,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "loop_max": [
+              2,
+              7
+            ],
+            "repeat_min": 3
+          }
+        },
+        {
+          "trace_id": "e20d25a0053f42aacb708476ed87b4ee",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "tool_failure",
+          "status": "applied",
+          "spans_stored": 12,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 87.33,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.15013492,
+          "loop_max": 2,
+          "marker_spans": [
+            "tool"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "marked_tool_error": 1,
+            "consumed_by_llm": 1,
+            "retried": 0,
+            "error_type": [
+              "ToolFailure"
+            ]
+          }
+        },
+        {
+          "trace_id": "b1b251ea44c575dfde45800f4e51b723",
+          "query": "71508edacc6c",
+          "stratum": "answerable",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 9,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 65.37,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": 0.13639897,
+          "loop_max": 1
+        },
+        {
+          "trace_id": "826c68489a5ab424ace5d0830e7fb067",
+          "query": "71508edacc6c",
+          "stratum": "answerable",
+          "kind": "golden_context_removed",
+          "status": "applied",
+          "spans_stored": 9,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 57.33,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.09639299,
+          "loop_max": 1,
+          "marker_spans": [
+            "retrieval",
+            "retrieval"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 2,
+          "joined_spans": 2,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "golden_in_topk": [
+              true,
+              false
+            ],
+            "max_score": [
+              0.13639897,
+              0.09639299
+            ]
+          }
+        },
+        {
+          "trace_id": "7d094e037eb1c776ea48e9a1b51b2441",
+          "query": "71508edacc6c",
+          "stratum": "answerable",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 7,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 63.44,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": 0.11203581,
+          "loop_max": 1,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "4b180b3c68b0a50529123a14a0a148c9",
+          "query": "71508edacc6c",
+          "stratum": "answerable",
+          "kind": "output_budget_exhausted",
+          "status": "applied",
+          "spans_stored": 7,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 53.73,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": 0.11203581,
+          "loop_max": 1,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "finish_reasons": [
+              [
+                "stop"
+              ],
+              [
+                "length"
+              ]
+            ],
+            "parse_ok": [
+              "false"
+            ]
+          }
+        },
+        {
+          "trace_id": "79cee7c8d324201d6b2a81ea70c35ce2",
+          "query": "71508edacc6c",
+          "stratum": "answerable",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 9,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 67.56,
+          "outcome": "empty_answer",
+          "steps": [
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7"
+          ],
+          "golden_in_topk": true,
+          "max_score": 0.13639897,
+          "loop_max": 1,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+              ],
+              [
+                "sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "3b19299c3ff24b7da07991d2ed8abbc9",
+          "query": "71508edacc6c",
+          "stratum": "answerable",
+          "kind": "step_memory_loss",
+          "status": "applied",
+          "spans_stored": 32,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 178.69,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": 0.13639897,
+          "loop_max": 5,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "loop_max": [
+              1,
+              5
+            ],
+            "repeat_min": 3
+          }
+        },
+        {
+          "trace_id": "22fb95baa68c868c7f08ddd658ec2f9c",
+          "query": "71508edacc6c",
+          "stratum": "answerable",
+          "kind": "tool_failure",
+          "status": "applied",
+          "spans_stored": 9,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 71.6,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": 0.059825182,
+          "loop_max": 1,
+          "marker_spans": [
+            "tool"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "marked_tool_error": 1,
+            "consumed_by_llm": 1,
+            "retried": 0,
+            "error_type": [
+              "ToolFailure"
+            ]
+          }
+        },
+        {
+          "trace_id": "97e3a6545586f78135025897f63d4f78",
+          "query": "64445239fb24",
+          "stratum": "answerable",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 6,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 52.41,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": -0.10814011,
+          "loop_max": 1
+        },
+        {
+          "trace_id": "67d73eb0d56f316f9a5a42d8235efeba",
+          "query": "64445239fb24",
+          "stratum": "answerable",
+          "kind": "golden_context_removed",
+          "status": "applied",
+          "spans_stored": 9,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 65.14,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": -0.14029014,
+          "loop_max": 2,
+          "marker_spans": [
+            "retrieval",
+            "retrieval"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 2,
+          "joined_spans": 2,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "golden_in_topk": [
+              true,
+              false
+            ],
+            "max_score": [
+              -0.10814011,
+              -0.14029014
+            ]
+          }
+        },
+        {
+          "trace_id": "a87694ea4af6a49a0e7fd2192528b744",
+          "query": "64445239fb24",
+          "stratum": "answerable",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 7,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 77.1,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": -0.09735656,
+          "loop_max": 1,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "6950e0f425c793059597d2d568cb440c",
+          "query": "64445239fb24",
+          "stratum": "answerable",
+          "kind": "output_budget_exhausted",
+          "status": "applied",
+          "spans_stored": 16,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 118.81,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": -0.09735656,
+          "loop_max": 2,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "finish_reasons": [
+              [
+                "stop"
+              ],
+              [
+                "length"
+              ]
+            ],
+            "parse_ok": [
+              "false"
+            ]
+          }
+        },
+        {
+          "trace_id": "1f18705399b6071cd7d868a70cb3a34a",
+          "query": "64445239fb24",
+          "stratum": "answerable",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 6,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 58.93,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:efb1b6be85504b589451fa68ed4396fae2ffedeee2d584934bb7f44eaa0e688f"
+          ],
+          "golden_in_topk": true,
+          "max_score": -0.12744474,
+          "loop_max": 1,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+              ],
+              [
+                "sha256:efb1b6be85504b589451fa68ed4396fae2ffedeee2d584934bb7f44eaa0e688f"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "1577dcc6a0d6869a2633bee8d1f8f24f",
+          "query": "64445239fb24",
+          "stratum": "answerable",
+          "kind": "step_memory_loss",
+          "status": "applied",
+          "spans_stored": 32,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 187.88,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": 0.001688242,
+          "loop_max": 4,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "loop_max": [
+              1,
+              4
+            ],
+            "repeat_min": 3
+          }
+        },
+        {
+          "trace_id": "6af3788a7b8e7d7dd7dc17dc06b3de08",
+          "query": "64445239fb24",
+          "stratum": "answerable",
+          "kind": "tool_failure",
+          "status": "applied",
+          "spans_stored": 6,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 49.04,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": null,
+          "loop_max": 1,
+          "marker_spans": [
+            "tool"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "marked_tool_error": 1,
+            "consumed_by_llm": 1,
+            "retried": 0,
+            "error_type": [
+              "ToolFailure"
+            ]
+          }
+        },
+        {
+          "trace_id": "08a1796552f4668336088e62396f2d42",
+          "query": "c6b82487fd31",
+          "stratum": "answerable",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 6,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 48.64,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": -0.23447287,
+          "loop_max": 1
+        },
+        {
+          "trace_id": "e1a6b065f4692df3d4bb7087fc574165",
+          "query": "c6b82487fd31",
+          "stratum": "answerable",
+          "kind": "golden_context_removed",
+          "status": "applied",
+          "spans_stored": 6,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 47.29,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": -0.4736333,
+          "loop_max": 1,
+          "marker_spans": [
+            "retrieval"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "golden_in_topk": [
+              false,
+              false
+            ],
+            "max_score": [
+              -0.23447287,
+              -0.4736333
+            ]
+          }
+        },
+        {
+          "trace_id": "5c404d15376e976dc855077846a1bc40",
+          "query": "c6b82487fd31",
+          "stratum": "answerable",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 7,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 67.47,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": -0.23447287,
+          "loop_max": 1,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "bcdf545082c640d6bb3dbb37fb6acbee",
+          "query": "c6b82487fd31",
+          "stratum": "answerable",
+          "kind": "output_budget_exhausted",
+          "status": "applied",
+          "spans_stored": 7,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 47.91,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": -0.2030834,
+          "loop_max": 1,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "finish_reasons": [
+              [
+                "stop"
+              ],
+              [
+                "length"
+              ]
+            ],
+            "parse_ok": [
+              "false"
+            ]
+          }
+        },
+        {
+          "trace_id": "bd138ea1195be6a1845a76801526dfdf",
+          "query": "c6b82487fd31",
+          "stratum": "answerable",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 12,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 68.0,
+          "outcome": "empty_answer",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7"
+          ],
+          "golden_in_topk": false,
+          "max_score": -0.25680315,
+          "loop_max": 2,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+              ],
+              [
+                "sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "489135c39c409d3ab43418ad9fda456a",
+          "query": "c6b82487fd31",
+          "stratum": "answerable",
+          "kind": "step_memory_loss",
+          "status": "applied",
+          "spans_stored": 32,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 169.73,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": true,
+          "max_score": -0.1668855,
+          "loop_max": 5,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "loop_max": [
+              1,
+              5
+            ],
+            "repeat_min": 3
+          }
+        },
+        {
+          "trace_id": "99754f43f5c555b4017c25a44f23783e",
+          "query": "c6b82487fd31",
+          "stratum": "answerable",
+          "kind": "tool_failure",
+          "status": "applied",
+          "spans_stored": 6,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 57.06,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": null,
+          "loop_max": 1,
+          "marker_spans": [
+            "tool"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "marked_tool_error": 1,
+            "consumed_by_llm": 1,
+            "retried": 0,
+            "error_type": [
+              "ToolFailure"
+            ]
+          }
+        }
+      ],
+      "problems": [],
+      "content_check": {
+        "needles": {
+          "queries": 4,
+          "contract_chunks": 567,
+          "windows": 12632
+        },
+        "leaking": 0,
+        "scanned": {
+          "rows": {
+            "blame": 0,
+            "eval_traces": 28,
+            "findings": 0,
+            "injections": 24,
+            "spans": 366,
+            "trace_arrivals": 177,
+            "trace_summary": 28
+          },
+          "rows_total": 623,
+          "exported_spans": 366,
+          "files": {
+            "otlp.json": 1,
+            "ledger.jsonl": 28,
+            "outcomes.jsonl": 28,
+            "plan.jsonl": 28,
+            "queries.jsonl": 4,
+            "state.json": 94
+          },
+          "id_fields_excluded": {
+            "fields": [
+              "query_ref",
+              "ref"
+            ],
+            "values": 116
+          }
+        }
+      }
+    },
+    "runbook-agent": {
+      "app": "runbook-agent",
+      "run_id": "faults-20261105-s7-b1b6b60",
+      "baseline_digest": "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1",
+      "spans": {
+        "sent": 33,
+        "stored": 33
+      },
+      "per_kind": {
+        "clean": {
+          "component": "",
+          "traces": 3,
+          "applied": 0,
+          "not_reached": 0,
+          "marker_ok": 0,
+          "joined": 0,
+          "moved": 0,
+          "assembled": 3,
+          "seconds_median": 113.6,
+          "seconds_p95": 364.8,
+          "outcomes": {
+            "no-runbook": 2,
+            "remediated": 1
+          }
+        },
+        "malformed_output": {
+          "component": "model",
+          "traces": 3,
+          "applied": 3,
+          "not_reached": 0,
+          "marker_ok": 3,
+          "joined": 3,
+          "moved": 3,
+          "assembled": 3,
+          "seconds_median": 93.1,
+          "seconds_p95": 120.1,
+          "outcomes": {
+            "no-runbook": 3
+          }
+        },
+        "prompt_variant": {
+          "component": "prompt",
+          "traces": 3,
+          "applied": 3,
+          "not_reached": 0,
+          "marker_ok": 3,
+          "joined": 3,
+          "moved": 3,
+          "assembled": 3,
+          "seconds_median": 60.4,
+          "seconds_p95": 84.5,
+          "outcomes": {
+            "remediated": 1,
+            "no-runbook": 1,
+            "rejected": 1
+          }
+        }
+      },
+      "per_trace": [
+        {
+          "trace_id": "4cb93e7d7bc7110f8af8157b160e17ce",
+          "query": "9d4442119917",
+          "stratum": "latency",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 120.1,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "677ecfe2ff412594a3f8ca772a6c1ced",
+          "query": "6b0b52f1a142",
+          "stratum": "latency",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 93.1,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "0d0e210926839f29044bea5fb3cf1122",
+          "query": "f6bf7d9ddd50",
+          "stratum": "latency",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 113.6,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0
+        },
+        {
+          "trace_id": "cc8f893329dc8018e804d81a2439f9cb",
+          "query": "ffda37087a98",
+          "stratum": "oom",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 5,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 364.8,
+          "outcome": "remediated",
+          "steps": [
+            "collect-diagnostics",
+            "restart-service"
+          ],
+          "bundle_digest": [
+            "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 1
+        },
+        {
+          "trace_id": "52229fed735bb768c4f651cbd2548ecb",
+          "query": "b7c734ff8c4b",
+          "stratum": "oom",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 79.0,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "4387e051d65c1b411221d90fcc3bb010",
+          "query": "d704e3f127ed",
+          "stratum": "oom",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 67.0,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0
+        },
+        {
+          "trace_id": "5eab6d5b8a4d193184188ca17c8eeee5",
+          "query": "664c2877e038",
+          "stratum": "oom",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 5,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 60.4,
+          "outcome": "remediated",
+          "steps": [
+            "collect-diagnostics",
+            "restart-service"
+          ],
+          "bundle_digest": [
+            "sha256:99983a64628c33e47965d9b2a35493ba2a9939f74dd0ec86aab3baefc94e0d33"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 1,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+              ],
+              [
+                "sha256:99983a64628c33e47965d9b2a35493ba2a9939f74dd0ec86aab3baefc94e0d33"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "06c22f3b669971baa516c38ad8654237",
+          "query": "286a4cdc6314",
+          "stratum": "latency",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 84.5,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+              ],
+              [
+                "sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "cc9552adde00d05edfdc859aec660ddb",
+          "query": "2ec8cd13b616",
+          "stratum": "oom",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 5,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 60.2,
+          "outcome": "rejected",
+          "steps": [
+            "collect-diagnostics",
+            "restart-service"
+          ],
+          "bundle_digest": [
+            "sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 1,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+              ],
+              [
+                "sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90"
+              ]
+            ]
+          }
+        }
+      ],
+      "problems": [],
+      "content_check": {
+        "needles": {
+          "alert": 30,
+          "prompt_windows": 153
+        },
+        "leaking": 0,
+        "scanned": {
+          "rows": {
+            "blame": 0,
+            "eval_traces": 9,
+            "findings": 0,
+            "injections": 6,
+            "spans": 33,
+            "trace_arrivals": 9,
+            "trace_summary": 9
+          },
+          "rows_total": 66,
+          "exported_spans": 33,
+          "files": {
+            "otlp.json": 1,
+            "ledger.jsonl": 9,
+            "outcomes.jsonl": 9,
+            "plan.jsonl": 9,
+            "queries.jsonl": 12,
+            "state.json": 99
+          },
+          "id_fields_excluded": {
+            "fields": [
+              "query_ref",
+              "ref"
+            ],
+            "values": 48
+          }
+        }
+      }
+    }
+  },
+  "state": {
+    "agentic-rag": {
+      "run_id": "faults-20261105-s7-b1b6b60",
+      "app": "agentic-rag",
+      "prepared_at": "2026-11-05T16:52:57Z",
+      "traceblame_commit": "b1b6b6048b98258f3495a577e7d88d4209496e90",
+      "app_commit": "5370b067fdd1c44553fc34c5abb92f267d2393a1",
+      "model": {
+        "name": "qwen2.5:7b",
+        "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+        "server": "ollama",
+        "server_version": "0.40.14"
+      },
+      "packages": {
+        "openinference-instrumentation-openai": "0.1.68",
+        "openinference-instrumentation": "0.1.74",
+        "openinference-semantic-conventions": "0.1.43",
+        "openai": "3.41.0",
+        "opentelemetry-sdk": "1.45.2",
+        "opentelemetry-exporter-otlp-proto-http": "1.45.2",
+        "traceblame-py": "0.1.0",
+        "chromadb": "1.5.9",
+        "sentence-transformers": "6.2.0",
+        "torch": "2.15.0+cpu"
+      },
+      "seed": 7,
+      "config": {
+        "n": 24,
+        "ratio": 0.5,
+        "queries": 4
+      },
+      "golden_coverage": {
+        "mapped": 12,
+        "answerable_sampled": 12
+      },
+      "plan": {
+        "entries": 28,
+        "sha256": "76aae3c66e04d97b2e9d6167e1843dcb87b9cda530dd34e96f356202b898c28d",
+        "by_kind": {
+          "clean": 4,
+          "golden_context_removed": 4,
+          "malformed_output": 4,
+          "output_budget_exhausted": 4,
+          "prompt_variant": 4,
+          "step_memory_loss": 4,
+          "tool_failure": 4
+        }
+      },
+      "faults_sha256": {
+        "packages/faults/src/traceblame_faults/__init__.py": "9d98854ead8cdf52b17fa0d73049f4fdee1ddaedd01127c1b38a35c09828f24c",
+        "packages/faults/src/traceblame_faults/bundle.py": "b93f268e0a81eb23faa2b76b2c066db10ea3e65cd4aa8261a8385ee23bbffc99",
+        "packages/faults/src/traceblame_faults/cli.py": "7d8785f7bc4225640af37a5cd9a511d081e286dbd0d94d5c189c7f4540ff7738",
+        "packages/faults/src/traceblame_faults/golden.py": "2af858bc17ad535200c984bcd57c4e28750eca5d69dd7e54e733f43cea340e2f",
+        "packages/faults/src/traceblame_faults/guard.py": "b650e8b2d602705730baa812e10ddc8a733f729d7f6dd9cc5d64bfdaa7792ed0",
+        "packages/faults/src/traceblame_faults/ids.py": "90e1ab604b786be092333f0a87cbd4e245eae739ce1fcf8df74ac67bac9b3415",
+        "packages/faults/src/traceblame_faults/kinds.py": "8bd057964536cf31ec4d9397876526571c5c5ee474cd647b5b4d4d8836015954",
+        "packages/faults/src/traceblame_faults/ledger.py": "18f16f4cec43cf9b256f530d2f440086a998543c98e789c3a302484e02d00425",
+        "packages/faults/src/traceblame_faults/mutate.py": "b855311f8a1483c089e1ac481254629dca008ebb05d87065649d47317ed3e104",
+        "packages/faults/src/traceblame_faults/plan.py": "ff25989b51706dbf772c6ee86ea805d7b8fbc30c0d8ee2d5ac3e3a8898c8d4bd",
+        "packages/faults/src/traceblame_faults/py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "packages/faults/src/traceblame_faults/record.py": "986dfe02379305993eb55f2453cf17ca385a62507ef058e81a73641e8de0c9ae",
+        "packages/faults/src/traceblame_faults/retrieval.py": "ed55a6ae1242c88d67e4bc987af719a88aa02d22cc9229ffd3a6cacb2983375b",
+        "packages/faults/src/traceblame_faults/scenario.py": "f01ad31e2e186a64ee663314afce7cb9d879643afc68306cde910b18eb2aeef5",
+        "packages/faults/src/traceblame_faults/scenarios/golden_context_removed.agentic-rag.yaml": "36338c55e5b438d828f3d8743d02832b70afcba2519efddd0f2d8e0d51154025",
+        "packages/faults/src/traceblame_faults/scenarios/malformed_output.agentic-rag.yaml": "341861225f8f1f3d125a0c534f96922834983f33041fcaf0e25795c6d79b88c9",
+        "packages/faults/src/traceblame_faults/scenarios/malformed_output.runbook-agent.yaml": "cc1b476a06e3b8997a640efea1913bf876bfcc4bb3d608f38064120ac2304fcf",
+        "packages/faults/src/traceblame_faults/scenarios/output_budget_exhausted.agentic-rag.yaml": "7dcc9bcabd3d7d08261da71dfa4d6a2a8cf21a430ceb153e8f992659a66b7956",
+        "packages/faults/src/traceblame_faults/scenarios/prompt_variant.agentic-rag.yaml": "62d02475feed0df067e8b2440597516a3a2b68d47a13fde35ca310431d98aa32",
+        "packages/faults/src/traceblame_faults/scenarios/prompt_variant.runbook-agent.yaml": "24134b3a869c38d53a642033125ba090aa91f98942e080b789a9eaf976cfe58e",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/agentic_rag/direct-answer-system.txt": "f5c88ac58cc8e17033932b2dd3ec0b302cf6619e97879bfa0b6a81e868517720",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/agentic_rag/pre-abc8838-reasoning.txt": "93d6e446ef90649df0db8d486b938456d84de445e0ebeabf67c558bc9bff8967",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/runbook_agent/no-candidate-rule-system.txt": "01925e1219193214f9772cf490105d9904e677a931c8a02d308c38fd1b232852",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/runbook_agent/no-decline-rule-system.txt": "e634dd00febe550e905111808923d4292ab57ab587b2d4f509bfcc367dfcf06b",
+        "packages/faults/src/traceblame_faults/scenarios/step_memory_loss.agentic-rag.yaml": "78f54fa1adde2181ca0be4ff541c1365f5ecf7452959dceab69b70b2a1c1f549",
+        "packages/faults/src/traceblame_faults/scenarios/tool_failure.agentic-rag.yaml": "9c2e3c069820064607d7fed43b0c5a3d699523ceebd3cd55bbf7db73695307f2",
+        "packages/faults/src/traceblame_faults/sql/eval_traces_read.sql": "368a5ae7636122848aa91fb0deb761867f4a0257b547a5abfc0c919b6777b398",
+        "packages/faults/src/traceblame_faults/sql/eval_traces_write.sql": "f2ca1f246cd520840d18b976b00baeebcbfcac0791d82174c8fed54d6408cca8",
+        "tools/faults/agentic_rag_app.py": "f1a93fcd065beea6b88cd07f22478d8409d4efc1ca441789ed0ef289761495ba"
+      },
+      "run": {
+        "nats_seq_before": 280610,
+        "finished_at": "2026-11-05T17:35:44Z",
+        "seconds": 2539.4,
+        "spans_sent": 366,
+        "eval_tenants": "[tenant-eval]"
+      },
+      "record": {
+        "eval_traces": 28,
+        "injections": 24
+      }
+    },
+    "runbook-agent": {
+      "run_id": "faults-20261105-s7-b1b6b60",
+      "app": "runbook-agent",
+      "built_at": "2026-11-05T17:38:45Z",
+      "traceblame_commit": "b1b6b6048b98258f3495a577e7d88d4209496e90",
+      "app_commit": "92fb6f8fcbcf30f463adea13794c37159d5409e9",
+      "seed": 7,
+      "config": {
+        "scenarios": [
+          "latency",
+          "oom"
+        ],
+        "per_scenario": 6,
+        "clean": 3,
+        "malformed_output": 3,
+        "prompt_variant": 3,
+        "approval_timeout_ms": 30000
+      },
+      "build": {
+        "image": "runbook-agent:92fb6f8-tbb1b6b60",
+        "image_id": "sha256:ff0fc47a87bc418c52e8ced48be1e3dd911c116bbe0e74a72d0defec8c137f50",
+        "node": "v22.23.4",
+        "kubectl": {
+          "version": "1.37.2",
+          "sha256": "c04487523e7aa7d1493f7808174c899db93d7a9cf57531420cd76b9bd415f8f4"
+        },
+        "shim_tarball_sha256": "5c7b5d1503758b5ca24a435fb6da165d19ba9ebab7e4045827d7a5a86cf6cf9b",
+        "dockerfile_patch": {
+          "original": "COPY package.json pnpm-lock.yaml ./",
+          "used": "COPY package.json pnpm-lock.yaml traceblame-ts-0.1.0.tgz ./"
+        },
+        "user": {
+          "uid": 100,
+          "gid": 101
+        },
+        "packages": {
+          "ai": "4.3.19",
+          "@ai-sdk/openai": "1.3.24",
+          "traceblame-ts": "0.1.0",
+          "@traceloop/node-server-sdk": "0.27.0",
+          "@opentelemetry/sdk-trace-base": "2.0.1",
+          "@opentelemetry/api": "1.9.0"
+        },
+        "eval_image": "runbook-agent:92fb6f8-tbb1b6b60-faults",
+        "eval_image_id": "sha256:a23e74792c6b17a684b1844cde10b03cc3d712d2fe27963ef95470b64be952d0"
+      },
+      "image_guard": {
+        "base_node_options": false,
+        "base_has_preload": false,
+        "eval_node_options": true,
+        "eval_has_preload": true,
+        "fetch_without_switch": "fetch",
+        "fetch_other_tenant": "fetch",
+        "fetch_eval_tenant": "handle"
+      },
+      "preload_sha256": "48ec262641600789dae90867a1ab881ccf4c393c38855957c60957fd1b530b1a",
+      "baseline_digest": "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1",
+      "plan": {
+        "entries": 9,
+        "sha256": "4fd1295b28bb92832bf73df3a59c95e83a1c37ae0dd9e32d3283521bfb5448a4",
+        "by_kind": {
+          "prompt_variant": 3,
+          "clean": 3,
+          "malformed_output": 3
+        }
+      },
+      "run": {
+        "nats_seq_before": 280640,
+        "finished_at": "2026-11-05T18:00:37Z",
+        "seconds": 1227.4,
+        "spans_sent": 33,
+        "eval_tenants": "[tenant-eval]",
+        "model": {
+          "name": "qwen2.5:7b",
+          "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+          "server_version": "0.40.14"
+        },
+        "safety": [
+          {
+            "bundle_digest": "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1",
+            "failed": []
+          },
+          {
+            "bundle_digest": "sha256:99983a64628c33e47965d9b2a35493ba2a9939f74dd0ec86aab3baefc94e0d33",
+            "failed": []
+          },
+          {
+            "bundle_digest": "sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90",
+            "failed": []
+          }
+        ],
+        "problems": []
+      },
+      "record": {
+        "eval_traces": 9,
+        "injections": 6
+      }
+    }
+  },
+  "ledger": {
+    "agentic-rag": {
+      "sha256": "1b6096c914266269500aacb9fee984651bf55bb5b660a1e5ea5523dccf5d6df4",
+      "records": 28,
+      "host_load1": {
+        "d0748f4838f3f855a48ee0e8acc2efc2": null,
+        "ab6e58a5f304b543784945406749fe13": null,
+        "aece804aabe308f6f44b674e0ffddf5b": null,
+        "c2a6d5c5d62a0ff31e84dd1c1c747848": null,
+        "ba083eb6fb364c50d82445165f1cd685": null,
+        "8b4cbbe9bb0c2c108d9486b24d6c38c4": null,
+        "e20d25a0053f42aacb708476ed87b4ee": null,
+        "b1b251ea44c575dfde45800f4e51b723": null,
+        "826c68489a5ab424ace5d0830e7fb067": null,
+        "7d094e037eb1c776ea48e9a1b51b2441": null,
+        "4b180b3c68b0a50529123a14a0a148c9": null,
+        "79cee7c8d324201d6b2a81ea70c35ce2": null,
+        "3b19299c3ff24b7da07991d2ed8abbc9": null,
+        "22fb95baa68c868c7f08ddd658ec2f9c": null,
+        "97e3a6545586f78135025897f63d4f78": null,
+        "67d73eb0d56f316f9a5a42d8235efeba": null,
+        "a87694ea4af6a49a0e7fd2192528b744": null,
+        "6950e0f425c793059597d2d568cb440c": null,
+        "1f18705399b6071cd7d868a70cb3a34a": null,
+        "1577dcc6a0d6869a2633bee8d1f8f24f": null,
+        "6af3788a7b8e7d7dd7dc17dc06b3de08": null,
+        "08a1796552f4668336088e62396f2d42": null,
+        "e1a6b065f4692df3d4bb7087fc574165": null,
+        "5c404d15376e976dc855077846a1bc40": null,
+        "bcdf545082c640d6bb3dbb37fb6acbee": null,
+        "bd138ea1195be6a1845a76801526dfdf": null,
+        "489135c39c409d3ab43418ad9fda456a": null,
+        "99754f43f5c555b4017c25a44f23783e": null
+      },
+      "counts": {
+        "clean": {
+          "clean": 4,
+          "applied": 0,
+          "not_reached": 0
+        },
+        "golden_context_removed": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "malformed_output": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "output_budget_exhausted": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "prompt_variant": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "step_memory_loss": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "tool_failure": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        }
+      }
+    },
+    "runbook-agent": {
+      "sha256": "67046eb87588627be7fcf26ca5a419e03250bcca02d15fba2471748854f49a2f",
+      "records": 9,
+      "host_load1": {
+        "4cb93e7d7bc7110f8af8157b160e17ce": null,
+        "677ecfe2ff412594a3f8ca772a6c1ced": null,
+        "0d0e210926839f29044bea5fb3cf1122": null,
+        "cc8f893329dc8018e804d81a2439f9cb": null,
+        "52229fed735bb768c4f651cbd2548ecb": null,
+        "4387e051d65c1b411221d90fcc3bb010": null,
+        "5eab6d5b8a4d193184188ca17c8eeee5": null,
+        "06c22f3b669971baa516c38ad8654237": null,
+        "cc9552adde00d05edfdc859aec660ddb": null
+      },
+      "counts": {
+        "malformed_output": {
+          "clean": 0,
+          "applied": 3,
+          "not_reached": 0
+        },
+        "clean": {
+          "clean": 3,
+          "applied": 0,
+          "not_reached": 0
+        },
+        "prompt_variant": {
+          "clean": 0,
+          "applied": 3,
+          "not_reached": 0
+        }
+      }
+    }
+  },
+  "loop_gate": {
+    "applied": 4,
+    "loop_signal": 4,
+    "hit_rate": 1.0,
+    "hit_rate_min": 0.6,
+    "repeat_min": 3,
+    "passed": true
+  },
+  "retrieval": [
+    {
+      "query": "9465608b62ea",
+      "status": "applied",
+      "mode": "distractor",
+      "golden_in_topk": [
+        false,
+        false
+      ],
+      "max_score": [
+        0.1586613,
+        -0.2219435
+      ],
+      "moved": true,
+      "counted": true
+    },
+    {
+      "query": "71508edacc6c",
+      "status": "applied",
+      "mode": "distractor",
+      "golden_in_topk": [
+        true,
+        false
+      ],
+      "max_score": [
+        0.13639897,
+        0.09639299
+      ],
+      "moved": true,
+      "counted": true
+    },
+    {
+      "query": "64445239fb24",
+      "status": "applied",
+      "mode": "remove",
+      "golden_in_topk": [
+        true,
+        false
+      ],
+      "max_score": [
+        -0.10814011,
+        -0.14029014
+      ],
+      "moved": true,
+      "counted": true
+    },
+    {
+      "query": "c6b82487fd31",
+      "status": "applied",
+      "mode": "distractor",
+      "golden_in_topk": [
+        false,
+        false
+      ],
+      "max_score": [
+        -0.23447287,
+        -0.4736333
+      ],
+      "moved": true,
+      "counted": true
+    }
+  ],
+  "d1_components": {
+    "retrieval": 75,
+    "tool": 75,
+    "orchestration": 150,
+    "model": 75,
+    "prompt": 75,
+    "clean": 150
+  },
+  "projection": {
+    "rows": [
+      {
+        "app": "agentic-rag",
+        "kind": "golden_context_removed",
+        "traces": 75,
+        "seconds_median": 57.5,
+        "hours": 1.1979166666666667
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "tool_failure",
+        "traces": 75,
+        "seconds_median": 64.3,
+        "hours": 1.3395833333333333
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "output_budget_exhausted",
+        "traces": 75,
+        "seconds_median": 60.3,
+        "hours": 1.25625
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "step_memory_loss",
+        "traces": 75,
+        "seconds_median": 174.2,
+        "hours": 3.629166666666667
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "malformed_output",
+        "traces": 50,
+        "seconds_median": 72.3,
+        "hours": 1.0041666666666667
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "prompt_variant",
+        "traces": 50,
+        "seconds_median": 67.8,
+        "hours": 0.9416666666666667
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "clean",
+        "traces": 110,
+        "seconds_median": 58.9,
+        "hours": 1.7997222222222222
+      },
+      {
+        "app": "runbook-agent",
+        "kind": "malformed_output",
+        "traces": 25,
+        "seconds_median": 93.1,
+        "hours": 0.6465277777777778
+      },
+      {
+        "app": "runbook-agent",
+        "kind": "prompt_variant",
+        "traces": 25,
+        "seconds_median": 60.4,
+        "hours": 0.41944444444444445
+      },
+      {
+        "app": "runbook-agent",
+        "kind": "clean",
+        "traces": 40,
+        "seconds_median": 113.6,
+        "hours": 1.2622222222222221
+      }
+    ],
+    "hours": 13.5,
+    "complete": true
+  },
+  "runbook_requests": [
+    "{\"max_tokens\": null, \"temperature\": 0}"
+  ],
+  "blockers": [
+    "ClickHouse persistence in kind (#58): D1 collection was blocked until it was fixed. Fixed by PR #59 (merged 2026-11-05 14:03 UTC) before this run: the CHI pod mounts the Bound PVC data-chi-traceblame-demo-0-0-0, and this run's database was the persistent one. It no longer blocks D1.",
+    "Prompt class without an MVP detector: decided on #16 (prompt_regression moves into the MVP set). This run records what it needs: baseline_digest per run in injections.params, and clean traces carrying the baseline digest. It no longer blocks D1.",
+    "D1 itself (#19) still needs about 13.5 h of serial run time (projection above) in slots on the shared kind cluster (flock), plus the frozen snapshot export under evals/datasets/."
+  ],
+  "problems": [],
+  "preload": {
+    "run_sha256": "48ec262641600789dae90867a1ab881ccf4c393c38855957c60957fd1b530b1a",
+    "run_commit_matches": true,
+    "committed_sha256": "99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4",
+    "commits_since": [
+      "38dd2b8 build(faults): lint the Node preload with eslint (#14)"
+    ],
+    "lines_added_removed": [
+      5,
+      5
+    ]
+  },
+  "notes": [
+    "Preload: the committed faults-preload.mjs differs from the run's only by the eslint fix in 38dd2b8, the rename of the internal helper obj() to parseObject() (no-shadow): with the name mapped back, every removed line has an identical added line. Behaviour and the shared vectors are unchanged (27 node tests). D1 runs with the committed preload, and its sha256 is in D1's provenance."
+  ]
+}

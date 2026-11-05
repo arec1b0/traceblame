@@ -223,9 +223,10 @@ def raw_json(path: str) -> Any:
 
 
 def build_image(
-    app_dir: Path, app_commit: str, traceblame_commit: str, work: Path
+    app_dir: Path, app_commit: str, traceblame_commit: str, work: Path, *, load: bool = True
 ) -> dict[str, Any]:
-    """The app image at its commit, with the shim packed from this tree at its commit."""
+    """The app image at its commit, with the shim packed from this tree at its commit; loaded
+    into the kind nodes unless load=False (the fault driver loads its own eval image)."""
     run([str(PNPM), "-C", str(SDK_DIR), "install", "--frozen-lockfile"])
     run([str(PNPM), "-C", str(SDK_DIR), "build"])
     run([str(PNPM), "-C", str(SDK_DIR), "pack", "--pack-destination", str(work)])
@@ -301,9 +302,17 @@ def build_image(
         ]
     )
     image_id = run(["docker", "image", "inspect", "--format", "{{.Id}}", tag]).stdout.strip()
-    run(
-        [str(ROOT / ".tools" / "bin" / "kind"), "load", "docker-image", "--name", "traceblame", tag]
-    )
+    if load:
+        run(
+            [
+                str(ROOT / ".tools" / "bin" / "kind"),
+                "load",
+                "docker-image",
+                "--name",
+                "traceblame",
+                tag,
+            ]
+        )
     installed = json.loads(
         run(["docker", "run", "--rm", "--entrypoint", "node", tag, "-e", _VERSIONS_JS]).stdout
     )
