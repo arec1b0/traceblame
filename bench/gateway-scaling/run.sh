@@ -21,6 +21,8 @@
 # Before the load: no other bench or capture may be running (pods, jobs, processes) and the
 # agents must accept no spans for 15 s; the report records both. The agents and the gateways
 # are rolled with the run's overlays, and restored to their plain configs on exit.
+# The report records both databases' applied migrations (schema_migrations) at the start and
+# whether they changed during the load; a run without the ClickHouse schema fails (#58).
 #
 # Run it under the shared kind lock: flock /tmp/traceblame-kind.lock -c 'make bench-scaling'.
 # Needs `make kind-up kind-deploy`. The report goes to
@@ -94,6 +96,40 @@ accepted() { # sum of otelcol_receiver_accepted_spans over the agents
   done
   echo "${total}"
 }
+
+chi_pod="$(gw get pod -l clickhouse.altinity.com/chi=traceblame -o jsonpath='{.items[0].metadata.name}')"
+ch_user="$(gw get secret clickhouse-credentials -o jsonpath='{.data.user}' | base64 -d)"
+ch_password="$(gw get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)"
+ch() { gw exec "${chi_pod}" -c clickhouse -- clickhouse-client --user "${ch_user}" --password "${ch_password}" --database traceblame --query "$1"; }
+pg_user="$("${KCTL[@]}" -n traceblame get secret postgres-credentials -o jsonpath='{.data.user}' | base64 -d)"
+pg_password="$("${KCTL[@]}" -n traceblame get secret postgres-credentials -o jsonpath='{.data.password}' | base64 -d)"
+pg() { "${KCTL[@]}" -n traceblame exec postgres-0 -- env PGPASSWORD="${pg_password}" psql -h 127.0.0.1 -U "${pg_user}" -d traceblame -Atqc "$1"; }
+
+# The applied migrations of both databases (ADR-0004, ADR-0007): another session may apply an
+# expand migration this checkout does not have (code N runs on schema N+1 expand), so the
+# report names the schema each run saw, at its start and at the end of its load.
+ch_schema() {
+  ch "SELECT arrayStringConcat(arraySort(groupArray(concat(leftPad(toString(version), 4, '0'), ' ', name,
+        ' (', phase, ', ', substring(sha256, 1, 12), ', ', formatDateTime(applied_at, '%FT%TZ', 'UTC'), ')'))), '; ')
+      FROM schema_migrations"
+}
+pg_schema() {
+  pg "SELECT string_agg(format('%s %s (%s, %s, %s)', lpad(version::text, 4, '0'), name, phase, left(sha256, 12),
+        to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')), '; ' ORDER BY version)
+      FROM schema_migrations"
+}
+beyond() { # applied versions (from a schema list) without a migration file in this checkout
+  local dir="${ROOT}/packages/storage/src/traceblame_storage/migrations/$1" v out=""
+  for v in $(tr ';' '\n' <<<"$2" | awk 'NF {print $1}'); do
+    compgen -G "${dir}/${v}_*.sql" >/dev/null || out+="${v} "
+  done
+  echo "${out:-none}"
+}
+
+step "schema: the applied migrations of ClickHouse and Postgres"
+ch_schema_start="$(ch_schema)" || { echo "run.sh: no schema_migrations in ClickHouse (data lost? #58): run make kind-deploy" >&2; exit 1; }
+pg_schema_start="$(pg_schema)" || { echo "run.sh: no schema_migrations in Postgres: run make kind-deploy" >&2; exit 1; }
+[[ -n "${ch_schema_start}" ]] || { echo "run.sh: ClickHouse has no applied migration (#58): run make kind-deploy" >&2; exit 1; }
 
 step "preflight: no other bench or capture in the cluster (run ${PREFIX})"
 preflight_at="$(date -u +%FT%TZ)"
@@ -198,11 +234,11 @@ fi
 
 step "waiting for the generators to finish"
 "${KCTL[@]}" -n bench wait job -l app=loadgen --for=condition=Complete --timeout="$((LOAD + 900))s" >/dev/null
-
-chi_pod="$(gw get pod -l clickhouse.altinity.com/chi=traceblame -o jsonpath='{.items[0].metadata.name}')"
-ch_user="$(gw get secret clickhouse-credentials -o jsonpath='{.data.user}' | base64 -d)"
-ch_password="$(gw get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)"
-ch() { gw exec "${chi_pod}" -c clickhouse -- clickhouse-client --user "${ch_user}" --password "${ch_password}" --database traceblame --query "$1"; }
+ch_schema_end="$(ch_schema)"
+pg_schema_end="$(pg_schema)"
+schema_changed="no"
+[[ "${ch_schema_end}" == "${ch_schema_start}" && "${pg_schema_end}" == "${pg_schema_start}" ]] \
+  || schema_changed="YES: ClickHouse at the end: ${ch_schema_end}; Postgres at the end: ${pg_schema_end}"
 
 step "waiting for the gateways to decide and flush (decision_wait 30 s, then stable counts)"
 sleep 30
@@ -298,6 +334,11 @@ json.dump({
     "metrics scrape": "every ${SCRAPE_EVERY} s through the API server's pod proxy (:8888); ClickHouse system.metric_log",
     "preflight (${preflight_at})": "no active job, no bench pod, no capture process; pods: ${pods_summary}",
     "idle check": "${idle}",
+    "ClickHouse schema_migrations at the start": "${ch_schema_start}",
+    "ClickHouse migrations applied beyond this checkout": "$(beyond clickhouse "${ch_schema_start}")",
+    "Postgres schema_migrations at the start": "${pg_schema_start}",
+    "Postgres migrations applied beyond this checkout": "$(beyond postgres "${pg_schema_start}")",
+    "schema changed during the load": "${schema_changed}",
     "network policy probe (non-agent pod -> gateway:4317)": "${netpol}",
     "run id": "${PREFIX}",
 }, open(sys.argv[1], "w"), indent=1)
