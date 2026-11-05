@@ -34,7 +34,7 @@ WINDOW = 48
 STEP = 16
 
 
-def _quiet_logs() -> None:
+def quiet_logs() -> None:
     """The app logs query prefixes through loguru; keep only its errors, without text."""
     from loguru import logger
 
@@ -42,18 +42,18 @@ def _quiet_logs() -> None:
     logger.add(sys.stderr, level="ERROR", format="{level} {name}:{line}")
 
 
-def _chunks(item: cuad.Item) -> list[Any]:
+def chunks(item: cuad.Item) -> list[Any]:
     from src.vectordb import Document, DocumentProcessor
 
-    chunks = DocumentProcessor().chunk_document(
+    out = DocumentProcessor().chunk_document(
         Document(content=item.context, metadata={"title": item.title})
     )
-    for n, chunk in enumerate(chunks):
+    for n, chunk in enumerate(out):
         chunk.doc_id = cuad.doc_id(item.title, n)
-    return chunks
+    return out
 
 
-def _session(qid: str) -> str:
+def session_id(qid: str) -> str:
     return "s-" + hashlib.sha256(qid.encode()).hexdigest()[:16]
 
 
@@ -81,14 +81,14 @@ async def _run(args: argparse.Namespace) -> int:
         for item in _sampled(args):
             if item.title not in stores:
                 stores[item.title] = ChromaStore(collection_name=cuad.doc_id(item.title, 0))
-                stores[item.title].add_documents(_chunks(item))
+                stores[item.title].add_documents(chunks(item))
             if agent is None:
                 agent = RAGAgent(vector_store=stores[item.title], enable_tracing=False)
             agent.vector_store = stores[item.title]
             agent.tool_selector.get_tool("retriever").vector_store = stores[item.title]
             record: dict[str, Any] = {
                 "qid": item.qid,
-                "session": _session(item.qid),
+                "session": session_id(item.qid),
                 "answerable": item.answerable,
             }
             try:
@@ -192,11 +192,11 @@ async def _canary(_: argparse.Namespace) -> int:
     # The query is the document's text, so retrieval finds it above the app's threshold.
     text = f"{CANARIES['document']} {CANARIES['query']}. " * 6
     item = cuad.Item(qid="canary", title=CANARY_TITLE, question=text, answerable=True, context=text)
-    chunks = _chunks(item)
-    _StubLLM.doc_id = chunks[0].doc_id
+    canary_chunks = chunks(item)
+    _StubLLM.doc_id = canary_chunks[0].doc_id
     try:
         store = ChromaStore(collection_name="traceblame-canary")
-        store.add_documents(chunks)
+        store.add_documents(canary_chunks)
         agent = RAGAgent(vector_store=store, enable_tracing=False)
         response = await agent.run(text, context={"session_id": "s-canary"})
     finally:
@@ -254,7 +254,7 @@ def _check_content(args: argparse.Namespace) -> int:
             exported.update(s[i : i + WINDOW] for i in range(max(len(s) - WINDOW, 0) + 1))
     found: list[str] = []
     for item in items:
-        texts = [item.question] + [c.content for c in _chunks(item)]
+        texts = [item.question] + [c.content for c in chunks(item)]
         if any(w in exported for t in texts for w in _windows(t)):
             found.append(item.qid)
     # Only the qids, never the text found.
@@ -278,7 +278,7 @@ def main() -> int:
     check.add_argument("--qids", nargs="+", required=True)
     check.add_argument("--files", nargs="+", required=True, help="JSON or JSON-lines files")
     args = parser.parse_args()
-    _quiet_logs()
+    quiet_logs()
     if args.command == "run":
         return asyncio.run(_run(args))
     if args.command == "canary":

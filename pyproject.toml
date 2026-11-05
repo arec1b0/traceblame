@@ -70,6 +70,7 @@ extraPaths = [
     "tools/fixtures",
     "tools/fixtures/agentic_rag",
     "tools/fixtures/runbook_agent",
+    "tools/faults",
     "tools/typings",
 ]
 
@@ -77,7 +78,12 @@ extraPaths = [
 # bench/gateway-scaling/assembler_report.py is imported the same way.
 [[tool.pyright.executionEnvironments]]
 root = "tests/scripts"
-extraPaths = ["tools/fixtures/agentic_rag", "tools/fixtures/runbook_agent", "bench/gateway-scaling"]
+extraPaths = [
+    "tools/fixtures/agentic_rag",
+    "tools/fixtures/runbook_agent",
+    "tools/faults",
+    "bench/gateway-scaling",
+]
 
 # The bench scripts run with the workspace environment (`uv run --frozen`).
 [[tool.pyright.executionEnvironments]]
@@ -87,8 +93,13 @@ root = "bench"
 minversion = "9.0"
 # The capture drivers add these directories to sys.path at run time (rules, scenarios, cuad);
 # tests/scripts imports those modules by the same names, and pyright's extraPaths match.
-# bench/gateway-scaling holds assembler_report.py.
-pythonpath = ["tools/fixtures/agentic_rag", "tools/fixtures/runbook_agent", "bench/gateway-scaling"]
+# bench/gateway-scaling holds assembler_report.py; tools/faults the fault drivers' modules.
+pythonpath = [
+    "tools/fixtures/agentic_rag",
+    "tools/fixtures/runbook_agent",
+    "tools/faults",
+    "bench/gateway-scaling",
+]
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config", "-ra"]
 testpaths = ["services", "packages", "sdk", "tests"]
 xfail_strict = true
