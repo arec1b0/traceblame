@@ -67,6 +67,14 @@ repos:
         language: unsupported
         files: (\.go|go\.mod|go\.work)$
         pass_filenames: false
+      - id: go-bootstrap-clean
+        name: go bootstrap leaves the tree clean (go.work.sum complete)
+        # On commit: only when go.work, go.work.sum or a go.mod/go.sum is staged (the files filter,
+        # no always_run). `make lint` and the CI static job pass --all-files, so they always run it.
+        entry: scripts/go-bootstrap-clean-check.sh
+        language: unsupported
+        files: (^|/)(go\.mod|go\.sum|go\.work|go\.work\.sum)$
+        pass_filenames: false
       - id: hadolint
         name: hadolint
         entry: .tools/bin/hadolint
