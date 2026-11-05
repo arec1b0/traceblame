@@ -28,14 +28,12 @@ def _recent_ms() -> int:
     return int(datetime.now(UTC).timestamp() * 1000) - 3_600_000
 
 
-# The fault injector's write with injection_id, and the join of an injection to the span it
-# was applied at (#36). They use a column new in this schema, so they are not contract
-# statements yet (code N must run on schema N-1); faults/ (#14) moves them into contract/.
-INJECTION_BY_ID_WRITE = (Path(__file__).parent / "injections_by_id_write.sql").read_text(
-    encoding="utf-8"
-)
-INJECTION_BY_ID_READ = (Path(__file__).parent / "injections_by_id_read.sql").read_text(
-    encoding="utf-8"
+# The fault injector's write before injections.injection_id (0013): main's contract statement
+# until #14 moved the injector's write, with the column, into contract/. Code N-1 on schema N-1.
+INJECTION_WRITE_BEFORE_0013 = (
+    "INSERT INTO injections (trace_id, fault_kind, target_component, params, seed, injected_at)"
+    " VALUES ('0af7651916cd43dd8448eb211c80319c', 'context_truncation', 'orchestration', '{}', 7,"
+    " now64(3))"
 )
 INJECTION_ID_MIGRATION = "injections_injection_id"
 
@@ -49,6 +47,7 @@ ENGINES = {
     "findings": "ReplacingMergeTree",
     "blame": "ReplacingMergeTree",
     "injections": "MergeTree",
+    "eval_traces": "ReplacingMergeTree",
     "schema_migrations": "MergeTree",
 }
 
@@ -88,7 +87,7 @@ def test_the_contract_statements_run_on_the_schema(
         results: dict[str, list[tuple[Any, ...]]] = {}
         for name, sql in contract.packaged():
             if name.endswith("_write.sql"):
-                client.command(sql)
+                client.command(sql, contract.parameters(sql))
             else:
                 results[name] = client.query_rows(sql, parameters=contract.parameters(sql))
         (span,) = results["spans_read.sql"]
@@ -138,6 +137,7 @@ def test_the_contract_statements_run_on_the_schema(
         assert len(results["findings_read.sql"]) == 1
         assert len(results["blame_read.sql"]) == 1
         assert len(results["injections_read.sql"]) == 1
+        assert results["injections_spans_read.sql"] == [], "no span carries the marker here"
     finally:
         client.close()
 
@@ -299,7 +299,7 @@ def _run(
         migrate(client, migrations)
         for name, sql in statements:
             if name.endswith("_write.sql"):
-                client.command(sql)
+                client.command(sql, contract.parameters(sql))
             else:
                 client.query_rows(sql, parameters=contract.parameters(sql))
     finally:
@@ -388,14 +388,14 @@ def _injected_span_write() -> str:
 def test_injection_id_expands_injections_for_old_and_new_writers(
     clickhouse: ClickHouseServer, database: str
 ) -> None:
-    """#36: rows written before the column read '', both writers work after it, and an
-    injection joins the span it was applied at by (trace_id, injection_id)."""
+    """#36, #14: rows written before the column read '', the injector's contract write is
+    idempotent per (trace_id, injection_id), and an injection joins the span it was applied at."""
     client = clickhouse.client(database)
     try:
         before = [m for m in packaged() if m.name != INJECTION_ID_MIGRATION]
         assert len(before) == len(packaged()) - 1
         migrate(client, before)
-        client.command(_statement("injections_write.sql"))  # code N-1 on schema N-1
+        client.command(INJECTION_WRITE_BEFORE_0013)  # code N-1 on schema N-1
         migrate(client, packaged())
 
         ids = (
@@ -403,12 +403,14 @@ def test_injection_id_expands_injections_for_old_and_new_writers(
             " WHERE trace_id = '0af7651916cd43dd8448eb211c80319c'"
         )
         assert client.query_rows(ids) == [("",)]
-        client.command(_statement("injections_write.sql"))  # code N-1 on schema N
-        client.command(INJECTION_BY_ID_WRITE)  # code N
-        assert sorted(r[0] for r in client.query_rows(ids)) == ["", "", "inj-contract-1"]
+        write = _statement("injections_write.sql")
+        client.command(write, contract.parameters(write))  # code N
+        client.command(write, contract.parameters(write))  # re-recorded: nothing new
+        assert sorted(r[0] for r in client.query_rows(ids)) == ["", "inj-contract-1"]
 
         client.command(_injected_span_write())
-        rows = client.query_rows(INJECTION_BY_ID_READ)
+        read = _statement("injections_spans_read.sql")
+        rows = client.query_rows(read, contract.parameters(read))
         assert [(r[0], r[1], bytes(r[2]).decode()) for r in rows] == [
             ("inj-contract-1", "context_truncation", "b7ad6b7169203331")
         ]
