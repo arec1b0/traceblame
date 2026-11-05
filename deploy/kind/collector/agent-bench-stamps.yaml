@@ -1,0 +1,14 @@
+# Bench overlay (#57), merged over agent.yaml (`--config agent.yaml --config agent-bench-stamps.yaml`)
+# by bench/gateway-scaling (STAMPS=1): stamps each span with the wall clock (unix ns) when the
+# agent's OTLP receiver hands it to the pipeline, as the first processor. Never part of a normal
+# deployment (tests/scripts/test_bench_overlays.py). OTTL from pkg/ottl v1.3.1 (contrib 0.164):
+# Now() is evaluated once per span; UnixNano returns an int64.
+processors:
+  transform/bench_agent:
+    error_mode: ignore
+    trace_statements:
+      - set(span.attributes["traceblame.bench.t_agent_ns"], UnixNano(Now()))
+service:
+  pipelines:
+    traces:
+      processors: [transform/bench_agent, memory_limiter, normalizer]

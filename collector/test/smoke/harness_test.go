@@ -125,6 +125,13 @@ func startCustom(t *testing.T, tmpl string) (*collector, Ports) {
 // startCustomStaged is startCustom with stage(dir) run first, to put files under {{.Dir}}.
 func startCustomStaged(t *testing.T, tmpl string, stage func(dir string)) (*collector, Ports) {
 	t.Helper()
+	return startCustomOverlaid(t, tmpl, stage)
+}
+
+// startCustomOverlaid is startCustomStaged with config files merged over the template, in
+// order (`--config` again for each, as the kind deployments merge their overlays).
+func startCustomOverlaid(t *testing.T, tmpl string, stage func(dir string), overlays ...string) (*collector, Ports) {
+	t.Helper()
 	bin := os.Getenv("OTELCOL_BIN")
 	if bin == "" {
 		t.Skip("OTELCOL_BIN is not set: run `make collector-smoke`")
@@ -146,15 +153,19 @@ func startCustomStaged(t *testing.T, tmpl string, stage func(dir string)) (*coll
 		outPath:    p.Out,
 		logPath:    p.Log,
 	}
-	return launch(t, bin, dir, c, b.String()), p
+	return launch(t, bin, dir, c, b.String(), overlays...), p
 }
 
-func launch(t *testing.T, bin, dir string, c *collector, cfg string) *collector {
+func launch(t *testing.T, bin, dir string, c *collector, cfg string, overlays ...string) *collector {
 	t.Helper()
 	cfgPath := filepath.Join(dir, "config.yaml")
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o600))
 
-	c.cmd = exec.Command(bin, "--config", "file:"+cfgPath) //nolint:gosec // test binary from OTELCOL_BIN
+	args := []string{"--config", "file:" + cfgPath}
+	for _, o := range overlays {
+		args = append(args, "--config", "file:"+o)
+	}
+	c.cmd = exec.Command(bin, args...) //nolint:gosec // test binary from OTELCOL_BIN
 	require.NoError(t, c.cmd.Start())
 	c.exited = make(chan struct{})
 	go func() {

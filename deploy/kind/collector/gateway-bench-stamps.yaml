@@ -1,0 +1,32 @@
+# Bench overlay (#57), merged after gateway-bench.yaml (`--config gateway.yaml --config
+# gateway-bench.yaml --config gateway-bench-stamps.yaml`) by bench/gateway-scaling (STAMPS=1):
+# stamps each span with the wall clock (unix ns) at the gateway's first processor, right after
+# tail_sampling, and as the last processor before the ClickHouse exporter. The processors after
+# tail_sampling run synchronously in its release, so the last two stamps are microseconds apart:
+# both mark the enqueue into the exporter's sending queue. Never part of a normal deployment
+# (tests/scripts/test_bench_overlays.py). A list replaces the base's list, so this names all of
+# the pipeline's processors.
+processors:
+  transform/bench_gateway:
+    error_mode: ignore
+    trace_statements:
+      - set(span.attributes["traceblame.bench.t_gateway_ns"], UnixNano(Now()))
+  transform/bench_decided:
+    error_mode: ignore
+    trace_statements:
+      - set(span.attributes["traceblame.bench.t_decided_ns"], UnixNano(Now()))
+  transform/bench_export:
+    error_mode: ignore
+    trace_statements:
+      - set(span.attributes["traceblame.bench.t_export_ns"], UnixNano(Now()))
+service:
+  pipelines:
+    traces:
+      processors:
+        - transform/bench_gateway
+        - memory_limiter
+        - normalizer
+        - tail_sampling
+        - transform/bench_decided
+        - resource/bench
+        - transform/bench_export

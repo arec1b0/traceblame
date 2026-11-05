@@ -107,11 +107,14 @@ done
 kill "${PF_PID}" && PF_PID=""
 
 step "collector configuration"
+# The *-bench*.yaml overlays ship in the ConfigMaps but are used only when bench/gateway-scaling
+# adds them to the args (#10, #57); the manifests start without them.
 collector="${ROOT}/deploy/kind/collector"
 "${KCTL[@]}" -n observability create configmap agent-config --from-file="${collector}/agent.yaml" \
-  --dry-run=client -o yaml | "${KCTL[@]}" apply -f -
+  --from-file="${collector}/agent-bench-stamps.yaml" --dry-run=client -o yaml | "${KCTL[@]}" apply -f -
 "${KCTL[@]}" -n observability create configmap gateway-config --from-file="${collector}/gateway.yaml" \
-  --from-file="${collector}/gateway-bench.yaml" --dry-run=client -o yaml | "${KCTL[@]}" apply -f -
+  --from-file="${collector}/gateway-bench.yaml" --from-file="${collector}/gateway-bench-stamps.yaml" \
+  --dry-run=client -o yaml | "${KCTL[@]}" apply -f -
 "${KCTL[@]}" -n observability create configmap latency-thresholds --from-env-file="${collector}/latency-thresholds.env" \
   --dry-run=client -o yaml | "${KCTL[@]}" apply -f -
 # One allowlist for both tiers (#36): the restart below rolls agents and gateways together.
