@@ -1279,8 +1279,40 @@
       ],
       "problems": [],
       "content_check": {
-        "checked": 4,
-        "leaking": 0
+        "needles": {
+          "queries": 4,
+          "contract_chunks": 567,
+          "windows": 12632
+        },
+        "leaking": 0,
+        "scanned": {
+          "rows": {
+            "blame": 0,
+            "eval_traces": 28,
+            "findings": 0,
+            "injections": 24,
+            "spans": 366,
+            "trace_arrivals": 177,
+            "trace_summary": 28
+          },
+          "rows_total": 623,
+          "exported_spans": 366,
+          "files": {
+            "otlp.json": 1,
+            "ledger.jsonl": 28,
+            "outcomes.jsonl": 28,
+            "plan.jsonl": 28,
+            "queries.jsonl": 4,
+            "state.json": 94
+          },
+          "id_fields_excluded": {
+            "fields": [
+              "query_ref",
+              "ref"
+            ],
+            "values": 116
+          }
+        }
       }
     },
     "runbook-agent": {
@@ -1642,9 +1674,39 @@
       ],
       "problems": [],
       "content_check": {
-        "alert_needles": 30,
-        "prompt_windows": 153,
-        "leaking": 0
+        "needles": {
+          "alert": 30,
+          "prompt_windows": 153
+        },
+        "leaking": 0,
+        "scanned": {
+          "rows": {
+            "blame": 0,
+            "eval_traces": 9,
+            "findings": 0,
+            "injections": 6,
+            "spans": 33,
+            "trace_arrivals": 9,
+            "trace_summary": 9
+          },
+          "rows_total": 66,
+          "exported_spans": 33,
+          "files": {
+            "otlp.json": 1,
+            "ledger.jsonl": 9,
+            "outcomes.jsonl": 9,
+            "plan.jsonl": 9,
+            "queries.jsonl": 12,
+            "state.json": 99
+          },
+          "id_fields_excluded": {
+            "fields": [
+              "query_ref",
+              "ref"
+            ],
+            "values": 48
+          }
+        }
       }
     }
   },
@@ -1838,6 +1900,111 @@
       }
     }
   },
+  "ledger": {
+    "agentic-rag": {
+      "sha256": "1b6096c914266269500aacb9fee984651bf55bb5b660a1e5ea5523dccf5d6df4",
+      "records": 28,
+      "host_load1": {
+        "d0748f4838f3f855a48ee0e8acc2efc2": null,
+        "ab6e58a5f304b543784945406749fe13": null,
+        "aece804aabe308f6f44b674e0ffddf5b": null,
+        "c2a6d5c5d62a0ff31e84dd1c1c747848": null,
+        "ba083eb6fb364c50d82445165f1cd685": null,
+        "8b4cbbe9bb0c2c108d9486b24d6c38c4": null,
+        "e20d25a0053f42aacb708476ed87b4ee": null,
+        "b1b251ea44c575dfde45800f4e51b723": null,
+        "826c68489a5ab424ace5d0830e7fb067": null,
+        "7d094e037eb1c776ea48e9a1b51b2441": null,
+        "4b180b3c68b0a50529123a14a0a148c9": null,
+        "79cee7c8d324201d6b2a81ea70c35ce2": null,
+        "3b19299c3ff24b7da07991d2ed8abbc9": null,
+        "22fb95baa68c868c7f08ddd658ec2f9c": null,
+        "97e3a6545586f78135025897f63d4f78": null,
+        "67d73eb0d56f316f9a5a42d8235efeba": null,
+        "a87694ea4af6a49a0e7fd2192528b744": null,
+        "6950e0f425c793059597d2d568cb440c": null,
+        "1f18705399b6071cd7d868a70cb3a34a": null,
+        "1577dcc6a0d6869a2633bee8d1f8f24f": null,
+        "6af3788a7b8e7d7dd7dc17dc06b3de08": null,
+        "08a1796552f4668336088e62396f2d42": null,
+        "e1a6b065f4692df3d4bb7087fc574165": null,
+        "5c404d15376e976dc855077846a1bc40": null,
+        "bcdf545082c640d6bb3dbb37fb6acbee": null,
+        "bd138ea1195be6a1845a76801526dfdf": null,
+        "489135c39c409d3ab43418ad9fda456a": null,
+        "99754f43f5c555b4017c25a44f23783e": null
+      },
+      "counts": {
+        "clean": {
+          "clean": 4,
+          "applied": 0,
+          "not_reached": 0
+        },
+        "golden_context_removed": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "malformed_output": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "output_budget_exhausted": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "prompt_variant": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "step_memory_loss": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        },
+        "tool_failure": {
+          "clean": 0,
+          "applied": 4,
+          "not_reached": 0
+        }
+      }
+    },
+    "runbook-agent": {
+      "sha256": "67046eb87588627be7fcf26ca5a419e03250bcca02d15fba2471748854f49a2f",
+      "records": 9,
+      "host_load1": {
+        "4cb93e7d7bc7110f8af8157b160e17ce": null,
+        "677ecfe2ff412594a3f8ca772a6c1ced": null,
+        "0d0e210926839f29044bea5fb3cf1122": null,
+        "cc8f893329dc8018e804d81a2439f9cb": null,
+        "52229fed735bb768c4f651cbd2548ecb": null,
+        "4387e051d65c1b411221d90fcc3bb010": null,
+        "5eab6d5b8a4d193184188ca17c8eeee5": null,
+        "06c22f3b669971baa516c38ad8654237": null,
+        "cc9552adde00d05edfdc859aec660ddb": null
+      },
+      "counts": {
+        "malformed_output": {
+          "clean": 0,
+          "applied": 3,
+          "not_reached": 0
+        },
+        "clean": {
+          "clean": 3,
+          "applied": 0,
+          "not_reached": 0
+        },
+        "prompt_variant": {
+          "clean": 0,
+          "applied": 3,
+          "not_reached": 0
+        }
+      }
+    }
+  },
   "loop_gate": {
     "applied": 4,
     "loop_signal": 4,
@@ -1846,6 +2013,68 @@
     "repeat_min": 3,
     "passed": true
   },
+  "retrieval": [
+    {
+      "query": "9465608b62ea",
+      "status": "applied",
+      "mode": "distractor",
+      "golden_in_topk": [
+        false,
+        false
+      ],
+      "max_score": [
+        0.1586613,
+        -0.2219435
+      ],
+      "moved": true,
+      "counted": true
+    },
+    {
+      "query": "71508edacc6c",
+      "status": "applied",
+      "mode": "distractor",
+      "golden_in_topk": [
+        true,
+        false
+      ],
+      "max_score": [
+        0.13639897,
+        0.09639299
+      ],
+      "moved": true,
+      "counted": true
+    },
+    {
+      "query": "64445239fb24",
+      "status": "applied",
+      "mode": "remove",
+      "golden_in_topk": [
+        true,
+        false
+      ],
+      "max_score": [
+        -0.10814011,
+        -0.14029014
+      ],
+      "moved": true,
+      "counted": true
+    },
+    {
+      "query": "c6b82487fd31",
+      "status": "applied",
+      "mode": "distractor",
+      "golden_in_topk": [
+        false,
+        false
+      ],
+      "max_score": [
+        -0.23447287,
+        -0.4736333
+      ],
+      "moved": true,
+      "counted": true
+    }
+  ],
   "d1_components": {
     "retrieval": 75,
     "tool": 75,
@@ -1938,5 +2167,6 @@
     "Prompt class without an MVP detector: decided on #16 (prompt_regression moves into the MVP set). This run records what it needs: baseline_digest per run in injections.params, and clean traces carrying the baseline digest. It no longer blocks D1.",
     "D1 itself (#19) still needs about 13.5 h of serial run time (projection above) in slots on the shared kind cluster (flock), plus the frozen snapshot export under evals/datasets/."
   ],
-  "problems": []
+  "problems": [],
+  "preload_sha256_now": "99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4"
 }

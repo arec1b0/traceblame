@@ -9,81 +9,100 @@ signal the #16 detector reads moved against a clean trace, and the trace reaches
 ## agentic-rag
 
 - run `faults-20261105-s7-b1b6b60`, traceblame `b1b6b6048b98`, app `5370b067fdd1`
-- plan sha256 `76aae3c66e04d97b`, 28 entries, seed 7
+- plan sha256 `76aae3c66e04d97b`, 28 entries, seed 7; ledger sha256 `1b6096c914266269`, 28 records (the counts below are re-derived from it)
 - spans sent 366, stored 366; baseline digest `sha256:3d5cd7f97e85e17b`
-- content check: {'checked': 4, 'leaking': 0}
+- content check: 0 leaking. Needles: 4 sampled CUAD questions: each question's text and every 48-character window (step 16) of every chunk of its contract (567 chunks, 12632 windows). Scanned: every stored row of the run's traces in every table with a trace_id, 623 rows (blame 0, eval_traces 28, findings 0, injections 24, spans 366, trace_arrivals 177, trace_summary 28); the 366 exported spans; the run's files otlp.json (1 line), ledger.jsonl (28 lines), outcomes.jsonl (28 lines), plan.jsonl (28 lines), queries.jsonl (4 lines), state.json (94 lines); left out: only the dataset id fields query_ref, ref (116 values, the dataset's own question or task ids; a runbook task id is also its workload's name, which the alert needles hold)
+- host 1-minute load average per trace: not recorded in this run (it predates the field; the drivers record it in the ledger from now on, and this run is not repeated for it)
 - golden chunks of the sampled answerable queries: {'mapped': 12, 'answerable_sampled': 12}
 
-| Kind | Component | Traces | Applied | Not reached | Marker on its span | Joined | Signal moved | Assembled | Median s | p95 s |
-|---|---|---|---|---|---|---|---|---|---|---|
-| clean | - | 4 | 0 | 0 | 0 | 0 | 0 | 4 | 58.9 | 93.21 |
-| golden_context_removed | retrieval | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 57.5 | 65.14 |
-| malformed_output | model | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 72.3 | 77.95 |
-| output_budget_exhausted | orchestration | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 60.3 | 118.81 |
-| prompt_variant | prompt | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 67.8 | 183.41 |
-| step_memory_loss | orchestration | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 174.2 | 187.88 |
-| tool_failure | tool | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 64.3 | 87.33 |
+| Kind | Component | Traces | Applied | Not reached | Marker on its span | Joined | Signal moved | Assembled | Median s | p95 s | Load1 median |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| clean | - | 4 | 0 | 0 | 0 | 0 | 0 | 4 | 58.9 | 93.21 | - |
+| golden_context_removed | retrieval | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 57.5 | 65.14 | - |
+| malformed_output | model | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 72.3 | 77.95 | - |
+| output_budget_exhausted | orchestration | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 60.3 | 118.81 | - |
+| prompt_variant | prompt | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 67.8 | 183.41 | - |
+| step_memory_loss | orchestration | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 174.2 | 187.88 | - |
+| tool_failure | tool | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 64.3 | 87.33 | - |
 
 Per trace (query = sha256 of the dataset id, first 12):
 
-| Query | Kind | Status | Outcome | Signal |
-|---|---|---|---|---|
-| 9465608b62ea | clean | clean | answered | {} |
-| 9465608b62ea | golden_context_removed | applied | answered | moved {'golden_in_topk': [False, False], 'max_score': [0.1586613, -0.2219435]} |
-| 9465608b62ea | malformed_output | applied | answered | moved {'parse_ok': [['true'], ['false']]} |
-| 9465608b62ea | output_budget_exhausted | applied | answered | moved {'finish_reasons': [['stop'], ['length']], 'parse_ok': ['false']} |
-| 9465608b62ea | prompt_variant | applied | answered | moved {'bundle_digest': [['sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965'], ['sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7']]} |
-| 9465608b62ea | step_memory_loss | applied | answered | moved {'loop_max': [2, 7], 'repeat_min': 3} |
-| 9465608b62ea | tool_failure | applied | answered | moved {'marked_tool_error': 1, 'consumed_by_llm': 1, 'retried': 0, 'error_type': ['ToolFailure']} |
-| 71508edacc6c | clean | clean | answered | {} |
-| 71508edacc6c | golden_context_removed | applied | answered | moved {'golden_in_topk': [True, False], 'max_score': [0.13639897, 0.09639299]} |
-| 71508edacc6c | malformed_output | applied | answered | moved {'parse_ok': [['true'], ['false']]} |
-| 71508edacc6c | output_budget_exhausted | applied | answered | moved {'finish_reasons': [['stop'], ['length']], 'parse_ok': ['false']} |
-| 71508edacc6c | prompt_variant | applied | empty_answer | moved {'bundle_digest': [['sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965'], ['sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7']]} |
-| 71508edacc6c | step_memory_loss | applied | answered | moved {'loop_max': [1, 5], 'repeat_min': 3} |
-| 71508edacc6c | tool_failure | applied | answered | moved {'marked_tool_error': 1, 'consumed_by_llm': 1, 'retried': 0, 'error_type': ['ToolFailure']} |
-| 64445239fb24 | clean | clean | answered | {} |
-| 64445239fb24 | golden_context_removed | applied | answered | moved {'golden_in_topk': [True, False], 'max_score': [-0.10814011, -0.14029014]} |
-| 64445239fb24 | malformed_output | applied | answered | moved {'parse_ok': [['true'], ['false']]} |
-| 64445239fb24 | output_budget_exhausted | applied | answered | moved {'finish_reasons': [['stop'], ['length']], 'parse_ok': ['false']} |
-| 64445239fb24 | prompt_variant | applied | answered | moved {'bundle_digest': [['sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965'], ['sha256:efb1b6be85504b589451fa68ed4396fae2ffedeee2d584934bb7f44eaa0e688f']]} |
-| 64445239fb24 | step_memory_loss | applied | answered | moved {'loop_max': [1, 4], 'repeat_min': 3} |
-| 64445239fb24 | tool_failure | applied | answered | moved {'marked_tool_error': 1, 'consumed_by_llm': 1, 'retried': 0, 'error_type': ['ToolFailure']} |
-| c6b82487fd31 | clean | clean | answered | {} |
-| c6b82487fd31 | golden_context_removed | applied | answered | moved {'golden_in_topk': [False, False], 'max_score': [-0.23447287, -0.4736333]} |
-| c6b82487fd31 | malformed_output | applied | answered | moved {'parse_ok': [['true'], ['false']]} |
-| c6b82487fd31 | output_budget_exhausted | applied | answered | moved {'finish_reasons': [['stop'], ['length']], 'parse_ok': ['false']} |
-| c6b82487fd31 | prompt_variant | applied | empty_answer | moved {'bundle_digest': [['sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965'], ['sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7']]} |
-| c6b82487fd31 | step_memory_loss | applied | answered | moved {'loop_max': [1, 5], 'repeat_min': 3} |
-| c6b82487fd31 | tool_failure | applied | answered | moved {'marked_tool_error': 1, 'consumed_by_llm': 1, 'retried': 0, 'error_type': ['ToolFailure']} |
+| Query | Kind | Status | Outcome | Load1 | Signal |
+|---|---|---|---|---|---|
+| 9465608b62ea | clean | clean | answered | - | {} |
+| 9465608b62ea | golden_context_removed | applied | answered | - | moved {'golden_in_topk': [False, False], 'max_score': [0.1586613, -0.2219435]} |
+| 9465608b62ea | malformed_output | applied | answered | - | moved {'parse_ok': [['true'], ['false']]} |
+| 9465608b62ea | output_budget_exhausted | applied | answered | - | moved {'finish_reasons': [['stop'], ['length']], 'parse_ok': ['false']} |
+| 9465608b62ea | prompt_variant | applied | answered | - | moved {'bundle_digest': [['sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965'], ['sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7']]} |
+| 9465608b62ea | step_memory_loss | applied | answered | - | moved {'loop_max': [2, 7], 'repeat_min': 3} |
+| 9465608b62ea | tool_failure | applied | answered | - | moved {'marked_tool_error': 1, 'consumed_by_llm': 1, 'retried': 0, 'error_type': ['ToolFailure']} |
+| 71508edacc6c | clean | clean | answered | - | {} |
+| 71508edacc6c | golden_context_removed | applied | answered | - | moved {'golden_in_topk': [True, False], 'max_score': [0.13639897, 0.09639299]} |
+| 71508edacc6c | malformed_output | applied | answered | - | moved {'parse_ok': [['true'], ['false']]} |
+| 71508edacc6c | output_budget_exhausted | applied | answered | - | moved {'finish_reasons': [['stop'], ['length']], 'parse_ok': ['false']} |
+| 71508edacc6c | prompt_variant | applied | empty_answer | - | moved {'bundle_digest': [['sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965'], ['sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7']]} |
+| 71508edacc6c | step_memory_loss | applied | answered | - | moved {'loop_max': [1, 5], 'repeat_min': 3} |
+| 71508edacc6c | tool_failure | applied | answered | - | moved {'marked_tool_error': 1, 'consumed_by_llm': 1, 'retried': 0, 'error_type': ['ToolFailure']} |
+| 64445239fb24 | clean | clean | answered | - | {} |
+| 64445239fb24 | golden_context_removed | applied | answered | - | moved {'golden_in_topk': [True, False], 'max_score': [-0.10814011, -0.14029014]} |
+| 64445239fb24 | malformed_output | applied | answered | - | moved {'parse_ok': [['true'], ['false']]} |
+| 64445239fb24 | output_budget_exhausted | applied | answered | - | moved {'finish_reasons': [['stop'], ['length']], 'parse_ok': ['false']} |
+| 64445239fb24 | prompt_variant | applied | answered | - | moved {'bundle_digest': [['sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965'], ['sha256:efb1b6be85504b589451fa68ed4396fae2ffedeee2d584934bb7f44eaa0e688f']]} |
+| 64445239fb24 | step_memory_loss | applied | answered | - | moved {'loop_max': [1, 4], 'repeat_min': 3} |
+| 64445239fb24 | tool_failure | applied | answered | - | moved {'marked_tool_error': 1, 'consumed_by_llm': 1, 'retried': 0, 'error_type': ['ToolFailure']} |
+| c6b82487fd31 | clean | clean | answered | - | {} |
+| c6b82487fd31 | golden_context_removed | applied | answered | - | moved {'golden_in_topk': [False, False], 'max_score': [-0.23447287, -0.4736333]} |
+| c6b82487fd31 | malformed_output | applied | answered | - | moved {'parse_ok': [['true'], ['false']]} |
+| c6b82487fd31 | output_budget_exhausted | applied | answered | - | moved {'finish_reasons': [['stop'], ['length']], 'parse_ok': ['false']} |
+| c6b82487fd31 | prompt_variant | applied | empty_answer | - | moved {'bundle_digest': [['sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965'], ['sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7']]} |
+| c6b82487fd31 | step_memory_loss | applied | answered | - | moved {'loop_max': [1, 5], 'repeat_min': 3} |
+| c6b82487fd31 | tool_failure | applied | answered | - | moved {'marked_tool_error': 1, 'consumed_by_llm': 1, 'retried': 0, 'error_type': ['ToolFailure']} |
 
 ## runbook-agent
 
 - run `faults-20261105-s7-b1b6b60`, traceblame `b1b6b6048b98`, app `92fb6f8fcbcf`
-- plan sha256 `4fd1295b28bb9283`, 9 entries, seed 7
+- plan sha256 `4fd1295b28bb9283`, 9 entries, seed 7; ledger sha256 `67046eb87588627b`, 9 records (the counts below are re-derived from it)
 - spans sent 33, stored 33; baseline digest `sha256:1b5b700607ed7cf7`
-- content check: {'alert_needles': 30, 'prompt_windows': 153, 'leaking': 0}
-- preload sha256 `48ec262641600789`; image guard {'base_node_options': False, 'base_has_preload': False, 'eval_node_options': True, 'eval_has_preload': True, 'fetch_without_switch': 'fetch', 'fetch_other_tenant': 'fetch', 'fetch_eval_tenant': 'handle'}
+- content check: 0 leaking. Needles: 30 alert needles (32-character windows of each alert summary and the task-unique label values) and 153 40-character windows of the triage prompt and its variants. Scanned: every stored row of the run's traces in every table with a trace_id, 66 rows (blame 0, eval_traces 9, findings 0, injections 6, spans 33, trace_arrivals 9, trace_summary 9); the 33 exported spans; the run's files otlp.json (1 line), ledger.jsonl (9 lines), outcomes.jsonl (9 lines), plan.jsonl (9 lines), queries.jsonl (12 lines), state.json (99 lines); left out: only the dataset id fields query_ref, ref (48 values, the dataset's own question or task ids; a runbook task id is also its workload's name, which the alert needles hold)
+- host 1-minute load average per trace: not recorded in this run (it predates the field; the drivers record it in the ledger from now on, and this run is not repeated for it)
+- preload sha256 `48ec262641600789` (the committed file has changed since this run: `99165cf4425ea58a`); image guard {'base_node_options': False, 'base_has_preload': False, 'eval_node_options': True, 'eval_has_preload': True, 'fetch_without_switch': 'fetch', 'fetch_other_tenant': 'fetch', 'fetch_eval_tenant': 'handle'}
 
-| Kind | Component | Traces | Applied | Not reached | Marker on its span | Joined | Signal moved | Assembled | Median s | p95 s |
-|---|---|---|---|---|---|---|---|---|---|---|
-| clean | - | 3 | 0 | 0 | 0 | 0 | 0 | 3 | 113.6 | 364.8 |
-| malformed_output | model | 3 | 3 | 0 | 3 | 3 | 3 | 3 | 93.1 | 120.1 |
-| prompt_variant | prompt | 3 | 3 | 0 | 3 | 3 | 3 | 3 | 60.4 | 84.5 |
+| Kind | Component | Traces | Applied | Not reached | Marker on its span | Joined | Signal moved | Assembled | Median s | p95 s | Load1 median |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| clean | - | 3 | 0 | 0 | 0 | 0 | 0 | 3 | 113.6 | 364.8 | - |
+| malformed_output | model | 3 | 3 | 0 | 3 | 3 | 3 | 3 | 93.1 | 120.1 | - |
+| prompt_variant | prompt | 3 | 3 | 0 | 3 | 3 | 3 | 3 | 60.4 | 84.5 | - |
 
 Per trace (query = sha256 of the dataset id, first 12):
 
-| Query | Kind | Status | Outcome | Signal |
-|---|---|---|---|---|
-| 9d4442119917 | malformed_output | applied | no-runbook | moved {'parse_ok': [['true'], ['false']]} |
-| 6b0b52f1a142 | malformed_output | applied | no-runbook | moved {'parse_ok': [['true'], ['false']]} |
-| f6bf7d9ddd50 | clean | clean | no-runbook | {} |
-| ffda37087a98 | clean | clean | remediated | {} |
-| b7c734ff8c4b | malformed_output | applied | no-runbook | moved {'parse_ok': [['true'], ['false']]} |
-| d704e3f127ed | clean | clean | no-runbook | {} |
-| 664c2877e038 | prompt_variant | applied | remediated | moved {'bundle_digest': [['sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1'], ['sha256:99983a64628c33e47965d9b2a35493ba2a9939f74dd0ec86aab3baefc94e0d33']]} |
-| 286a4cdc6314 | prompt_variant | applied | no-runbook | moved {'bundle_digest': [['sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1'], ['sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90']]} |
-| 2ec8cd13b616 | prompt_variant | applied | rejected | moved {'bundle_digest': [['sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1'], ['sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90']]} |
+| Query | Kind | Status | Outcome | Load1 | Signal |
+|---|---|---|---|---|---|
+| 9d4442119917 | malformed_output | applied | no-runbook | - | moved {'parse_ok': [['true'], ['false']]} |
+| 6b0b52f1a142 | malformed_output | applied | no-runbook | - | moved {'parse_ok': [['true'], ['false']]} |
+| f6bf7d9ddd50 | clean | clean | no-runbook | - | {} |
+| ffda37087a98 | clean | clean | remediated | - | {} |
+| b7c734ff8c4b | malformed_output | applied | no-runbook | - | moved {'parse_ok': [['true'], ['false']]} |
+| d704e3f127ed | clean | clean | no-runbook | - | {} |
+| 664c2877e038 | prompt_variant | applied | remediated | - | moved {'bundle_digest': [['sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1'], ['sha256:99983a64628c33e47965d9b2a35493ba2a9939f74dd0ec86aab3baefc94e0d33']]} |
+| 286a4cdc6314 | prompt_variant | applied | no-runbook | - | moved {'bundle_digest': [['sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1'], ['sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90']]} |
+| 2ec8cd13b616 | prompt_variant | applied | rejected | - | moved {'bundle_digest': [['sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1'], ['sha256:85dda408a6af4dd9872cbb965a4c67da11b38c7a2a534999c7754abd32f5ab90']]} |
+
+## golden_context_removed: mode and the D1 rule
+
+D1 (#19) counts a `golden_context_removed` trace as a retrieval fault only when
+the golden set was in the clean run's top-k, or the mode is `distractor`. A
+`remove` whose run never had a golden chunk in its results is `not_reached`: the
+store wrapper reports nothing removed, the ledger gets no injection id, and
+`injections` gets no row.
+
+In this run: 4 applied ({'distractor': 3, 'remove': 1}), 4 counted; the mode comes from the ledger.
+
+| Query | Mode | Golden in clean top-k | Golden in faulted top-k | Max score clean -> faulted | Signal moved | Counted |
+|---|---|---|---|---|---|---|
+| 9465608b62ea | distractor | False | False | 0.1586613 -> -0.2219435 | True | True |
+| 71508edacc6c | distractor | True | False | 0.13639897 -> 0.09639299 | True | True |
+| 64445239fb24 | remove | True | False | -0.10814011 -> -0.14029014 | True | True |
+| c6b82487fd31 | distractor | False | False | -0.23447287 -> -0.4736333 | True | True |
 
 ## step_memory_loss gate
 
