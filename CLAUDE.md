@@ -104,6 +104,9 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
 - `make kind-deploy`: images, ClickHouse via the Altinity operator, NATS JetStream, Postgres,
   migrations of both databases, agent DaemonSet, gateway and trace-assembler Deployments into
   kind (deploy/kind/README.md)
+- `make kind-clickhouse-persistence`: the CHI pod mounts a Bound PVC at /var/lib/clickhouse and a
+  marker survives a pod deletion (`MODE=write`, then `MODE=verify TOKEN=...` around a manual
+  Docker Desktop restart; deploy/kind/README.md)
 - `make kind-runbook-up` / `make kind-runbook-down`: the runbook-agent sandbox and its
   monitoring (namespace-only RBAC, derived NetworkPolicy addresses, pinned upstream rules)
 - `make attribution`: no AI attribution trailers or footer phrases in origin/main..HEAD
