@@ -9,7 +9,8 @@ make kind-up        # cluster `traceblame` (1 control plane + 2 workers), namesp
 make kind-deploy    # images, ClickHouse (Altinity operator + CHI), NATS, Postgres, migrations, agent, gateway, trace-assembler
 make bench-scaling  # span loss / split traces while the gateway scales 2 -> 4 -> 2; assembler lag
 PROFILE=low STAMPS=1 RUN_NAME=low make bench-scaling  # per-stage lag at 2 x 10 traces/s, no scaling (#57)
-make kind-down
+make kind-clickhouse-persistence  # ClickHouse keeps its data across a CHI pod deletion (#58)
+make kind-down      # deletes the cluster and ALL its data, ClickHouse included
 ```
 
 ## Layout
@@ -38,6 +39,28 @@ make kind-down
   mark traces. To change the list, edit `collector/eval-tenants.env` and run
   `make kind-deploy`, which restarts the agents and the gateways together. The shims and
   `faults/` set the markers (#12, #13, #14).
+- **ClickHouse data (#58).** The CHI's data directory (`/var/lib/clickhouse`) is a PVC on the
+  `standard` StorageClass (`rancher.io/local-path`, 20 Gi requested, not enforced). The
+  operator keeps the PVC (`reclaimPolicy: Retain`) when it recreates the StatefulSet or when the
+  CHI is deleted. local-path stores it under the node's `/var/local-path-provisioner`, on the
+  Docker volume kind gives each node's `/var`. So the data survives a deleted pod and a restart of
+  the node containers (Docker Desktop, Windows update, `wsl --shutdown`).
+  - **`make kind-down` deletes the data.** `kind delete cluster` removes the node containers
+    together with their `/var` volumes.
+  - To start ClickHouse empty without kind-down, delete the CHI and its PVC
+    (`kubectl -n observability delete chi traceblame && kubectl -n observability delete pvc -l clickhouse.altinity.com/chi=traceblame`),
+    then run `make kind-deploy`.
+  - **Switching an existing cluster.** On a cluster created before #58, the first
+    `make kind-deploy` makes the operator recreate the StatefulSet with the claim. ClickHouse
+    then starts empty on the new volume, and the migrations in the same run recreate the schema.
+  - `make kind-clickhouse-persistence` checks the mount and the PVC. It writes a marker into a
+    scratch database (`persistence_check`, never the migrated schema), deletes the CHI pod,
+    waits for Ready and checks the marker.
+  - The node-restart check is manual:
+    1. `make kind-clickhouse-persistence MODE=write` prints a token.
+    2. Restart Docker Desktop and wait for `kubectl --context kind-traceblame get nodes` to be
+       Ready.
+    3. Run `make kind-clickhouse-persistence MODE=verify TOKEN=<token>`.
 - **No NATS from the collector.** `natsexporter` v0.164.1 cannot publish to JetStream. The
   gateway exports to ClickHouse only; the trace-assembler (#35, ADR-0003) polls
   `trace_arrivals` by arrival time instead. NATS (`observability`) carries only what our own
@@ -45,7 +68,8 @@ make kind-down
 - **Trace-assembler (#35).** Two replicas in `traceblame` share the partitions by leases in
   Postgres (`assembler_partitions`); the watermark advance is fenced by the lease epoch. Its
   thresholds are the ConfigMap `assembler-config` (grace, poll interval, window, lease TTL,
-  duplicate window, partition count). NATS and Postgres are single-server and ephemeral here.
+  duplicate window, partition count). NATS and Postgres are single-server and ephemeral here (Postgres on an `emptyDir`: it survives a
+  node restart, not a deleted pod).
   The migrations of both databases run in `make kind-deploy`. The assembler uses the
   gateway's ClickHouse user, a demo shortcut. Alerts: `deploy/alerts/` (not deployed: this
   cluster has no Prometheus outside the runbook sandbox).
