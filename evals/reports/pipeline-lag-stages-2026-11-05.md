@@ -71,6 +71,7 @@ Per-stage p95s do not add up to the end-to-end p95; shares are means and do.
 
 - Over budget at low steady load: none.
 - Over budget only under the stress profile: enqueue_to_clickhouse.
+- Follow-up, one per stage over budget: enqueue_to_clickhouse in [#60](https://github.com/arec1b0/traceblame/issues/60).
 - The highest tested load with end-to-end p95 within budget: 20 traces/s (total); the lowest tested load over it: 100 traces/s.
 
 ## Analysis (written after the runs, from the numbers above and the per-run reports)
