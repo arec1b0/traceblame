@@ -1,0 +1,128 @@
+{
+  "environment": {
+    "ClickHouse migrations applied beyond this checkout": "none",
+    "ClickHouse schema_migrations at the start": "0001 spans (expand, ec39fa3ba092, 2026-11-05T13:23:49Z); 0002 otel_traces_ingest (expand, 2bf4555ab291, 2026-11-05T13:23:49Z); 0003 spans_from_otel (expand, fffa026e8a2e, 2026-11-05T13:23:50Z); 0004 findings (expand, 6dcc9ca329c1, 2026-11-05T13:23:50Z); 0005 blame (expand, 500e7a24481c, 2026-11-05T13:23:50Z); 0006 injections (expand, ed6f0e72f1bb, 2026-11-05T13:23:50Z); 0007 trace_roots (expand, d10f004f53e2, 2026-11-05T13:23:50Z); 0008 trace_roots_from_otel (expand, a39825f34fac, 2026-11-05T13:23:51Z); 0009 trace_arrivals (expand, 06f38018e34f, 2026-11-05T13:23:51Z); 0010 trace_arrivals_from_otel (expand, e86b012f785a, 2026-11-05T13:23:51Z); 0011 drop_trace_roots_from_otel (contract, d91fa5370215, 2026-11-05T13:23:51Z); 0012 drop_trace_roots (contract, 6eef3c7d38f4, 2026-11-05T13:23:52Z); 0013 injections_injection_id (expand, 8e9c3e726c14, 2026-11-05T13:23:52Z); 0014 trace_summary (expand, e4ace319061a, 2026-11-05T13:23:52Z)",
+    "Postgres migrations applied beyond this checkout": "none",
+    "Postgres schema_migrations at the start": "0001 assembler_partitions (expand, 8ae1a3710e21, 2026-11-04T15:31:58Z); 0002 assembler_replicas (expand, 0328e6b9c1a0, 2026-11-04T17:25:03Z)",
+    "clickhouse": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779 via Altinity operator 0.27.4, 1 shard x 1 replica",
+    "cluster": "kind 0.33.0, node image kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5, Kubernetes v1.37.0, 1 control plane + 2 workers",
+    "collector": "traceblame-otelcol:local (otelcol-contrib 0.164 module set), image sha256:25daf80d6b5e76dec2d6bc008640a8e8e64661c58d91ea30727642f08e204668",
+    "commit": "295d51927363dcb20c3be1a777aea59e88c017af",
+    "date": "2026-11-05",
+    "dirty": "false",
+    "gateway drain": "preStop sleep 15 s, terminationGracePeriodSeconds 75 s, decision_wait 30 s, export timeout 10 s",
+    "host": "WSL2 (Windows 11), Docker Desktop: 16 CPUs, 16768462848 bytes",
+    "host load average (1/5/15 min) at the load's end": "6.31 7.02 4.96 (16 CPUs)",
+    "host load average (1/5/15 min) at the load's start": "2.18 2.21 2.62 (16 CPUs)",
+    "idle check": "0 spans accepted by the agents in 15 s before the load",
+    "image ids": "local images have no registry digest; the image ID (config digest) identifies them",
+    "load": "2 generators x 50 traces/s x 360 s, 4 spans per trace, every 2nd trace an error trace; spans exported as they end",
+    "loadgen": "traceblame-loadgen:local, image sha256:87a7e363788c178ec0b5c5eb34f1e79b4de551dd1c7933abcbdfe2406ae2f024",
+    "metrics scrape": "every 5 s through the API server's pod proxy (:8888); ClickHouse system.metric_log",
+    "network policy probe (non-agent pod -\u003e gateway:4317)": "blocked otel-gateway.observability.svc:4317: dial tcp 10.96.149.226:4317: i/o timeout",
+    "preflight (2026-11-05T15:39:48Z)": "no active job, no bench pod, no capture process; pods: traceblame 3, bench 2, local-path-storage 1, runbook-sandbox 2, observability 7, runbook-monitoring 4, kube-system 13",
+    "profile": "steady",
+    "routing": "loadbalancing exporter, routing_key traceID, k8s resolver (EndpointSlices)",
+    "run id": "25920372",
+    "scaling": "none: gateway fixed at 2 replicas",
+    "schema changed during the load": "no",
+    "stamps overlay": "on (agent-bench-stamps.yaml, gateway-bench-stamps.yaml)",
+    "trace-assembler": "traceblame-assembler:local, image sha256:fd806c91acdbc26245e7ed41faaed8ec03fa8a4a19fad600024081654b9b07ff"
+  },
+  "load": [
+    {
+      "run_id": 630326130,
+      "pod": 0,
+      "tenant": "tenant-a",
+      "t0_ns": 1793893237334044481,
+      "rate": 50,
+      "traces": 18000,
+      "spans": 72000,
+      "sent_spans": 72000,
+      "unsent_spans": 0,
+      "export_errors": 0,
+      "finished_ns": 1793893657012332844,
+      "spans_per_trace": 4,
+      "error_every": 2,
+      "seed": 7,
+      "backlog_ms": {
+        "p50": 13.058011,
+        "p95": 38.552934,
+        "max": 4027.808635
+      }
+    },
+    {
+      "run_id": 630326130,
+      "pod": 1,
+      "tenant": "tenant-b",
+      "t0_ns": 1793893237538808807,
+      "rate": 50,
+      "traces": 18000,
+      "spans": 72000,
+      "sent_spans": 72000,
+      "unsent_spans": 0,
+      "export_errors": 0,
+      "finished_ns": 1793893657258282943,
+      "spans_per_trace": 4,
+      "error_every": 2,
+      "seed": 7,
+      "backlog_ms": {
+        "p50": 13.020003,
+        "p95": 37.125305,
+        "max": 4002.541137
+      }
+    }
+  ],
+  "phases": {
+    "steady": {
+      "traces": 36000,
+      "spans": 144000,
+      "stored": 29607,
+      "dropped": 6393,
+      "split": 0,
+      "lost": 0,
+      "lost_spans": 0,
+      "dropped_spans": 25572,
+      "error_split": 0,
+      "error_split_complete": 0,
+      "split_rate": 0
+    }
+  },
+  "latency_policy": {
+    "bench-openinference": {
+      "threshold_ms": 4704,
+      "traces": 12000,
+      "slow": 8653,
+      "share": 0.7210833333333333,
+      "slow_stored": 8653
+    },
+    "bench-openllmetry": {
+      "threshold_ms": 4426,
+      "traces": 12000,
+      "slow": 10498,
+      "share": 0.8748333333333334,
+      "slow_stored": 10498
+    },
+    "bench-otel-genai": {
+      "threshold_ms": 4261,
+      "traces": 12000,
+      "slow": 558,
+      "share": 0.0465,
+      "slow_stored": 556
+    }
+  },
+  "tenant_mismatches": 0,
+  "unsent_spans": 0,
+  "spans_sent": 144000,
+  "spans_stored": 118428,
+  "spans_dropped_by_decision": 25572,
+  "spans_lost": 0,
+  "hard_criteria": {
+    "no_spans_lost_in_transport": true,
+    "no_spans_lost_on_scale_down": true,
+    "no_split_traces_in_steady_state": true,
+    "tenant_from_credentials": true
+  },
+  "decision_wait": "30s",
+  "scale_down_lost_spans": 0
+}

@@ -64,6 +64,9 @@ func TestTheKindConfigsValidate(t *testing.T) {
 		"agent":         {"agent.yaml"},
 		"gateway":       {"gateway.yaml"},
 		"gateway+bench": {"gateway.yaml", "gateway-bench.yaml"},
+		// #57: the stamps overlays parse with the distribution's transform and OTTL (0.164).
+		"agent+stamps":         {"agent.yaml", "agent-bench-stamps.yaml"},
+		"gateway+bench+stamps": {"gateway.yaml", "gateway-bench.yaml", "gateway-bench-stamps.yaml"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			args := []string{"validate"}
@@ -115,6 +118,74 @@ service:
 func shaPassword(pw string) string {
 	sum := sha1.Sum([]byte(pw)) //nolint:gosec // htpasswd {SHA}
 	return base64.StdEncoding.EncodeToString(sum[:])
+}
+
+// The agent's processors without auth or a loadbalancing exporter, for the stamps overlay
+// (#57): agent-bench-stamps.yaml replaces this pipeline's processors with
+// [transform/bench_agent, memory_limiter, normalizer].
+const stampedAgentConfig = `
+extensions:
+  health_check:
+    endpoint: 127.0.0.1:{{.Health}}
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:{{.OTLP}}
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  normalizer:
+    tenant_source: config
+    tenant_id: tenant-a
+exporters:
+  file:
+    path: {{.Out}}
+    format: json
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics: {level: none}
+    logs: {output_paths: [{{.Log}}], error_output_paths: [{{.Log}}]}
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, normalizer]
+      exporters: [file]
+`
+
+// #57: the agent overlay stamps every span with the wall clock (unix ns, an int) when the
+// receiver hands it on, and the normalizer after it keeps the stamp.
+func TestTheStampsOverlayWritesTheWallClockPerSpan(t *testing.T) {
+	overlay := repoPath("deploy", "kind", "collector", "agent-bench-stamps.yaml")
+	c, _ := startCustomOverlaid(t, stampedAgentConfig, nil, overlay)
+
+	td := fixtures.ByID(t, fixtures.OneSpan).Load(t)
+	body, err := (&ptrace.JSONMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+	before := time.Now().UnixNano()
+	c.post(t, body)
+	after := time.Now().UnixNano()
+
+	exported := c.exported(t)
+	require.Len(t, exported, 1)
+	spans := 0
+	for i := 0; i < exported[0].ResourceSpans().Len(); i++ {
+		ss := exported[0].ResourceSpans().At(i).ScopeSpans()
+		for j := 0; j < ss.Len(); j++ {
+			for k := 0; k < ss.At(j).Spans().Len(); k++ {
+				v, ok := ss.At(j).Spans().At(k).Attributes().Get("traceblame.bench.t_agent_ns")
+				require.True(t, ok, "span without the stamp")
+				require.Equal(t, "Int", v.Type().String())
+				assert.GreaterOrEqual(t, v.Int(), before)
+				assert.LessOrEqual(t, v.Int(), after)
+				spans++
+			}
+		}
+	}
+	assert.Equal(t, td.SpanCount(), spans)
 }
 
 // ADR-0005: the agent names the tenant after the authenticated user; a shim value that

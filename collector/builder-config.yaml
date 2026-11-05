@@ -24,6 +24,9 @@ processors:
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.164.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.164.1
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.164.1
+  # Bench overlays only (#57: deploy/kind/collector/*-bench-stamps.yaml); unused in normal
+  # deployments, which tests/scripts/test_bench_overlays.py enforces.
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.164.1
   - gomod: github.com/arec1b0/traceblame/collector v0.0.0
     import: github.com/arec1b0/traceblame/collector/processor/normalizer
     path: ./

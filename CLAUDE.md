@@ -120,5 +120,8 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   (scripts/attribution-check.sh [RANGE]; PR_TITLE and PR_BODY in the environment add the PR text)
 - `make bench-scaling`: gateway 2 -> 4 -> 2 under steady load; span loss / split-trace report
   and the trace-assembler's lag (root end to `trace.completed`, p50/p95) and rejoined split
-  traces into evals/reports/ (RATE, LOAD, UP_AT, DOWN_AT override the defaults)
+  traces into evals/reports/ (RATE, LOAD, UP_AT, DOWN_AT override the defaults). PROFILE=low
+  (2 x 10 traces/s, gateway fixed at 2) or steady (RATE given), STAMPS=1 for the per-stage lag
+  overlays (#57; budget in bench/gateway-scaling/stage-budget.env), RUN_NAME suffixes the report.
+  Run it under `flock /tmp/traceblame-kind.lock -c '...'` (shared cluster)
 - `make demo`: M3
