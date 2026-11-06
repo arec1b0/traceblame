@@ -3,7 +3,16 @@ name = "traceblame-detectors"
 version = "0.0.0"
 description = "TraceBlame detectors: plugin detectors that turn traces into versioned findings."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "pyyaml>=6.0.2",
+    "traceblame-storage",
+]
+
+[project.scripts]
+traceblame-detectors = "traceblame_detectors.cli:main"
+
+[tool.uv.sources]
+traceblame-storage = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14"]

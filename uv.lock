@@ -1006,6 +1006,16 @@ requires-dist = [
 name = "traceblame-detectors"
 version = "0.0.0"
 source = { editable = "services/detectors" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "traceblame-storage" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "traceblame-storage", editable = "packages/storage" },
+]
 
 [[package]]
 name = "traceblame-faults"

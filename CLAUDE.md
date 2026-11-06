@@ -163,6 +163,13 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   every phase and the report resolve the run through it (`run_id.py adopt` for older runs)
 - `uv run traceblame-faults scenarios check|plan|check-ledger|record|digest`: the fault library's
   CLI (`packages/faults`; scenarios in `src/traceblame_faults/scenarios/`)
+- `uv run --frozen traceblame-detectors run-offline|snapshot-export|versions`: the detectors over a
+  frozen snapshot (JSON lines, or ClickHouse in production mode only; `mode: eval` never writes
+  ClickHouse), a snapshot export through the contract reads, each detector's params-derived
+  version (services/detectors/README.md; ADR-0010 draft)
+- `uv run --frozen pytest -m integration -s tests/scripts/test_detectors_kind_scan.py`: value scan
+  of the newest fault run's trace views in kind (read-only; takes the kind lock itself, skips
+  when it is held or there is no cluster)
 - `make attribution`: no AI attribution trailers or footer phrases in origin/main..HEAD
   (scripts/attribution-check.sh [RANGE]; PR_TITLE and PR_BODY in the environment add the PR text)
 - `make bench-scaling`: gateway 2 -> 4 -> 2 under steady load; span loss / split-trace report
