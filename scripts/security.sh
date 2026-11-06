@@ -79,14 +79,30 @@ if [[ "${1:-}" == "image" ]]; then
 fi
 
 echo "==> gitleaks: full git history"
-# safe.directory via environment only: the mounted repo has a different owner in the container.
-run -v "${ROOT}:/repo:ro" \
-  -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo \
+# Scan the shared git directory (git rev-parse --git-common-dir), not the checkout: in a linked
+# worktree .git is a file pointing outside the mounted tree, and gitleaks then scans 0 commits
+# and still exits 0. The checkout is mounted for .gitleaks.toml only (a directory mount, see
+# grype_gate). safe.directory via environment only: the mounts have a different owner in the
+# container. gitleaks logs to stderr; its "N commits scanned." line is the gate's count.
+git_dir="$(git -C "${ROOT}" rev-parse --path-format=absolute --git-common-dir)"
+status=0
+run -v "${ROOT}:/repo:ro" -v "${git_dir}:/repo.git:ro" \
+  -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo.git \
   "${GITLEAKS_IMAGE}" git --no-banner --no-color --redact --log-opts="--all" \
-  --report-format json --report-path /dev/stdout /repo >"${OUT}/gitleaks.json" || {
+  --config /repo/.gitleaks.toml --report-format json --report-path /dev/stdout /repo.git \
+  >"${OUT}/gitleaks.json" 2>"${OUT}/gitleaks.log" || status=$?
+cat "${OUT}/gitleaks.log" >&2
+if ((status != 0)); then
   echo "security: gitleaks found secrets (see .security/gitleaks.json)" >&2
   exit 1
-}
+fi
+# A scan that checked nothing is a failure, not a pass.
+commits="$(grep -oE '[0-9]+ commits scanned' "${OUT}/gitleaks.log" | tail -n1 | cut -d' ' -f1 || true)"
+if [[ -z "${commits}" || "${commits}" -eq 0 ]]; then
+  echo "security: gitleaks scanned ${commits:-an unknown number of} commits; nothing was checked" >&2
+  exit 1
+fi
+echo "gitleaks: ${commits} commits scanned, no leaks"
 
 echo "==> syft: SBOM of the source tree"
 run -v "${ROOT}:/repo:ro" -v "${OUT}:/out" -e XDG_CACHE_HOME=/tmp \
