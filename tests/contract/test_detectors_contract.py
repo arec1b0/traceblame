@@ -106,17 +106,34 @@ def test_the_embedded_statements_are_the_canonical_ones() -> None:
         assert (EMBEDDED / name).read_bytes() == (INTEGRATION / name).read_bytes(), name
 
 
-def _base_json(path: Path) -> dict[str, Any] | None:
+class _AbsentError(Exception):
+    """The file does not exist at the base revision (the ref itself resolved)."""
+
+
+def _base_json(path: Path) -> dict[str, Any]:
+    """The file's JSON at CONTRACT_BASE_REF. Raises _AbsentError only when the ref resolves and the
+    path is not in its tree; any other git failure fails the test instead of skipping it."""
     ref = os.environ.get("CONTRACT_BASE_REF", "main")
-    text = git_text(["show", f"{ref}:{path.relative_to(ROOT).as_posix()}"], ROOT)
-    return None if text is None else json.loads(text)
+    rel = path.relative_to(ROOT).as_posix()
+    if git_text(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], ROOT) is None:
+        pytest.fail(f"CONTRACT_BASE_REF {ref!r} does not resolve to a commit")
+    listed = git_text(["ls-tree", "--name-only", ref, "--", rel], ROOT)
+    if listed is None:
+        pytest.fail(f"git ls-tree {ref} -- {rel} failed")
+    if not listed.strip():
+        raise _AbsentError(rel)
+    text = git_text(["show", f"{ref}:{rel}"], ROOT)
+    if text is None:
+        pytest.fail(f"git show {ref}:{rel} failed although the path is in the tree")
+    return json.loads(text)
 
 
 @pytest.mark.parametrize("name", [FRAMEWORK_LOCK, PLUGINS_LOCK])
 def test_version_locks_only_grow_against_the_base_revision(name: str) -> None:
     path = DETECTORS / "src" / "traceblame_detectors" / name
-    base = _base_json(path)
-    if base is None:
+    try:
+        base = _base_json(path)
+    except _AbsentError:
         pytest.skip(f"{name} is not on the base revision yet")
     assert append_only_problems(base, load_lock(name)) == []
 
@@ -124,7 +141,12 @@ def test_version_locks_only_grow_against_the_base_revision(name: str) -> None:
 def test_released_vectors_never_change() -> None:
     vectors = sorted((DETECTORS / "vectors").glob("v*.json"))
     assert vectors
+    compared = 0
     for path in vectors:
-        base = _base_json(path)
-        if base is not None:
-            assert json.loads(path.read_text(encoding="utf-8")) == base, path.name
+        try:
+            base = _base_json(path)
+        except _AbsentError:
+            continue  # a vectors file new in this change
+        assert json.loads(path.read_text(encoding="utf-8")) == base, path.name
+        compared += 1
+    print(f"vectors compared with the base revision: {compared} of {len(vectors)}")

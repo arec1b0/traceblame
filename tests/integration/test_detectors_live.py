@@ -626,3 +626,37 @@ def test_a_late_span_supersedes_and_a_crash_before_the_marker_loses_nothing(
     count = pipeline.rows("SELECT count() FROM findings FINAL")
     pipeline.handle(config, trace_id, revision)
     assert pipeline.rows("SELECT count() FROM findings FINAL") == count
+
+
+def test_the_old_findings_read_returns_one_row_per_revision(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """Code N-1's read (contract/findings_read.sql) on schema N: revision is in the sorting key,
+    so FINAL keeps one row per revision of a span. The old read has no revision column and is
+    superseded by detectors_findings_current_read.sql (ADR-0009); nothing on main reads findings
+    besides this contract harness."""
+    client = clickhouse.client(database)
+    try:
+        migrate(client, clickhouse_migrations())
+        old_read = next(s for n, s in contract.packaged() if n == "findings_read.sql")
+        write = _statement("detectors_findings_write.sql")
+        params = contract.parameters(write)
+        for revision, details in (
+            (params["revision_ms"], '{"r":1}'),
+            (params["revision_ms"] + 1, '{"r":2}'),
+        ):
+            client.command(write, {**params, "revision_ms": revision, "details": [details],
+                                   "finding_ids": [str(uuid.uuid4())]})  # fmt: skip
+        rows = client.query_rows(old_read)
+        print("\nold findings_read.sql on schema N:", *rows, sep="\n  ")
+        assert len(rows) == 2
+        # FixedString columns come back as bytes from clickhouse-connect.
+        assert {(bytes(r[1]).decode(), r[2], r[3]) for r in rows} == {
+            ("b7ad6b7169203331", "context_truncation", "0.1.0+p0123abcd")
+        }
+        assert sorted(r[7] for r in rows) == ['{"r":1}', '{"r":2}']
+        current = client.query_rows(_statement("detectors_findings_current_read.sql"),
+                                    {"trace_id": params["trace_id"]})  # fmt: skip
+        assert current == [], "no run marker yet: the current read shows nothing"
+    finally:
+        client.close()

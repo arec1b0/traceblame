@@ -42,3 +42,9 @@ The detectors (#15) write `findings` with the new `revision` and `input_digest` 
 `detector_runs` and `detector_params`, all new in this schema: those statements live in
 `tests/integration/detectors_*.sql`, embedded in `traceblame_detectors/sql/` (checked by
 `tests/contract/test_detectors_contract.py`), until the schema is on main.
+
+`findings_read.sql` predates revisions. On the new schema it returns one row per revision of a
+span (`revision` is in the sorting key, so `FINAL` keeps each, and the read does not select it).
+Its only caller is this contract's own harness; it is superseded by
+`tests/integration/detectors_findings_current_read.sql` (ADR-0009 draft), which reads through
+the `detector_runs` marker, and is replaced by it when that read moves here.

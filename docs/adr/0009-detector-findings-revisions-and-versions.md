@@ -45,8 +45,11 @@ detector_version)` (CLAUDE.md rule 3). Three facts do not fit that table alone:
    registered with other params.
 4. **Deterministic ids and digests.** `finding_id = uuid5(trace_id/detector/detector_version/
    span_id/revision/input_digest)`; findings are canonical JSON (sorted keys, ASCII, no NaN).
-   `FRAMEWORK_VERSION` covers the engine, the trace view, the canonical form and the policy;
-   version locks and golden vectors pin them and are append-only.
+   `FRAMEWORK_VERSION` covers the engine, the trace view, the canonical form, the policy and
+   the context; version locks and golden vectors pin them and are append-only. Evidence
+   strings are ids from the detector's own view, id-typed strings its own context returned
+   (baseline bundle digests; golden doc ids for eval_only detectors in eval mode) or declared
+   enum values; anything else fails the run.
 5. **What a detector sees.** A trace view built from the contract reads of `trace_summary`
    and `spans`. The reads never select `resource_attrs`, tenant, session, decision or content
    references, and select from `attrs` only the keys enabled detectors declared, which can
@@ -69,6 +72,13 @@ detector_version)` (CLAUDE.md rule 3). Three facts do not fit that table alone:
 
 ## Consequences
 
+- **The old read changes meaning.** `contract/findings_read.sql` (code N-1) on the new schema
+  returns one row per revision of a span: `revision` is in the sorting key, so `FINAL` no
+  longer folds them, and the read does not select it
+  (`tests/integration/test_detectors_live.py::test_the_old_findings_read_returns_one_row_per_revision`).
+  On main its only caller is the storage contract harness (the statements and N-1 tests in
+  `tests/integration/test_migrations_live.py`); no service reads findings yet. It is superseded
+  by `detectors_findings_current_read.sql` and dropped from the contract when that read moves in.
 - Older revisions' rows stay in `findings` (no TTL, like the design's table); readers filter
   through `detector_runs`. If they grow, a TTL or a contract-phase cleanup is a later change.
 - The attributor (#17) and the API (#18) read findings through the run marker
