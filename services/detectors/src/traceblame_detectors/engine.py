@@ -1,0 +1,289 @@
+"""The engine: runs the enabled detectors on one trace view (#15). Pure; the online handler and
+the offline runner both call `run_trace`, so the same trace gives the same findings in both.
+
+Per detector it builds the detector's projection, calls `detect`, validates the drafts and
+turns them into canonical findings. A detector that raises, or returns something invalid, fails
+its own run only (`status=error`, `error_kind` = a fixed reason or the exception class name,
+never its message).
+
+FRAMEWORK_VERSION covers this module, view.py, canonical.py and policy.py: what decides a
+finding's bytes besides the detector. framework.lock.json pins their sources per version.
+"""
+
+import math
+import re
+import uuid
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
+
+from traceblame_detectors.canonical import canonical_json, digest, sha256_hex
+from traceblame_detectors.config import EnabledDetector
+from traceblame_detectors.context import BaselineProvider, DetectorContext, GoldenProvider
+from traceblame_detectors.model import EvidenceValue, FindingDraft, Severity
+from traceblame_detectors.view import TraceView
+
+FRAMEWORK_VERSION = "1.0.0"
+
+# Bounds of one run's output: they bound the finding.v1 event (PR-B) and the details column.
+MAX_FINDINGS_PER_RUN = 64
+MAX_EVIDENCE_KEYS = 32
+MAX_EVIDENCE_LIST = 256
+SCORE_DECIMALS = 4
+
+# finding_id = uuid5(FINDING_NAMESPACE,
+#                    "trace_id/detector/detector_version/span_id/revision/input_digest").
+FINDING_NAMESPACE = uuid.UUID("8f0b6d52-3c0e-4f43-9d8a-6a1f5f0e2b7c")
+_KEY = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+class RunStatus(StrEnum):
+    OK = "ok"
+    ERROR = "error"
+
+
+class RejectedError(ValueError):
+    """A detector's output broke the contract; the message is a fixed reason."""
+
+
+@dataclass(frozen=True)
+class Finding:
+    trace_id: str
+    revision_ms: int
+    input_digest: str
+    span_id: str
+    detector: str
+    detector_version: str
+    component: str
+    severity: str
+    score: float
+    # Sorted (key, value) pairs; lists as tuples.
+    evidence: tuple[tuple[str, EvidenceValue], ...]
+
+    @property
+    def finding_id(self) -> str:
+        return finding_id(
+            self.trace_id,
+            self.detector,
+            self.detector_version,
+            self.span_id,
+            self.revision_ms,
+            self.input_digest,
+        )
+
+    def evidence_json(self) -> str:
+        return canonical_json(_evidence_obj(self.evidence)).decode("ascii")
+
+    def canonical(self) -> dict[str, Any]:
+        return {
+            "finding_id": self.finding_id,
+            "trace_id": self.trace_id,
+            "revision_ms": self.revision_ms,
+            "input_digest": self.input_digest,
+            "span_id": self.span_id,
+            "detector": self.detector,
+            "detector_version": self.detector_version,
+            "component": self.component,
+            "severity": self.severity,
+            "score": self.score,
+            "evidence": _evidence_obj(self.evidence),
+        }
+
+    def canonical_bytes(self) -> bytes:
+        return canonical_json(self.canonical())
+
+
+@dataclass(frozen=True)
+class DetectorRun:
+    trace_id: str
+    revision_ms: int
+    assembler_version: str
+    detector: str
+    detector_version: str
+    code_version: str
+    component: str
+    status: RunStatus
+    error_kind: str
+    input_digest: str
+    context_digest: str
+    framework_version: str
+    findings: tuple[Finding, ...]
+
+    @property
+    def findings_digest(self) -> str:
+        return sha256_hex(canonical_json([f.canonical() for f in self.findings]))
+
+    def canonical(self) -> dict[str, Any]:
+        return {
+            "trace_id": self.trace_id,
+            "revision_ms": self.revision_ms,
+            "assembler_version": self.assembler_version,
+            "detector": self.detector,
+            "detector_version": self.detector_version,
+            "code_version": self.code_version,
+            "component": self.component,
+            "status": self.status.value,
+            "error_kind": self.error_kind,
+            "input_digest": self.input_digest,
+            "context_digest": self.context_digest,
+            "framework_version": self.framework_version,
+            "findings_digest": self.findings_digest,
+            "findings": [f.canonical() for f in self.findings],
+        }
+
+
+@dataclass(frozen=True)
+class Providers:
+    """Context providers the caller built. The online path never sets `golden`."""
+
+    baseline: BaselineProvider | None = None
+    golden: GoldenProvider | None = None
+
+
+def finding_id(
+    trace_id: str,
+    detector: str,
+    detector_version: str,
+    span_id: str,
+    revision_ms: int,
+    input_digest: str,
+) -> str:
+    name = f"{trace_id}/{detector}/{detector_version}/{span_id}/{revision_ms}/{input_digest}"
+    return str(uuid.uuid5(FINDING_NAMESPACE, name))
+
+
+def run_trace(
+    view: TraceView, detectors: Sequence[EnabledDetector], providers: Providers
+) -> tuple[DetectorRun, ...]:
+    return tuple(_run_one(view, d, providers) for d in detectors)
+
+
+def _run_one(view: TraceView, enabled: EnabledDetector, providers: Providers) -> DetectorRun:
+    spec = enabled.spec
+    projection = view.project(spec.reads)
+    input_digest = digest(projection.canonical())
+    ctx = DetectorContext(
+        trace_id=view.trace_id,
+        trace_start_us=view.start_us,
+        needs=spec.needs,
+        baseline=providers.baseline,
+        golden=providers.golden if spec.eval_only else None,
+    )
+    status, error_kind = RunStatus.OK, ""
+    findings: tuple[Finding, ...] = ()
+    try:
+        drafts = enabled.instance().detect(projection, ctx)
+        findings = _validate(projection, enabled, drafts, input_digest)
+    except RejectedError as e:
+        status, error_kind = RunStatus.ERROR, str(e)
+    except Exception as e:  # a detector bug fails its own run only
+        status, error_kind = RunStatus.ERROR, type(e).__name__
+    return DetectorRun(
+        trace_id=view.trace_id,
+        revision_ms=view.revision_ms,
+        assembler_version=view.assembler_version,
+        detector=spec.name,
+        detector_version=enabled.detector_version,
+        code_version=spec.code_version,
+        component=spec.component.value,
+        status=status,
+        error_kind=error_kind,
+        input_digest=input_digest,
+        context_digest=digest(ctx.used()),
+        framework_version=FRAMEWORK_VERSION,
+        findings=findings,
+    )
+
+
+def _validate(
+    projection: TraceView,
+    enabled: EnabledDetector,
+    drafts: Sequence[FindingDraft],
+    input_digest: str,
+) -> tuple[Finding, ...]:
+    if len(drafts) > MAX_FINDINGS_PER_RUN:
+        raise RejectedError("too_many_findings")
+    span_ids = {s.span_id for s in projection.spans} | {projection.root_span_id}
+    allowed = _evidence_strings(projection, enabled.spec.evidence_enums)
+    out: list[Finding] = []
+    for d in drafts:
+        if not isinstance(d, FindingDraft):  # pyright: ignore[reportUnnecessaryIsInstance]  # plugins are not type-checked at run time
+            raise RejectedError("not_a_finding")
+        if d.span_id not in span_ids:
+            raise RejectedError("unknown_span")
+        if not isinstance(d.severity, Severity):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise RejectedError("bad_severity")
+        score: object = d.score  # plugins are not type-checked at run time
+        if isinstance(score, bool) or not isinstance(score, int | float):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise RejectedError("bad_score")
+        if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+            raise RejectedError("bad_score")
+        out.append(
+            Finding(
+                trace_id=projection.trace_id,
+                revision_ms=projection.revision_ms,
+                input_digest=input_digest,
+                span_id=d.span_id,
+                detector=enabled.spec.name,
+                detector_version=enabled.detector_version,
+                component=enabled.spec.component.value,
+                severity=d.severity.value,
+                score=round(float(score), SCORE_DECIMALS),
+                evidence=_evidence(d.evidence, allowed),
+            )
+        )
+    if len({f.span_id for f in out}) != len(out):
+        raise RejectedError("duplicate_span")
+    return tuple(sorted(out, key=lambda f: f.span_id))
+
+
+def _evidence_strings(
+    projection: TraceView, enums: Mapping[str, frozenset[str]]
+) -> dict[str | None, frozenset[str]]:
+    """Strings evidence may carry: ids from the detector's own view (key None: any evidence
+    key), and each key's declared enum values."""
+    ids: set[str] = {projection.root_span_id, projection.bundle_digest}
+    for s in projection.spans:
+        ids.update((s.span_id, s.tool_name, s.model, s.args_hash, s.bundle_digest, s.provider))
+        ids.update(s.retrieved_doc_ids)
+        ids.update(s.finish_reasons)
+    ids.discard("")
+    allowed: dict[str | None, frozenset[str]] = {None: frozenset(ids)}
+    allowed.update(enums)
+    return allowed
+
+
+def _evidence(
+    evidence: Mapping[str, EvidenceValue], allowed: Mapping[str | None, frozenset[str]]
+) -> tuple[tuple[str, EvidenceValue], ...]:
+    if len(evidence) > MAX_EVIDENCE_KEYS:
+        raise RejectedError("evidence_rejected")
+    out: list[tuple[str, EvidenceValue]] = []
+    for key, value in evidence.items():
+        if not isinstance(key, str) or not _KEY.fullmatch(key):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise RejectedError("evidence_rejected")
+        ok = allowed[None] | allowed.get(key, frozenset())
+        if isinstance(value, tuple):
+            if len(value) > MAX_EVIDENCE_LIST:
+                raise RejectedError("evidence_rejected")
+            out.append((key, tuple(_scalar(v, ok) for v in value)))
+        else:
+            out.append((key, _scalar(value, ok)))
+    return tuple(sorted(out))
+
+
+def _scalar(value: object, ok: frozenset[str]) -> bool | int | float | str:
+    if isinstance(value, bool | int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise RejectedError("evidence_rejected")
+        return value
+    if isinstance(value, str) and value in ok:
+        return value
+    raise RejectedError("evidence_rejected")
+
+
+def _evidence_obj(evidence: tuple[tuple[str, EvidenceValue], ...]) -> dict[str, Any]:
+    return {k: list(v) if isinstance(v, tuple) else v for k, v in evidence}

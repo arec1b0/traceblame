@@ -1,0 +1,10 @@
+{
+  "versions": {
+    "1.0.0": {
+      "canonical.py": "b2dd60af941cc1ba69ee75f85a415255076b9f978949c415d0b85276ee53dc2b",
+      "engine.py": "0023eecd46de8580a6c7303fb0494f540246ce98b45c6ceb5a72445637a240ed",
+      "policy.py": "3524999ea4f0140d32d80412a6ccbebff9ef9f48fbae5a82d36cf4de28bf3cfc",
+      "view.py": "feacad944348f21888b63025b324b7968838e49b67558a80adf46a6a894d2f84"
+    }
+  }
+}
