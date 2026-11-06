@@ -31,3 +31,4 @@ improvising.
 | [0006](0006-shim-side-content-handling.md) | Shim-side content handling: in-process features, sealed provider, export allowlist | Proposed |
 | [0007](0007-postgres-schema-management.md) | Postgres schema management: a second backend of the storage runner | Proposed |
 | [0008](0008-fault-taxonomy-and-eval-ground-truth.md) | Fault taxonomy, injection points and eval ground truth | Proposed |
+| [0009](0009-detector-findings-revisions-and-versions.md) | Detector findings: revisions, run markers and params-derived versions | Proposed |

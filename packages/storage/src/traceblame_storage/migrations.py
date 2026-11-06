@@ -97,6 +97,54 @@ POSTGRES = Dialect(
 )
 _ALLOWED = {"expand": {"create", "add"}, "migrate": {"backfill"}, "contract": {"drop"}}
 
+# The clauses of a ClickHouse expand ALTER. The statement pattern sees only the first clause, so
+# every clause is checked: additions, plus MODIFY ORDER BY after at least one ADD COLUMN.
+# ClickHouse extends a sorting key only with columns added in the same ALTER (and rejects an
+# existing column itself), which keeps the change metadata-only and the old rows in order.
+_ALTER_HEAD = re.compile(rf"^ALTER TABLE {_IDENT} ", re.IGNORECASE)
+_ADD_CLAUSE = re.compile(r"^ADD (COLUMN|INDEX|PROJECTION) IF NOT EXISTS ", re.IGNORECASE)
+_ADD_COLUMN_CLAUSE = re.compile(r"^ADD COLUMN IF NOT EXISTS ", re.IGNORECASE)
+_ORDER_BY_CLAUSE = re.compile(r"^MODIFY ORDER BY ", re.IGNORECASE)
+
+
+def _clauses(statement: str) -> list[str]:
+    """The comma-separated clauses of an ALTER, ignoring commas in parentheses and quotes."""
+    head = _ALTER_HEAD.match(statement)
+    body = statement[head.end() :] if head else statement
+    clauses: list[str] = []
+    current: list[str] = []
+    depth, quote = 0, ""
+    for c in body:
+        if quote:
+            quote = "" if c == quote else quote
+        elif c in "'\"`":
+            quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        elif c == "," and depth == 0:
+            clauses.append("".join(current).strip())
+            current = []
+            continue
+        current.append(c)
+    clauses.append("".join(current).strip())
+    return clauses
+
+
+def _expand_alter_problems(statement: str) -> list[str]:
+    problems: list[str] = []
+    added_column = False
+    clauses = _clauses(statement)
+    for i, clause in enumerate(clauses):
+        if _ADD_CLAUSE.match(clause):
+            added_column = added_column or bool(_ADD_COLUMN_CLAUSE.match(clause))
+            continue
+        if _ORDER_BY_CLAUSE.match(clause) and added_column and i == len(clauses) - 1:
+            continue
+        problems.append(f"clause not allowed in an expand ALTER: {clause[:60]}")
+    return problems
+
 
 class MigrationError(Exception):
     pass
@@ -236,6 +284,8 @@ def check(
                 )
                 if s.upper().startswith("CREATE") and "IF NOT EXISTS" not in s.upper():
                     problems.append(f"{m.filename}: CREATE without IF NOT EXISTS")
+            elif m.phase == "expand" and kind == "add" and dialect is CLICKHOUSE:
+                problems.extend(f"{m.filename}: {p}" for p in _expand_alter_problems(s))
     current = {m.filename: m for m in migrations}
     for b in base:
         now = current.get(b.filename)

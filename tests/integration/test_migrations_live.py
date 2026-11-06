@@ -48,6 +48,8 @@ ENGINES = {
     "blame": "ReplacingMergeTree",
     "injections": "MergeTree",
     "eval_traces": "ReplacingMergeTree",
+    "detector_runs": "ReplacingMergeTree",
+    "detector_params": "ReplacingMergeTree",
     "schema_migrations": "MergeTree",
 }
 

@@ -81,6 +81,42 @@ def test_check_allows_each_phase_its_statements() -> None:
     assert check(migrations) == []
 
 
+def test_an_expand_alter_may_extend_the_sorting_key_only_with_columns_it_adds() -> None:
+    # ClickHouse accepts MODIFY ORDER BY only with columns added in the same ALTER (findings,
+    # #15); the server rejects an existing column, the check rejects every other clause.
+    extend = _m(
+        1,
+        "expand",
+        "ALTER TABLE t ADD COLUMN IF NOT EXISTS r DateTime64(3) AFTER a, "
+        "ADD COLUMN IF NOT EXISTS d String, MODIFY ORDER BY (a, b, r)",
+    )
+    assert check([extend]) == []
+    alone = _m(1, "expand", "ALTER TABLE t MODIFY ORDER BY (a, b, r)")
+    assert any("not allowed in an expand" in p for p in check([alone]))
+    smuggled = [
+        "ALTER TABLE t ADD COLUMN IF NOT EXISTS r String, DROP COLUMN a",
+        "ALTER TABLE t ADD COLUMN IF NOT EXISTS r String, MODIFY COLUMN a UInt8",
+        "ALTER TABLE t ADD COLUMN IF NOT EXISTS r String, MODIFY TTL toDate(x) + 1",
+        "ALTER TABLE t ADD COLUMN IF NOT EXISTS r String, ADD COLUMN s String",
+        "ALTER TABLE t MODIFY ORDER BY (a, r), ADD COLUMN IF NOT EXISTS r String",
+    ]
+    for sql in smuggled:
+        problems = check([_m(1, "expand", sql)])
+        assert any(
+            "clause not allowed" in p or "not allowed in an expand" in p for p in problems
+        ), (
+            sql,
+            problems,
+        )
+    # A comma inside a type or a default is not a clause boundary.
+    nested = _m(
+        1,
+        "expand",
+        "ALTER TABLE t ADD COLUMN IF NOT EXISTS m Map(String, String) DEFAULT map('a,b', 'c')",
+    )
+    assert check([nested]) == []
+
+
 def test_check_needs_contiguous_versions() -> None:
     sql = "CREATE TABLE IF NOT EXISTS t (a String) ENGINE = Null"
     assert any("version 2" in p for p in check([_m(1, "expand", sql), _m(3, "expand", sql)]))
