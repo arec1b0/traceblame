@@ -13,6 +13,9 @@ Phases, each its own command so that only the ones that touch kind run under the
   content  (kind)      only the content check of a finished run (read-only): every stored row
                        of its traces in every table with a trace_id, and the run's files
 
+Every kind phase records the images kind ran and both databases' applied migrations at its
+start and its end (provenance.py, #65); a change in between or an empty read is a problem.
+
 The report over both apps is tools/faults/report.py. Run from WSL2 or Linux after
 `make kind-up kind-deploy`, with both checkouts committed (provenance).
 """
@@ -38,7 +41,17 @@ import capture as common  # noqa: E402
 import capture_agentic_rag as rag  # noqa: E402
 import cuad  # noqa: E402
 import faultslib  # noqa: E402
-from kindlib import PortForward, check_model, require_clean, run, spans_of, tenant_password  # noqa: E402
+import provenance  # noqa: E402
+from kindlib import (  # noqa: E402
+    PortForward,
+    check_model,
+    is_dirty,
+    kubectl,
+    require_clean,
+    run,
+    spans_of,
+    tenant_password,
+)
 
 from traceblame_faults import kinds, ledger, plan, record  # noqa: E402
 
@@ -111,8 +124,9 @@ def prepare(args: argparse.Namespace) -> int:
     packages = rag.installed_versions(python)
     embedding = rag.ensure_embedding_model(python)
     archive = cuad.ensure_archive(rag.CACHE / "cuad")
+    dirty = is_dirty(ROOT)
     run_id = faultslib.ensure_run(
-        args.run_id, seed=seed, commit=traceblame_commit, now=datetime.now(UTC)
+        args.run_id, seed=seed, commit=traceblame_commit, dirty=dirty, now=datetime.now(UTC)
     )
     d = _dir(run_id)
     d.mkdir(parents=True, exist_ok=True)
@@ -123,7 +137,10 @@ def prepare(args: argparse.Namespace) -> int:
         "prepared_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "host_cpus": os.cpu_count(),
         "traceblame_commit": traceblame_commit,
+        "dirty": dirty,
         "app_commit": app_commit,
+        "app_dirty": is_dirty(app_dir),
+        "provenance": {},  # images and migrations per kind phase (provenance.py, #65)
         "ollama": ollama,
         "model": {
             "name": common.CHAT_MODEL,
@@ -185,6 +202,7 @@ def run_phase(args: argparse.Namespace) -> int:
     state = _state(d)
     tenants = faultslib.require_eval_tenant()
     password = tenant_password(faultslib.EVAL_TENANT)
+    prov = provenance.begin(state, "run", kubectl=kubectl, log=log)
     python = rag.VENV / "bin" / "python"
     (d / "ledger.jsonl").unlink(missing_ok=True)
     seq = faultslib.stream_last_seq()
@@ -218,6 +236,7 @@ def run_phase(args: argparse.Namespace) -> int:
         "spans_sent": len(spans_of(otlp)),
         "eval_tenants": tenants,
     }
+    prov.end()
     _save(d, state)
     return 0
 
@@ -228,10 +247,12 @@ def run_phase(args: argparse.Namespace) -> int:
 def record_phase(args: argparse.Namespace) -> int:
     d = _dir(args.run_id)
     state = _state(d)
+    prov = provenance.begin(state, "record", kubectl=kubectl, log=log)
     records = ledger.read(d / "ledger.jsonl")
     with faultslib.clickhouse_client() as client:
         counts = record.record(client, records)
     state["record"] = counts
+    prov.end()
     _save(d, state)
     log(f"recorded {counts}")
     return 0
@@ -278,6 +299,7 @@ def check_phase(args: argparse.Namespace) -> int:
     d = _dir(args.run_id)
     state = _state(d)
     queries = _queries(d)
+    prov = provenance.begin(state, "check", kubectl=kubectl, log=log)
     result = faultslib.check_run(
         APP,
         d,
@@ -287,6 +309,8 @@ def check_phase(args: argparse.Namespace) -> int:
         content=_content(d, state, sorted(queries)),
         log=log,
     )
+    prov.end()
+    _save(d, state)
     log(f"check: {len(result['problems'])} problems")
     return 0
 
@@ -294,7 +318,10 @@ def check_phase(args: argparse.Namespace) -> int:
 def content_phase(args: argparse.Namespace) -> int:
     d = _dir(args.run_id)
     state = _state(d)
+    prov = provenance.begin(state, "content", kubectl=kubectl, log=log)
     check = faultslib.recheck_content(d, _content(d, state, sorted(_queries(d))), log)
+    prov.end()
+    _save(d, state)
     log(f"content: {check['content_check']}")
     return 0
 

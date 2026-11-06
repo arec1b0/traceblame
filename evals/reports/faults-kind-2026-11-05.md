@@ -13,6 +13,9 @@ signal the #16 detector reads moved against a clean trace, and the trace reaches
 - spans sent 366, stored 366; baseline digest `sha256:3d5cd7f97e85e17b`
 - content check: 0 leaking. Needles: 4 sampled CUAD questions: each question's text and every 48-character window (step 16) of every chunk of its contract (567 chunks, 12632 windows). Scanned: every stored row of the run's traces in every table with a trace_id, 623 rows (blame 0, eval_traces 28, findings 0, injections 24, spans 366, trace_arrivals 177, trace_summary 28); the 366 exported spans; the run's files otlp.json (1 line), ledger.jsonl (28 lines), outcomes.jsonl (28 lines), plan.jsonl (28 lines), queries.jsonl (4 lines), state.json (94 lines); left out: 116 values of query_ref, ref that are exactly one of the run's own dataset ids in its format (`<task>@s<seed>`, CUAD `<title>__<category>`; a runbook task id is also its workload's name, which the alert needles hold). Any other value in those fields is scanned
 - host 1-minute load average per trace: not recorded in this run (it predates the field; the drivers record it in the ledger from now on, and this run is not repeated for it)
+- dirty flag at the build: not recorded (predates #65); the build refused a dirty checkout (`require_clean`)
+- applied migrations (ClickHouse and Postgres `schema_migrations`): not recorded (predates #65)
+- pipeline image IDs (otel agent and gateway, trace-assembler, ClickHouse, NATS): not recorded (predates #65)
 - golden chunks of the sampled answerable queries: {'mapped': 12, 'answerable_sampled': 12}
 
 | Kind | Component | Traces | Applied | Not reached | Marker on its span | Joined | Signal moved | Assembled | Median s | p95 s | Load1 median |
@@ -65,6 +68,10 @@ Per trace (query = sha256 of the dataset id, first 12):
 - spans sent 33, stored 33; baseline digest `sha256:1b5b700607ed7cf7`
 - content check: 0 leaking. Needles: 30 alert needles (32-character windows of each alert summary and the task-unique label values) and 153 40-character windows of the triage prompt and its variants. Scanned: every stored row of the run's traces in every table with a trace_id, 66 rows (blame 0, eval_traces 9, findings 0, injections 6, spans 33, trace_arrivals 9, trace_summary 9); the 33 exported spans; the run's files otlp.json (1 line), ledger.jsonl (9 lines), outcomes.jsonl (9 lines), plan.jsonl (9 lines), queries.jsonl (12 lines), state.json (99 lines); left out: 48 values of query_ref, ref that are exactly one of the run's own dataset ids in its format (`<task>@s<seed>`, CUAD `<title>__<category>`; a runbook task id is also its workload's name, which the alert needles hold). Any other value in those fields is scanned
 - host 1-minute load average per trace: not recorded in this run (it predates the field; the drivers record it in the ledger from now on, and this run is not repeated for it)
+- dirty flag at the build: not recorded (predates #65); the build refused a dirty checkout (`require_clean`)
+- applied migrations (ClickHouse and Postgres `schema_migrations`): not recorded (predates #65)
+- pipeline image IDs (otel agent and gateway, trace-assembler, ClickHouse, NATS): not recorded (predates #65)
+- eval pod image ID: not recorded (predates #65); built eval_image_id `sha256:a23e74792c6b17a684b1844cde10b03cc3d712d2fe27963ef95470b64be952d0`
 - image guard {'base_node_options': False, 'base_has_preload': False, 'eval_node_options': True, 'eval_has_preload': True, 'fetch_without_switch': 'fetch', 'fetch_other_tenant': 'fetch', 'fetch_eval_tenant': 'handle'}
 - preload used by this run: sha256 `48ec262641600789dae90867a1ab881ccf4c393c38855957c60957fd1b530b1a` (equal to the file at the run's commit)
 - the committed preload differs: sha256 `99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4`, changed since the run by `38dd2b8 build(faults): lint the Node preload with eslint (#14)` (5 lines added, 5 removed). D1 runs with the committed preload: the build phase refuses a dirty checkout and records the file's sha256 in the run's provenance (`preload_sha256`)

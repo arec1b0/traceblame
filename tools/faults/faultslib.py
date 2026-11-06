@@ -62,23 +62,30 @@ def _write_run(run: dict[str, Any]) -> dict[str, Any]:
     return run
 
 
-def new_run(*, seed: int, commit: str, now: datetime) -> str:
+def new_run(*, seed: int, commit: str, dirty: bool, now: datetime) -> str:
     """The one place a run id is computed: faults-<UTC date>-s<seed>-<commit7>, written to
-    .tools/faults/<run>/run.json with its seed, commit and creation time."""
+    .tools/faults/<run>/run.json with its seed, commit, dirty flag and creation time."""
     run_id = f"faults-{now.astimezone(UTC):%Y%m%d}-s{seed}-{commit[:7]}"
-    return ensure_run(run_id, seed=seed, commit=commit, now=now)
+    return ensure_run(run_id, seed=seed, commit=commit, dirty=dirty, now=now)
 
 
-def ensure_run(run_id: str | None, *, seed: int, commit: str, now: datetime) -> str:
+def ensure_run(run_id: str | None, *, seed: int, commit: str, dirty: bool, now: datetime) -> str:
     """The run a prepare/build phase belongs to: a new one without an id; with an id, its
-    run.json (written now if the id is new), whose seed and commit must be this phase's."""
+    run.json (written now if the id is new), whose seed and commit must be this phase's.
+    `dirty` is whether the checkout had uncommitted changes, recorded next to the commit."""
     if run_id is None:
-        return new_run(seed=seed, commit=commit, now=now)
+        return new_run(seed=seed, commit=commit, dirty=dirty, now=now)
     ids.check(run_id, "run id")
     if not _run_file(run_id).is_file():
         stamp = now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         _write_run(
-            {"run_id": run_id, "seed": seed, "traceblame_commit": commit, "created_at": stamp}
+            {
+                "run_id": run_id,
+                "seed": seed,
+                "traceblame_commit": commit,
+                "dirty": dirty,
+                "created_at": stamp,
+            }
         )
         return run_id
     run = open_run(run_id)

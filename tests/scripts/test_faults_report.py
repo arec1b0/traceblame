@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import faultslib
+import provenance
 import pytest
 import report  # tools/faults, on pytest's pythonpath as at the driver's run time
 
@@ -307,3 +308,174 @@ def test_load_medians_are_true_medians_shared_with_check_json() -> None:
     assert faultslib.median([1.0, 2.0, 3.0, 4.0]) == 2.5
     assert faultslib.median([3.0, 1.0, 2.0]) == 2.0
     assert faultslib.median([]) is None
+
+
+# provenance (#65) --------------------------------------------------------------------------
+
+
+def _snapshot(at: str, extra_migration: bool = False) -> dict[str, Any]:
+    migrations = {
+        "clickhouse": [
+            {
+                "version": "0001",
+                "name": "spans",
+                "phase": "expand",
+                "sha256": "ec39fa3ba092",
+                "applied_at": "2026-11-05T13:23:49Z",
+            }
+        ],
+        "postgres": [
+            {
+                "version": "0001",
+                "name": "assembler_partitions",
+                "phase": "expand",
+                "sha256": "8ae1a3710e21",
+                "applied_at": "2026-11-04T15:31:58Z",
+            }
+        ],
+    }
+    if extra_migration:
+        migrations["postgres"].append(
+            {**migrations["postgres"][0], "version": "0002", "name": "assembler_replicas"}
+        )
+    roles = ("otel-agent", "otel-gateway", "trace-assembler", "clickhouse", "nats")
+    images = {
+        role: [
+            {
+                "pod": f"{role}-a",
+                "container": "main",
+                "image": "app:tag",
+                "image_id": f"docker.io/library/import-2026-11-06@sha256:{i:064x}",
+            }
+        ]
+        for i, role in enumerate(roles, 1)
+    }
+    return {"at": at, "images": images, "migrations": migrations, "errors": {}}
+
+
+def _phase(extra_migration: bool = False) -> dict[str, Any]:
+    rec: dict[str, Any] = {
+        "start": _snapshot("2026-11-06T09:00:00Z"),
+        "end": _snapshot("2026-11-06T09:30:00Z", extra_migration),
+    }
+    rec["problems"] = provenance.phase_problems(rec)
+    return rec
+
+
+EVAL_ID = "sha256:" + "e" * 64
+
+
+CONFIG_ID = "sha256:" + "c" * 64
+
+
+def _state(
+    *, recorded: bool, app: str = "runbook-agent", node_config: str = CONFIG_ID
+) -> dict[str, Any]:
+    state: dict[str, Any] = {"build": {"eval_image_id": EVAL_ID}}
+    if recorded:
+        run = _phase()
+        run["eval"] = {
+            "image": "runbook-agent:abc-faults",
+            "built_image_id": EVAL_ID,
+            "built_config_id": CONFIG_ID,
+        }
+        run["eval_pods"] = [
+            {
+                "label": "end",
+                "at": "x",
+                "pods": [
+                    {
+                        "pod": "runbook-agent-x",
+                        "container": "runbook-agent",
+                        "image": "runbook-agent:abc-faults",
+                        "image_id": "docker.io/library/import-2026-11-06@sha256:" + "7" * 64,
+                        "node": "traceblame-worker",
+                        "node_config_ids": [node_config],
+                    }
+                ],
+            }
+        ]
+        state |= {
+            "dirty": False,
+            "app_dirty": False,
+            "provenance": {"run": run, "record": _phase(), "check": _phase()},
+        }
+    return state
+
+
+def test_a_run_before_the_provenance_says_not_recorded_for_every_new_field() -> None:
+    state = _state(recorded=False)
+    lines = "\n".join(
+        report.provenance_lines("runbook-agent", state, report.provenance_info(state))
+    )
+    assert report.provenance_info(state) == {
+        "dirty": "not recorded (predates #65)",
+        "app_dirty": "not recorded (predates #65)",
+        "phases": "not recorded (predates #65)",
+    }
+    assert "dirty flag at the build: not recorded (predates #65)" in lines
+    assert "applied migrations (ClickHouse and Postgres `schema_migrations`): not recorded" in lines
+    assert (
+        "pipeline image IDs (otel agent and gateway, trace-assembler, ClickHouse, NATS): not"
+        in lines
+    )
+    assert (
+        f"eval pod image ID: not recorded (predates #65); built eval_image_id `{EVAL_ID}`" in lines
+    )
+    assert provenance.run_problems(state.get("provenance"), "runbook-agent") == []
+
+
+def test_a_recorded_run_shows_its_images_migrations_and_flags_in_the_markdown() -> None:
+    state = _state(recorded=True)
+    lines = "\n".join(
+        report.provenance_lines("runbook-agent", state, report.provenance_info(state))
+    )
+    assert "dirty flag at the build: traceblame false, app false" in lines
+    assert "| run | 2026-11-06T09:00:00Z | 2026-11-06T09:30:00Z | ClickHouse 1 (`" in lines
+    assert "| none | 0 |" in lines
+    assert "ClickHouse at the end of the run phase: 0001 spans (expand, ec39fa3ba092," in lines
+    assert "Postgres: 0001 assembler_partitions (expand, 8ae1a3710e21," in lines
+    assert (
+        f"| otel-gateway | 1 | main | `docker.io/library/import-2026-11-06@sha256:{2:064x}` |"
+        in lines
+    )
+    assert (
+        f"config digest built `{CONFIG_ID}` against the config digest the pods' nodes held" in lines
+    )
+    assert f"`{CONFIG_ID}`: equal." in lines
+    assert "kept the imageID `docker.io/library/import-2026-11-06@sha256:" + "7" * 64 in lines
+    assert f"the build's `eval_image_id` is `{EVAL_ID}`" in lines
+    assert "not comparable" not in lines
+
+
+def test_the_report_says_not_equal_when_a_node_holds_another_config_digest() -> None:
+    state = _state(recorded=True, node_config="sha256:" + "d" * 64)
+    lines = "\n".join(
+        report.provenance_lines("runbook-agent", state, report.provenance_info(state))
+    )
+    assert f"`{'d' * 64 and 'sha256:' + 'd' * 64}`: **not equal**." in lines
+    problems = provenance.run_problems(state["provenance"], "runbook-agent")
+    assert any("holds config digest dddddddddddd" in p for p in problems)
+
+
+def test_a_change_within_a_phase_is_visible_in_the_table_and_a_problem_in_the_report() -> None:
+    state = _state(recorded=True)
+    state["provenance"]["check"] = _phase(extra_migration=True)
+    lines = "\n".join(
+        report.provenance_lines("runbook-agent", state, report.provenance_info(state))
+    )
+    assert (
+        "postgres: applied migrations changed during the phase: added 0002 assembler_replicas"
+        in lines
+    )
+    problems = provenance.run_problems(state["provenance"], "runbook-agent")
+    assert any(p.startswith("check: postgres: applied migrations changed") for p in problems)
+
+
+def test_a_dirty_checkout_in_a_state_is_a_problem() -> None:
+    assert report.dirty_problems({"dirty": False, "app_dirty": False}) == []
+    assert report.dirty_problems({}) == []  # a run that predates the flag
+    assert report.dirty_problems({"dirty": True, "app_dirty": True}) == [
+        "the traceblame checkout was dirty",
+        "the app checkout was dirty",
+    ]
