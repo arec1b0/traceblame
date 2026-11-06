@@ -38,9 +38,9 @@ Its statements on `eval_traces`, new in this schema, are not here yet: they live
 embeds a copy of each (`packages/faults/src/traceblame_faults/sql/`, checked by
 `tests/contract/test_faults_sql_copies.py`). They move here once the table is on main.
 
-The detectors (#15) write `findings` with the new `revision` and `input_digest` columns, and
-`detector_runs` and `detector_params`, all new in this schema: those statements live in
-`tests/integration/detectors_*.sql`, embedded in `traceblame_detectors/sql/` (checked by
+The detectors (#15) write `findings` with the new `revision`, `input_digest` and `run_digest`
+columns, and `detector_runs` and `detector_params`, all new in this schema: those statements
+live in `tests/integration/detectors_*.sql`, embedded in `traceblame_detectors/sql/` (checked by
 `tests/contract/test_detectors_contract.py`), until the schema is on main.
 
 `findings_read.sql` predates revisions. On the new schema it returns one row per revision of a

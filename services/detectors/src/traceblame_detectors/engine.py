@@ -53,6 +53,8 @@ class Finding:
     trace_id: str
     revision_ms: int
     input_digest: str
+    # The identity of the run that produced the finding (run_digest()): what readers join on.
+    run_digest: str
     span_id: str
     detector: str
     detector_version: str
@@ -70,7 +72,7 @@ class Finding:
             self.detector_version,
             self.span_id,
             self.revision_ms,
-            self.input_digest,
+            self.run_digest,
         )
 
     def evidence_json(self) -> str:
@@ -82,6 +84,7 @@ class Finding:
             "trace_id": self.trace_id,
             "revision_ms": self.revision_ms,
             "input_digest": self.input_digest,
+            "run_digest": self.run_digest,
             "span_id": self.span_id,
             "detector": self.detector,
             "detector_version": self.detector_version,
@@ -109,6 +112,7 @@ class DetectorRun:
     input_digest: str
     context_digest: str
     framework_version: str
+    run_digest: str
     findings: tuple[Finding, ...]
 
     @property
@@ -129,6 +133,7 @@ class DetectorRun:
             "input_digest": self.input_digest,
             "context_digest": self.context_digest,
             "framework_version": self.framework_version,
+            "run_digest": self.run_digest,
             "findings_digest": self.findings_digest,
             "findings": [f.canonical() for f in self.findings],
         }
@@ -148,10 +153,26 @@ def finding_id(
     detector_version: str,
     span_id: str,
     revision_ms: int,
-    input_digest: str,
+    run_digest: str,
 ) -> str:
-    name = f"{trace_id}/{detector}/{detector_version}/{span_id}/{revision_ms}/{input_digest}"
+    name = f"{trace_id}/{detector}/{detector_version}/{span_id}/{revision_ms}/{run_digest}"
     return str(uuid.uuid5(FINDING_NAMESPACE, name))
+
+
+def run_digest(
+    input_digest: str, context_digest: str, detector_version: str, framework_version: str
+) -> str:
+    """The identity of a run's complete inputs: its projection of the trace, the context it got,
+    its version and the framework's. Two runs with the same run_digest produce the same findings;
+    findings and their detector_runs marker are joined on it."""
+    return digest(
+        {
+            "input_digest": input_digest,
+            "context_digest": context_digest,
+            "detector_version": detector_version,
+            "framework_version": framework_version,
+        }
+    )
 
 
 def run_trace(
@@ -176,11 +197,13 @@ def _run_one(view: TraceView, enabled: EnabledDetector, providers: Providers) ->
     try:
         drafts = enabled.instance().detect(projection, ctx)
         context_ids = ctx.returned_ids(golden=spec.eval_only)
-        findings = _validate(projection, enabled, drafts, input_digest, context_ids)
+        identity = _identity(input_digest, digest(ctx.used()), enabled.detector_version)
+        findings = _validate(projection, enabled, drafts, identity, context_ids)
     except RejectedError as e:
         status, error_kind = RunStatus.ERROR, str(e)
     except Exception as e:  # a detector bug fails its own run only
         status, error_kind = RunStatus.ERROR, type(e).__name__
+    context_digest = digest(ctx.used())
     return DetectorRun(
         trace_id=view.trace_id,
         revision_ms=view.revision_ms,
@@ -192,9 +215,19 @@ def _run_one(view: TraceView, enabled: EnabledDetector, providers: Providers) ->
         status=status,
         error_kind=error_kind,
         input_digest=input_digest,
-        context_digest=digest(ctx.used()),
+        context_digest=context_digest,
         framework_version=FRAMEWORK_VERSION,
+        run_digest=run_digest(
+            input_digest, context_digest, enabled.detector_version, FRAMEWORK_VERSION
+        ),
         findings=findings,
+    )
+
+
+def _identity(input_digest: str, context_digest: str, detector_version: str) -> tuple[str, str]:
+    """(input_digest, run_digest) that the run's findings carry."""
+    return input_digest, run_digest(
+        input_digest, context_digest, detector_version, FRAMEWORK_VERSION
     )
 
 
@@ -202,7 +235,7 @@ def _validate(
     projection: TraceView,
     enabled: EnabledDetector,
     drafts: Sequence[FindingDraft],
-    input_digest: str,
+    identity: tuple[str, str],
     context_ids: frozenset[str] = frozenset(),
 ) -> tuple[Finding, ...]:
     if len(drafts) > MAX_FINDINGS_PER_RUN:
@@ -226,7 +259,8 @@ def _validate(
             Finding(
                 trace_id=projection.trace_id,
                 revision_ms=projection.revision_ms,
-                input_digest=input_digest,
+                input_digest=identity[0],
+                run_digest=identity[1],
                 span_id=d.span_id,
                 detector=enabled.spec.name,
                 detector_version=enabled.detector_version,

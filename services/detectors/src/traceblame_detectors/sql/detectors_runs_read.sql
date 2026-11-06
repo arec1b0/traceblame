@@ -10,6 +10,7 @@ SELECT detector,
     status,
     error_kind,
     finding_count,
-    findings_digest
+    findings_digest,
+    run_digest
 FROM detector_runs FINAL
 WHERE trace_id = {trace_id:FixedString(32)}

@@ -221,6 +221,7 @@ class FakeClickHouse:
                         r["error_kind"],
                         r["finding_count"],
                         r["findings_digest"],
+                        r["run_digest"],
                     )
                     for r in latest.values()
                 ]
@@ -257,6 +258,7 @@ class FakeClickHouse:
                                 ("detector", "detectors"),
                                 ("detector_version", "detector_versions"),
                                 ("input_digest", "input_digests"),
+                                ("run_digest", "run_digests"),
                                 ("component", "components"),
                                 ("severity", "severities"),
                                 ("score", "scores"),
@@ -279,6 +281,7 @@ class FakeClickHouse:
                             for col, arr in (
                                 ("detector_version", "detector_versions"),
                                 ("input_digest", "input_digests"),
+                                ("run_digest", "run_digests"),
                                 ("context_digest", "context_digests"),
                                 ("status", "statuses"),
                                 ("error_kind", "error_kinds"),

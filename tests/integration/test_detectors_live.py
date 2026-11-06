@@ -22,13 +22,15 @@ from traceblame_contracts.fixtures import discover_fixtures
 from traceblame_detectors.api import Detector
 from traceblame_detectors.cli import main as detectors_cli
 from traceblame_detectors.config import DetectorConfig, load_config
-from traceblame_detectors.engine import DetectorRun
+from traceblame_detectors.context import StaticBaselineProvider
+from traceblame_detectors.engine import DetectorRun, Providers, RunStatus, run_trace
+from traceblame_detectors.model import ServiceBaseline
 from traceblame_detectors.online import Outcome, handle
 from traceblame_detectors.policy import DECLARABLE
 from traceblame_detectors.sinks import ClickHouseSink
 from traceblame_detectors.sources.clickhouse import ClickHouseTraceSource
-from traceblame_detectors.testing import load_detector
-from traceblame_detectors.view import TraceView
+from traceblame_detectors.testing import TRACE_ID, load_detector, span_rows, summary_row
+from traceblame_detectors.view import TraceView, build_view
 from traceblame_storage import contract
 from traceblame_storage.client import connect_postgres
 from traceblame_storage.migrations import POSTGRES, packaged
@@ -165,7 +167,7 @@ def test_findings_get_a_revision_in_the_sorting_key_and_old_rows_read_revision_0
         client.command(old_write)  # code N-1's write, on schema N-1
         migrate(client, clickhouse_migrations())
         (key,) = client.query_rows(_SORTING_KEY, {"db": database})
-        assert key[0] == "trace_id, detector, detector_version, span_id, revision"
+        assert key[0] == "trace_id, detector, detector_version, span_id, revision, run_digest"
         assert client.query_rows(
             "SELECT toUnixTimestamp64Milli(revision), input_digest FROM findings"
         ) == [(0, "")]
@@ -198,7 +200,7 @@ def test_the_findings_migration_is_idempotent_when_rerun_by_hand(
         (statement,) = m.statements()
         client.command(statement)
         (key,) = client.query_rows(_SORTING_KEY, {"db": database})
-        assert key[0] == "trace_id, detector, detector_version, span_id, revision"
+        assert key[0] == "trace_id, detector, detector_version, span_id, revision, run_digest"
     finally:
         client.close()
 
@@ -210,6 +212,7 @@ def _runs_write(revision_ms: int, finding_count: int, digest: str) -> dict[str, 
         "revision_ms": revision_ms,
         "finding_counts": [finding_count],
         "input_digests": [digest],
+        "run_digests": [digest],
     }
 
 
@@ -233,6 +236,7 @@ def _findings_write(revision_ms: int, span_ids: Sequence[str], digest: str) -> d
             )
         },
         "input_digests": [digest] * n,
+        "run_digests": [digest] * n,
     }
 
 
@@ -658,5 +662,101 @@ def test_the_old_findings_read_returns_one_row_per_revision(
         current = client.query_rows(_statement("detectors_findings_current_read.sql"),
                                     {"trace_id": params["trace_id"]})  # fmt: skip
         assert current == [], "no run marker yet: the current read shows nothing"
+    finally:
+        client.close()
+
+
+# --- the identity of a committed run (Codex review on #69) ---------------------------------------
+
+OTHER_BASELINE = ServiceBaseline(
+    service="agentic-rag",
+    bundle_digest="sha256:" + "b" * 64,
+    window_start_us=1_793_000_000_000_000,
+    window_end_us=1_793_600_000_000_000,
+    trace_count=120,
+)
+
+
+def _current(client: Any) -> list[tuple[Any, ...]]:
+    return client.query_rows(
+        _statement("detectors_findings_current_read.sql"), {"trace_id": TRACE_ID}
+    )
+
+
+def _write(client: Any, runs: Sequence[DetectorRun]) -> None:
+    ClickHouseSink(client).write(runs)
+
+
+def test_a_rerun_with_other_context_and_no_findings_leaves_no_current_finding(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """(a) Same revision and input; the baseline changes between the runs, and the second run
+    finds nothing: its marker must not select the first run's finding."""
+    client = clickhouse.client(database)
+    try:
+        migrate(client, clickhouse_migrations())
+        config = load_config({"detectors": {"reference_baseline": {}}}, _registry())
+        view = build_view(summary_row(), span_rows(), DECLARABLE)
+        first = run_trace(
+            view, config.detectors, Providers(StaticBaselineProvider([OTHER_BASELINE]))
+        )
+        second = run_trace(view, config.detectors, Providers())
+        assert len(first[0].findings) == 1
+        assert second[0].findings == ()
+        assert first[0].input_digest == second[0].input_digest
+        _write(client, first)
+        assert len(_current(client)) == 1
+        _write(client, second)
+        assert _current(client) == []
+    finally:
+        client.close()
+
+
+def test_a_failed_retry_selects_no_findings(clickhouse: ClickHouseServer, database: str) -> None:
+    """(b) An ok run, then a retry with the same inputs that fails: fail closed."""
+    client = clickhouse.client(database)
+    try:
+        migrate(client, clickhouse_migrations())
+        config = load_config({"detectors": {"reference_root": {}}}, _registry())
+        view = build_view(summary_row(), span_rows(), DECLARABLE)
+        (ok,) = run_trace(view, config.detectors, Providers())
+        assert ok.findings
+        _write(client, [ok])
+        assert len(_current(client)) == len(ok.findings)
+        failed = replace(ok, status=RunStatus.ERROR, error_kind="RuntimeError", findings=())
+        _write(client, [failed])
+        assert _current(client) == []
+    finally:
+        client.close()
+
+
+def test_uncommitted_findings_of_another_projection_never_replace_committed_ones(
+    clickhouse: ClickHouseServer, database: str
+) -> None:
+    """(c) Two projections of one revision (a late span visible before the summary moved on).
+    The second run writes its findings and crashes before its marker: after the merges, the
+    first run's committed findings are still the current ones."""
+    client = clickhouse.client(database)
+    try:
+        migrate(client, clickhouse_migrations())
+        config = load_config({"detectors": {"reference_root": {}}}, _registry())
+        rows = span_rows()
+        late = {**rows[1], "span_id": "4444444444444444", "start_us": rows[1]["start_us"] + 5}
+        first = run_trace(
+            build_view(summary_row(), rows, DECLARABLE), config.detectors, Providers()
+        )
+        second = run_trace(
+            build_view(summary_row(), [*rows, late], DECLARABLE), config.detectors, Providers()
+        )
+        assert first[0].revision_ms == second[0].revision_ms
+        assert first[0].input_digest != second[0].input_digest
+        assert {f.span_id for f in first[0].findings} & {f.span_id for f in second[0].findings}
+        _write(client, first)
+        committed = sorted(r[0] for r in _current(client))
+        with pytest.raises(ConnectionError):
+            ClickHouseSink(_CrashBeforeMarker(client)).write(second)
+        client.command("OPTIMIZE TABLE findings FINAL")
+        assert sorted(r[0] for r in _current(client)) == committed
+        assert committed
     finally:
         client.close()

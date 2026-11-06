@@ -67,14 +67,16 @@ the context hand over.
   `FRAMEWORK_VERSION`, then add its lock entry with
   `uv run --frozen python -c "from traceblame_detectors.locks import framework_sources; print(framework_sources())"`.
 - Findings are idempotent by `(trace_id, detector, detector_version)` per trace revision:
-  `finding_id = uuid5(trace_id/detector/detector_version/span_id/revision/input_digest)`.
+  `finding_id = uuid5(trace_id/detector/detector_version/span_id/revision/run_digest)`, where
+  `run_digest` = sha256 of `{input_digest, context_digest, detector_version, framework_version}`.
   Per trace, the findings are written first, then one `detector_runs` row per detector (the
   commit marker, also for a run that found nothing). The current findings of a detector version
-  are those whose `(revision, input_digest)` equal its newest `detector_runs` row, so a
-  re-assembled trace's run replaces the earlier one, whatever the insert order
+  are those whose `(revision, run_digest)` equal its newest `detector_runs` row, if that run is
+  ok: a re-assembled trace's run replaces the earlier one whatever the insert order, a rerun
+  with other context selects only its own rows, and a failed run selects none
   (`tests/integration/detectors_findings_current_read.sql`).
-- `detector_runs.findings_digest` and `input_digest` make runs comparable byte for byte
-  (findings.score is Float32, so read-back rows are not).
+- `detector_runs.findings_digest`, `input_digest` and `run_digest` make runs comparable byte
+  for byte (findings.score is Float32, so read-back rows are not).
 
 ## Online and offline
 

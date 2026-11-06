@@ -9,12 +9,13 @@
 -- param detector_versions = ["0.1.0+p0123abcd"]
 -- param input_digests = ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"]
 -- param context_digests = ["4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"]
+-- param run_digests = ["1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a7988"]
 -- param statuses = ["ok"]
 -- param error_kinds = [""]
 -- param finding_counts = [1]
 -- param findings_digests = ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"]
-INSERT INTO detector_runs (trace_id, detector, detector_version, revision, input_digest, context_digest, framework_version, assembler_version, status, error_kind, finding_count, findings_digest, ran_at)
-SELECT {trace_id:FixedString(32)}, r.1, r.2, fromUnixTimestamp64Milli({revision_ms:Int64}), r.3, r.4, {framework_version:String}, {assembler_version:String}, r.5, r.6, r.7, r.8, now64(3)
+INSERT INTO detector_runs (trace_id, detector, detector_version, revision, input_digest, context_digest, run_digest, framework_version, assembler_version, status, error_kind, finding_count, findings_digest, ran_at)
+SELECT {trace_id:FixedString(32)}, r.1, r.2, fromUnixTimestamp64Milli({revision_ms:Int64}), r.3, r.4, r.5, {framework_version:String}, {assembler_version:String}, r.6, r.7, r.8, r.9, now64(3)
 FROM (
-    SELECT arrayJoin(arrayZip({detectors:Array(String)}, {detector_versions:Array(String)}, {input_digests:Array(String)}, {context_digests:Array(String)}, {statuses:Array(String)}, {error_kinds:Array(String)}, {finding_counts:Array(UInt16)}, {findings_digests:Array(String)})) AS r
+    SELECT arrayJoin(arrayZip({detectors:Array(String)}, {detector_versions:Array(String)}, {input_digests:Array(String)}, {context_digests:Array(String)}, {run_digests:Array(String)}, {statuses:Array(String)}, {error_kinds:Array(String)}, {finding_counts:Array(UInt16)}, {findings_digests:Array(String)})) AS r
 )

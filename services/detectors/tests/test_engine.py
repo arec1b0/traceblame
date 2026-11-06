@@ -86,7 +86,7 @@ def test_a_new_revision_gives_new_finding_ids(make_config: Make) -> None:
     assert {f.finding_id for f in a.findings}.isdisjoint(f.finding_id for f in b.findings)
     f = a.findings[0]
     assert f.finding_id == finding_id(
-        TRACE_ID, f.detector, f.detector_version, f.span_id, f.revision_ms, f.input_digest
+        TRACE_ID, f.detector, f.detector_version, f.span_id, f.revision_ms, f.run_digest
     )
 
 
@@ -414,3 +414,23 @@ def test_a_golden_id_from_a_detector_that_is_not_eval_only_is_rejected(
     )
     run = _run(config, _view(), Providers(golden=_Golden()))
     assert (run.status, run.error_kind) == (RunStatus.ERROR, "evidence_rejected")
+
+
+def test_findings_carry_their_runs_digest_which_covers_context_too(make_config: Make) -> None:
+    config = make_config(reference_baseline={}, reference_root={})
+    with_baseline = run_trace(
+        _view(), config.detectors, Providers(baseline=StaticBaselineProvider([BASELINE]))
+    )
+    without = run_trace(_view(), config.detectors, Providers())
+    checked = 0
+    for run in (*with_baseline, *without):
+        for f in run.findings:
+            assert f.run_digest == run.run_digest
+            assert f.input_digest == run.input_digest
+            checked += 1
+    assert checked > 0
+    baseline_a, root_a = with_baseline
+    baseline_b, root_b = without
+    assert baseline_a.input_digest == baseline_b.input_digest
+    assert baseline_a.run_digest != baseline_b.run_digest  # other context, other run
+    assert root_a.run_digest == root_b.run_digest  # no context asked: same inputs, same run

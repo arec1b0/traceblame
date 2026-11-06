@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from traceblame_detectors.config import detector_version
-from traceblame_detectors.engine import FRAMEWORK_VERSION, Finding, finding_id
+from traceblame_detectors.engine import FRAMEWORK_VERSION, Finding, finding_id, run_digest
 from traceblame_detectors.locks import (
     FRAMEWORK_LOCK,
     PLUGINS_LOCK,
@@ -99,7 +99,7 @@ def test_finding_ids_match_the_vectors() -> None:
             v["detector_version"],
             v["span_id"],
             v["revision_ms"],
-            v["input_digest"],
+            v["run_digest"],
         )
         assert finding_id(*args) == v["finding_id"]
 
@@ -115,3 +115,13 @@ def test_canonical_finding_bytes_match_the_vectors() -> None:
         )
         finding = Finding(**f, evidence=evidence)
         assert finding.canonical_bytes().decode() == v["canonical"]
+
+
+def test_run_digests_match_the_vectors() -> None:
+    entries = _vectors()["run_digests"]
+    assert entries
+    for v in entries:
+        got = run_digest(
+            v["input_digest"], v["context_digest"], v["detector_version"], v["framework_version"]
+        )
+        assert got == v["run_digest"]

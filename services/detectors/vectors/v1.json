@@ -3,25 +3,25 @@
     {
       "detector": "retrieval_miss",
       "detector_version": "1.2.0+p0123abcd",
-      "finding_id": "2c3316f2-24f4-5223-a829-9fe8b4981e47",
-      "input_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "finding_id": "5562258d-6853-586d-82d0-f1b72af7c61c",
       "revision_ms": 1793700000123,
+      "run_digest": "988ff54d612e4b1ca45c615e5065715d8235808b24354dafd438385d390a32de",
       "span_id": "00f067aa0ba902b7",
       "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
     },
     {
       "detector": "retrieval_miss",
       "detector_version": "1.2.0+p0123abcd",
-      "finding_id": "ccab8311-69c0-5f0c-953d-2ab45f8414d0",
-      "input_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "finding_id": "129b0218-94c7-5e88-b1d7-13202b89255a",
       "revision_ms": 1793700000124,
+      "run_digest": "988ff54d612e4b1ca45c615e5065715d8235808b24354dafd438385d390a32de",
       "span_id": "00f067aa0ba902b7",
       "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
     }
   ],
   "findings": [
     {
-      "canonical": "{\"component\":\"retrieval\",\"detector\":\"retrieval_miss\",\"detector_version\":\"1.2.0+p0123abcd\",\"evidence\":{\"docs\":[\"cuad-0123456789ab-3\",\"cuad-0123456789ab-7\"],\"max_score\":0.8999999761581421,\"parse_ok\":false,\"spans\":4},\"finding_id\":\"e987c6ba-24f0-553d-9d6b-5d65a4b7ca7f\",\"input_digest\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"revision_ms\":1793700000123,\"score\":0.8235,\"severity\":\"warn\",\"span_id\":\"1111111111111111\",\"trace_id\":\"4bf92f3577b34da6a3ce929d0e0e4736\"}",
+      "canonical": "{\"component\":\"retrieval\",\"detector\":\"retrieval_miss\",\"detector_version\":\"1.2.0+p0123abcd\",\"evidence\":{\"docs\":[\"cuad-0123456789ab-3\",\"cuad-0123456789ab-7\"],\"max_score\":0.8999999761581421,\"parse_ok\":false,\"spans\":4},\"finding_id\":\"7855f449-492d-54e9-81b6-827b7092d5e0\",\"input_digest\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"revision_ms\":1793700000123,\"run_digest\":\"988ff54d612e4b1ca45c615e5065715d8235808b24354dafd438385d390a32de\",\"score\":0.8235,\"severity\":\"warn\",\"span_id\":\"1111111111111111\",\"trace_id\":\"4bf92f3577b34da6a3ce929d0e0e4736\"}",
       "finding": {
         "component": "retrieval",
         "detector": "retrieval_miss",
@@ -49,6 +49,7 @@
         ],
         "input_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "revision_ms": 1793700000123,
+        "run_digest": "988ff54d612e4b1ca45c615e5065715d8235808b24354dafd438385d390a32de",
         "score": 0.8235,
         "severity": "warn",
         "span_id": "1111111111111111",
@@ -56,7 +57,7 @@
       }
     },
     {
-      "canonical": "{\"component\":\"retrieval\",\"detector\":\"retrieval_miss\",\"detector_version\":\"1.2.0+p0123abcd\",\"evidence\":{},\"finding_id\":\"e987c6ba-24f0-553d-9d6b-5d65a4b7ca7f\",\"input_digest\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"revision_ms\":1793700000123,\"score\":0.8235,\"severity\":\"warn\",\"span_id\":\"1111111111111111\",\"trace_id\":\"4bf92f3577b34da6a3ce929d0e0e4736\"}",
+      "canonical": "{\"component\":\"retrieval\",\"detector\":\"retrieval_miss\",\"detector_version\":\"1.2.0+p0123abcd\",\"evidence\":{},\"finding_id\":\"7855f449-492d-54e9-81b6-827b7092d5e0\",\"input_digest\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"revision_ms\":1793700000123,\"run_digest\":\"988ff54d612e4b1ca45c615e5065715d8235808b24354dafd438385d390a32de\",\"score\":0.8235,\"severity\":\"warn\",\"span_id\":\"1111111111111111\",\"trace_id\":\"4bf92f3577b34da6a3ce929d0e0e4736\"}",
       "finding": {
         "component": "retrieval",
         "detector": "retrieval_miss",
@@ -64,6 +65,7 @@
         "evidence": [],
         "input_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "revision_ms": 1793700000123,
+        "run_digest": "988ff54d612e4b1ca45c615e5065715d8235808b24354dafd438385d390a32de",
         "score": 0.8235,
         "severity": "warn",
         "span_id": "1111111111111111",
@@ -72,6 +74,15 @@
     }
   ],
   "framework_version": "1.0.0",
+  "run_digests": [
+    {
+      "context_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "detector_version": "1.2.0+p0123abcd",
+      "framework_version": "1.0.0",
+      "input_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "run_digest": "988ff54d612e4b1ca45c615e5065715d8235808b24354dafd438385d390a32de"
+    }
+  ],
   "versions": [
     {
       "code_version": "0.1.0",

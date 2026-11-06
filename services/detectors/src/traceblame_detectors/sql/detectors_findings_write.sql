@@ -10,12 +10,13 @@
 -- param detectors = ["context_truncation"]
 -- param detector_versions = ["0.1.0+p0123abcd"]
 -- param input_digests = ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"]
+-- param run_digests = ["1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a7988"]
 -- param components = ["orchestration"]
 -- param severities = ["warn"]
 -- param scores = [0.9]
 -- param details = ["{}"]
-INSERT INTO findings (finding_id, trace_id, span_id, detector, detector_version, revision, input_digest, component, severity, score, details, created_at)
-SELECT toUUID(f.1), {trace_id:FixedString(32)}, f.2, f.3, f.4, fromUnixTimestamp64Milli({revision_ms:Int64}), f.5, f.6, f.7, f.8, f.9, now64(3)
+INSERT INTO findings (finding_id, trace_id, span_id, detector, detector_version, revision, input_digest, run_digest, component, severity, score, details, created_at)
+SELECT toUUID(f.1), {trace_id:FixedString(32)}, f.2, f.3, f.4, fromUnixTimestamp64Milli({revision_ms:Int64}), f.5, f.6, f.7, f.8, f.9, f.10, now64(3)
 FROM (
-    SELECT arrayJoin(arrayZip({finding_ids:Array(String)}, {span_ids:Array(String)}, {detectors:Array(String)}, {detector_versions:Array(String)}, {input_digests:Array(String)}, {components:Array(String)}, {severities:Array(String)}, {scores:Array(Float32)}, {details:Array(String)})) AS f
+    SELECT arrayJoin(arrayZip({finding_ids:Array(String)}, {span_ids:Array(String)}, {detectors:Array(String)}, {detector_versions:Array(String)}, {input_digests:Array(String)}, {run_digests:Array(String)}, {components:Array(String)}, {severities:Array(String)}, {scores:Array(Float32)}, {details:Array(String)})) AS f
 )

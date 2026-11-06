@@ -24,27 +24,33 @@ detector_version)` (CLAUDE.md rule 3). Three facts do not fit that table alone:
 
 ## Decision
 
-1. **Findings per revision.** `findings` gets `revision` (the `trace_summary` revision the
-   detector ran on) and `input_digest` (sha256 of the detector's input). `revision` joins the
-   sorting key: `(trace_id, detector, detector_version, span_id, revision)`. ClickHouse extends
-   a sorting key, metadata only, with a column added in the same ALTER; the migration
-   checker allows `MODIFY ORDER BY` in an expand ALTER only after an `ADD COLUMN` of the same
-   statement. Rows of code N-1 read revision 0.
+1. **Findings per run.** `findings` gets `revision` (the `trace_summary` revision the
+   detector ran on), `input_digest` (sha256 of the detector's input) and `run_digest`
+   (sha256 of the canonical `{input_digest, context_digest, detector_version,
+   framework_version}`: the identity of the run's complete inputs). `revision` and `run_digest`
+   join the sorting key: `(trace_id, detector, detector_version, span_id, revision,
+   run_digest)`, so the findings of another run of the same revision (another projection, a
+   rerun with other context) never replace a committed run's rows, not even after merges.
+   ClickHouse extends a sorting key, metadata only, with columns added in the same ALTER
+   without a default; the migration checker allows `MODIFY ORDER BY` in an expand ALTER only
+   after an `ADD COLUMN` of the same statement. Rows of code N-1 read revision 0 and an empty
+   run_digest.
 2. **A run marker.** `detector_runs`, `ReplacingMergeTree(revision)` ordered by `(trace_id,
    detector, detector_version)`, gets one row per detector run, written after the run's
    findings, also when it found nothing or failed: `input_digest`, `context_digest`,
-   `findings_digest`, `framework_version`, `assembler_version`, `status`, `error_kind` (a fixed
-   reason or an exception class name), `finding_count`. The current findings of a detector
-   version are the rows whose `(revision, input_digest)` equal its newest run row. A crash
-   between the two inserts leaves the previous revision current; the replay writes the same
-   rows again.
+   `run_digest`, `findings_digest`, `framework_version`, `assembler_version`, `status`,
+   `error_kind` (a fixed reason or an exception class name), `finding_count`. The current
+   findings of a detector version are the rows whose `(revision, run_digest)` equal its newest
+   run row, and only if that run is `ok`: a failed run selects no findings (fail closed), and a
+   rerun of the same revision with other context selects only its own rows. A crash between the
+   two inserts leaves the previous run current; the replay writes the same rows again.
 3. **Params-derived versions.** `detector_version = <code semver>+p<first 8 hex of
    sha256(canonical behaviour params)>` (semver build metadata). Operational settings never
    enter it. `detector_params (detector, detector_version, code_version, framework_version,
    params)` resolves every version to its params; a writer refuses to start when a version is
    registered with other params.
 4. **Deterministic ids and digests.** `finding_id = uuid5(trace_id/detector/detector_version/
-   span_id/revision/input_digest)`; findings are canonical JSON (sorted keys, ASCII, no NaN).
+   span_id/revision/run_digest)`; findings are canonical JSON (sorted keys, ASCII, no NaN).
    `FRAMEWORK_VERSION` covers the engine, the trace view, the canonical form, the policy and
    the context; version locks and golden vectors pin them and are append-only. Evidence
    strings are ids from the detector's own view, id-typed strings its own context returned
@@ -86,4 +92,9 @@ detector_version)` (CLAUDE.md rule 3). Three facts do not fit that table alone:
 - The detectors' new statements live in `tests/integration/detectors_*.sql` with embedded
   copies until the schema is on main; then they move into the storage contract.
 - PR-B (worker) adds `traceblame.finding.v1`, which references findings (ids, keys, scores) and
-  carries the run's `input_digest`.
+  carries the run's `input_digest` and `run_digest`.
+- Review of #69 (Codex) found the first identity, `(revision, input_digest)`, too weak: a rerun
+  with other context matched an earlier run's findings, a failed retry exposed them, and an
+  uncommitted run of another projection replaced committed rows at merge. `run_digest` in the
+  sorting key and the join, plus the `ok` filter, close all three
+  (`tests/integration/test_detectors_live.py`, tests (a)-(c)).
