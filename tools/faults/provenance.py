@@ -58,6 +58,8 @@ class EvalImage(NamedTuple):
     config_id: str | None
 
 
+# `Config` of manifest.json in either of Docker's archive layouts: 64 lowercase hex digits.
+_CONFIG_PATH = re.compile(r"blobs/sha256/(?P<blob>[0-9a-f]{64})|(?P<classic>[0-9a-f]{64})\.json")
 NodeImages = Callable[[str], str]  # kind node name -> `crictl images -o json`
 _NODE = re.compile(r"^[a-z0-9][a-z0-9.-]{0,62}$")
 
@@ -225,7 +227,8 @@ def config_ids(images_json: str, image_id: str) -> list[str]:
 
 def built_config_digest(tag: str) -> str:
     """The config digest of a docker-built image: `Config` of `docker save`'s manifest.json,
-    streamed (the archive is never written)."""
+    streamed (the archive is never written). Docker's containerd image store writes
+    `blobs/sha256/<64 hex>`, its classic store `<64 hex>.json`; anything else is an error."""
     proc = subprocess.Popen(  # noqa: S603 - fixed argv
         ["docker", "save", tag],  # noqa: S607
         stdout=subprocess.PIPE,
@@ -240,10 +243,10 @@ def built_config_digest(tag: str) -> str:
                     if handle is None:
                         raise LookupError("manifest.json of docker save is not a file")
                     config = str(json.loads(handle.read())[0]["Config"])
-                    prefix = "blobs/sha256/"
-                    if not config.startswith(prefix):
+                    found = _CONFIG_PATH.fullmatch(config)
+                    if found is None:
                         raise ValueError(f"unexpected Config in manifest.json: {config!r}")
-                    return "sha256:" + config.removeprefix(prefix)
+                    return "sha256:" + (found["blob"] or found["classic"])
         raise LookupError(f"no manifest.json in docker save {tag}")
     finally:
         proc.kill()

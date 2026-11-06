@@ -461,6 +461,47 @@ def test_the_built_config_digest_is_read_from_the_streamed_manifest(
     assert proc.killed  # the rest of the stream is never read
 
 
+HEX = "c" * 64
+
+
+@pytest.mark.parametrize(
+    "config",
+    [f"blobs/sha256/{HEX}", f"{HEX}.json"],
+    ids=["containerd image store", "classic image store"],
+)
+def test_both_docker_archive_layouts_give_the_config_digest(
+    monkeypatch: pytest.MonkeyPatch, config: str
+) -> None:
+    manifest = json.dumps([{"Config": config, "Layers": []}]).encode()
+    _save(monkeypatch, {"manifest.json": manifest})
+    assert provenance.built_config_digest("t:1") == f"sha256:{HEX}"
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        f"blobs/sha256/{HEX[:-1]}",  # 63 characters
+        f"blobs/sha256/{HEX}0",  # 65
+        f"blobs/sha256/{'C' * 64}",  # uppercase
+        f"blobs/sha256/{'g' * 64}",  # not hex
+        f"{HEX[:-1]}.json",
+        f"{'g' * 64}.json",
+        f"{HEX}.txt",
+        f"blobs/sha512/{HEX}",
+        f"other/{HEX}",
+        f"blobs/sha256/{HEX}.json",  # both layouts at once
+        f"../{HEX}.json",
+        "",
+    ],
+)
+def test_a_config_that_is_not_64_lowercase_hex_in_a_known_layout_is_an_error(
+    monkeypatch: pytest.MonkeyPatch, config: str
+) -> None:
+    _save(monkeypatch, {"manifest.json": json.dumps([{"Config": config}]).encode()})
+    with pytest.raises(ValueError, match="unexpected Config"):
+        provenance.built_config_digest("t:1")
+
+
 @pytest.mark.parametrize(
     ("members", "match"),
     [
