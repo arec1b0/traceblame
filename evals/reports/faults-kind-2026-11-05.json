@@ -1906,6 +1906,18 @@
       }
     }
   },
+  "provenance": {
+    "agentic-rag": {
+      "dirty": "not recorded (predates #65)",
+      "app_dirty": "not recorded (predates #65)",
+      "phases": "not recorded (predates #65)"
+    },
+    "runbook-agent": {
+      "dirty": "not recorded (predates #65)",
+      "app_dirty": "not recorded (predates #65)",
+      "phases": "not recorded (predates #65)"
+    }
+  },
   "ledger": {
     "agentic-rag": {
       "sha256": "1b6096c914266269500aacb9fee984651bf55bb5b660a1e5ea5523dccf5d6df4",
