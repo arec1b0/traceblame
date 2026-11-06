@@ -79,6 +79,7 @@ extraPaths = [
 [[tool.pyright.executionEnvironments]]
 root = "tests/scripts"
 extraPaths = [
+    "tools/fixtures",
     "tools/fixtures/agentic_rag",
     "tools/fixtures/runbook_agent",
     "tools/faults",
@@ -95,6 +96,7 @@ minversion = "9.0"
 # tests/scripts imports those modules by the same names, and pyright's extraPaths match.
 # bench/gateway-scaling holds assembler_report.py; tools/faults the fault drivers' modules.
 pythonpath = [
+    "tools/fixtures",
     "tools/fixtures/agentic_rag",
     "tools/fixtures/runbook_agent",
     "tools/faults",

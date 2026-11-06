@@ -19,6 +19,7 @@ sys.path.insert(0, str(HERE))
 
 import checks  # noqa: E402
 import faultslib  # noqa: E402
+import provenance  # noqa: E402
 
 from traceblame_faults import kinds, ledger, plan  # noqa: E402
 
@@ -40,6 +41,7 @@ D1: dict[tuple[str, str], int] = {
     ("runbook-agent", "clean"): 40,
 }
 DUE = "2026-11-22"
+NOT_RECORDED = "not recorded (predates #65)"
 
 
 def loop_gate(check: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
@@ -228,6 +230,137 @@ def loads_by_kind(check: dict[str, Any], view: dict[str, Any]) -> dict[str, floa
     return {k: faultslib.median(v) for k, v in out.items()}
 
 
+def dirty_problems(s: dict[str, Any]) -> list[str]:
+    """A run built from a dirty checkout (the drivers refuse one; this catches an edited state)."""
+    out = [
+        f"the {what} checkout was dirty"
+        for what, key in (("traceblame", "dirty"), ("app", "app_dirty"))
+        if s.get(key) is True
+    ]
+    return out
+
+
+def provenance_info(s: dict[str, Any]) -> dict[str, Any]:
+    """The #65 fields of one app's state, or NOT_RECORDED for a run that predates them."""
+    return {
+        "dirty": s.get("dirty", NOT_RECORDED),
+        "app_dirty": s.get("app_dirty", NOT_RECORDED),
+        "phases": s.get("provenance") or NOT_RECORDED,
+    }
+
+
+def _flag(value: Any) -> str:
+    return str(value).lower() if isinstance(value, bool) else str(value)
+
+
+def _schema_cell(snap: dict[str, Any]) -> str:
+    cells: list[str] = []
+    for db, label in (("clickhouse", "ClickHouse"), ("postgres", "Postgres")):
+        rows = snap["migrations"][db]
+        digest = hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest()[:8]
+        cells.append(f"{label} {len(rows)} (`{digest}`)")
+    return ", ".join(cells)
+
+
+def _image_table(snap: dict[str, Any]) -> list[str]:
+    out = ["  | Role | Pods | Container | imageID |", "  |---|---|---|---|"]
+    for role, containers in snap["images"].items():
+        groups: dict[tuple[str, str], int] = {}
+        for c in containers:
+            groups[(c["container"], c["image_id"])] = (
+                groups.get((c["container"], c["image_id"]), 0) + 1
+            )
+        for (container, image_id), n in sorted(groups.items()):
+            out.append(f"  | {role} | {n} | {container} | `{image_id or '-'}` |")
+        if not containers:
+            out.append(f"  | {role} | 0 | - | - |")
+    return out
+
+
+def provenance_lines(app: str, s: dict[str, Any], info: dict[str, Any]) -> list[str]:
+    """Each app's provenance section: the dirty flag, what kind ran (pod imageID) and the
+    migrations both databases had applied, per phase, and whether they changed during it."""
+    dirty = (
+        f"traceblame {_flag(info['dirty'])}, app {_flag(info['app_dirty'])}"
+        if isinstance(info["dirty"], bool)
+        else f"{NOT_RECORDED}; the build refused a dirty checkout (`require_clean`)"
+    )
+    out = [f"- dirty flag at the build: {dirty}"]
+    phases = info["phases"]
+    built = s.get("build", {}).get("eval_image_id")
+    if not isinstance(phases, dict):
+        out += [
+            f"- applied migrations (ClickHouse and Postgres `schema_migrations`): {NOT_RECORDED}",
+            f"- pipeline image IDs (otel agent and gateway, trace-assembler, ClickHouse, NATS):"
+            f" {NOT_RECORDED}",
+        ]
+        if app == "runbook-agent":
+            out.append(f"- eval pod image ID: {NOT_RECORDED}; built eval_image_id `{built}`")
+        return out
+    phases = cast("dict[str, dict[str, Any]]", phases)
+    first = phases.get("run") or next(iter(phases.values()), None)
+    out += [
+        "- applied migrations and the images kind ran, read at the start and the end of each"
+        " phase (a change within a phase, or a read that found nothing, is a problem):",
+        "",
+        "  | Phase | Start | End | Applied migrations (count, list hash) at the end | Changed"
+        " within the phase | Problems |",
+        "  |---|---|---|---|---|---|",
+    ]
+    for name, rec in phases.items():
+        changed = "; ".join(provenance.changes(rec["start"], rec["end"])) or "none"
+        out.append(
+            f"  | {name} | {rec['start']['at']} | {rec['end']['at']} | {_schema_cell(rec['end'])}"
+            f" | {changed} | {len(provenance.phase_problems(rec))} |"
+        )
+    if first is not None:
+        mig = first["end"]["migrations"]
+        out += [
+            "",
+            f"  ClickHouse at the end of the {'run' if first is phases.get('run') else 'first'}"
+            f" phase: {_migrations_text(mig['clickhouse'])}",
+            "",
+            f"  Postgres: {_migrations_text(mig['postgres'])}",
+            "",
+            *_image_table(first["end"]),
+        ]
+    eval_rec = (phases.get("run") or {}).get("eval")
+    if eval_rec is not None:
+        pods = [c for sample in phases["run"]["eval_pods"] for c in sample["pods"]]
+        ids = sorted({c["image_id"] for c in pods})
+        node_ids = sorted({i for c in pods for i in c.get("node_config_ids", [])})
+        built_cfg = eval_rec.get("built_config_id")
+        verdict = (
+            "equal"
+            if built_cfg and node_ids == [built_cfg] and all(c.get("node_config_ids") for c in pods)
+            else "**not equal**"
+        )
+        out += [
+            "",
+            f"  Eval image of the run: `{eval_rec['image']}`. Proof: the config digest built"
+            f" `{built_cfg or 'not recorded'}` against the config digest the pods' nodes held for"
+            f" their image IDs (`crictl images`, matched on the pod's imageID)"
+            f" {', '.join(f'`{i}`' for i in node_ids) or 'none'}: {verdict}. Additional signals:"
+            f" the pods ran the built tag and kept the imageID"
+            + (" ".join(f" `{i}`" for i in ids) or " none")
+            + f" across {len(phases['run']['eval_pods'])} samples (one per deploy and one at the"
+            f" end). For reference, the build's `eval_image_id` is"
+            f" `{eval_rec['built_image_id']}`, an index digest that a node never reports"
+            " (ADR-0009).",
+        ]
+    return out
+
+
+def _migrations_text(rows: list[dict[str, str]]) -> str:
+    return (
+        "; ".join(
+            f"{m['version']} {m['name']} ({m['phase']}, {m['sha256']}, {m['applied_at']})"
+            for m in rows
+        )
+        or "none"
+    )
+
+
 def markdown(report: dict[str, Any]) -> str:
     out = [
         f"# Fault injection through kind: validation run ({report['date']})",
@@ -266,6 +399,7 @@ def markdown(report: dict[str, Any]) -> str:
                 " in the ledger from now on, and this run is not repeated for it)"
             ),
         ]
+        out += provenance_lines(app, s, report["provenance"][app])
         if app == "runbook-agent":
             out.append(f"- image guard {s['image_guard']}")
             out += preload_lines(report.get("preload"))
@@ -477,6 +611,11 @@ def main() -> int:
         for p in faultslib.content_problems(c["content_check"])
         if p not in c["problems"]
     ]
+    problems += [
+        f"{app}: {p}"
+        for app, s in states.items()
+        for p in dirty_problems(s) + provenance.run_problems(s.get("provenance"), app)
+    ]
     if not gate["passed"]:
         problems.append("step_memory_loss: loop signal below the gate; redesign before D1")
     requests: list[Any] = []
@@ -495,10 +634,13 @@ def main() -> int:
         "apps": per_app,
         "state": {
             app: {
-                k: v for k, v in s.items() if k not in ("app_dir", "archive", "embedding", "ollama")
+                k: v
+                for k, v in s.items()
+                if k not in ("app_dir", "archive", "embedding", "ollama", "provenance")
             }
             for app, s in states.items()
         },
+        "provenance": {app: provenance_info(s) for app, s in states.items()},
         "ledger": {
             app: {k: v for k, v in view.items() if k != "modes"} for app, view in views.items()
         },
