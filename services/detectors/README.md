@@ -12,14 +12,19 @@ A detector is a class in `src/traceblame_detectors/plugins/<name>/detector.py`, 
 
 ```python
 @dataclass(frozen=True)
-class Params:                      # behaviour params only: thresholds, windows, switches
+class Params:  # behaviour params only: thresholds, windows, switches
     min_score: float = 0.35
+
 
 class RetrievalMiss(Detector):
     spec = DetectorSpec(
-        name="retrieval_miss", code_version="1.0.0", component=Component.RETRIEVAL,
-        reads=Reads(span_kinds=frozenset({SpanKind.RETRIEVAL, SpanKind.LLM}),
-                    attrs=frozenset({"aegis.output.cited_doc_ids"})),
+        name="retrieval_miss",
+        code_version="1.0.0",
+        component=Component.RETRIEVAL,
+        reads=Reads(
+            span_kinds=frozenset({SpanKind.RETRIEVAL, SpanKind.LLM}),
+            attrs=frozenset({"aegis.output.cited_doc_ids"}),
+        ),
         params_type=Params,
     )
 
@@ -37,8 +42,10 @@ class RetrievalMiss(Detector):
 - **Output.** `FindingDraft(span_id, severity, score, evidence)`: one per span at most, score
   in [0, 1] (quantized to 1e-4), at most 64 per run. Evidence strings must be ids from the
   detector's own view (span ids, doc ids, tool names, models, finish reasons, args hashes,
-  bundle digests, providers) or values of its declared `evidence_enums`; anything else fails
-  the run (`evidence_rejected`). Never content.
+  bundle digests, providers), id-typed strings its own context returned
+  (`ServiceBaseline.bundle_digest`; golden doc ids, eval_only detectors only), or values of its
+  declared `evidence_enums`. Anything else, outcome names and values included, fails the run
+  (`evidence_rejected`). Never content.
 - **Failures.** A detector that raises or breaks the contract fails its own run
   (`status=error`, `error_kind` = a fixed reason or the exception class name, never its message).
 

@@ -49,6 +49,9 @@ class DetectorContext:
         self._baseline = baseline
         self._golden = golden
         self._used: list[dict[str, Any]] = []
+        # Id-typed strings the context returned, which evidence may repeat (engine.py).
+        self._baseline_digests: set[str] = set()
+        self._golden_ids: set[str] = set()
 
     def service_baseline(self, service: str, as_of_us: int) -> ServiceBaseline | None:
         self._require(ContextNeed.SERVICE_BASELINE)
@@ -57,6 +60,8 @@ class DetectorContext:
         value = (
             None if self._baseline is None else self._baseline.service_baseline(service, as_of_us)
         )
+        if value is not None:
+            self._baseline_digests.add(value.bundle_digest)
         self._used.append(
             {
                 "need": ContextNeed.SERVICE_BASELINE.value,
@@ -70,6 +75,8 @@ class DetectorContext:
     def golden_doc_ids(self) -> tuple[str, ...] | None:
         self._require(ContextNeed.EVAL_GOLDEN)
         value = None if self._golden is None else self._golden.golden_doc_ids(self._trace_id)
+        if value is not None:
+            self._golden_ids.update(value)
         self._used.append(
             {
                 "need": ContextNeed.EVAL_GOLDEN.value,
@@ -77,6 +84,11 @@ class DetectorContext:
             }
         )
         return value
+
+    def returned_ids(self, *, golden: bool) -> frozenset[str]:
+        """Id-typed strings this context returned: baseline bundle digests, and golden doc ids
+        when `golden` (eval_only detectors). Never outcome names or values."""
+        return frozenset(self._baseline_digests | (self._golden_ids if golden else set()))
 
     def used(self) -> list[dict[str, Any]]:
         """The answers given, in the order they were asked."""

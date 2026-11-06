@@ -25,7 +25,7 @@ VECTORS = Path(__file__).resolve().parents[1] / "vectors" / "v1.json"
 
 def test_the_framework_sources_match_the_lock_of_this_version() -> None:
     sources = framework_sources()
-    assert len(sources) == 4
+    assert len(sources) == 5
     assert framework_problems(load_lock(FRAMEWORK_LOCK), FRAMEWORK_VERSION, sources) == []
 
 

@@ -1,7 +1,7 @@
 """Version locks (#15): a change to what decides a finding's bytes needs a new version.
 
 - framework.lock.json pins, per FRAMEWORK_VERSION, the sha256 of the framework modules (engine,
-  view, canonical, policy). Changing one without a new version and a new lock entry fails.
+  view, canonical, policy, context). Changing one without a new version and a new lock entry fails.
 - plugins/versions.lock.json pins, per detector and code_version, the sha256 of the plugin's
   sources (plugins/<name>/*.py, tests excluded).
 
@@ -18,7 +18,7 @@ from typing import Any, cast
 from traceblame_detectors.api import Detector
 from traceblame_detectors.canonical import sha256_hex
 
-FRAMEWORK_MODULES = ("canonical.py", "engine.py", "policy.py", "view.py")
+FRAMEWORK_MODULES = ("canonical.py", "context.py", "engine.py", "policy.py", "view.py")
 FRAMEWORK_LOCK = "framework.lock.json"
 PLUGINS_LOCK = "plugins/versions.lock.json"
 

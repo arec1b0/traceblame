@@ -6,8 +6,9 @@ turns them into canonical findings. A detector that raises, or returns something
 its own run only (`status=error`, `error_kind` = a fixed reason or the exception class name,
 never its message).
 
-FRAMEWORK_VERSION covers this module, view.py, canonical.py and policy.py: what decides a
-finding's bytes besides the detector. framework.lock.json pins their sources per version.
+FRAMEWORK_VERSION covers this module, view.py, canonical.py, policy.py and context.py: what
+decides a finding's bytes (and which evidence is accepted) besides the detector.
+framework.lock.json pins their sources per version.
 """
 
 import math
@@ -174,7 +175,8 @@ def _run_one(view: TraceView, enabled: EnabledDetector, providers: Providers) ->
     findings: tuple[Finding, ...] = ()
     try:
         drafts = enabled.instance().detect(projection, ctx)
-        findings = _validate(projection, enabled, drafts, input_digest)
+        context_ids = ctx.returned_ids(golden=spec.eval_only)
+        findings = _validate(projection, enabled, drafts, input_digest, context_ids)
     except RejectedError as e:
         status, error_kind = RunStatus.ERROR, str(e)
     except Exception as e:  # a detector bug fails its own run only
@@ -201,11 +203,12 @@ def _validate(
     enabled: EnabledDetector,
     drafts: Sequence[FindingDraft],
     input_digest: str,
+    context_ids: frozenset[str] = frozenset(),
 ) -> tuple[Finding, ...]:
     if len(drafts) > MAX_FINDINGS_PER_RUN:
         raise RejectedError("too_many_findings")
     span_ids = {s.span_id for s in projection.spans} | {projection.root_span_id}
-    allowed = _evidence_strings(projection, enabled.spec.evidence_enums)
+    allowed = _evidence_strings(projection, enabled.spec.evidence_enums, context_ids)
     out: list[Finding] = []
     for d in drafts:
         if not isinstance(d, FindingDraft):  # pyright: ignore[reportUnnecessaryIsInstance]  # plugins are not type-checked at run time
@@ -239,11 +242,12 @@ def _validate(
 
 
 def _evidence_strings(
-    projection: TraceView, enums: Mapping[str, frozenset[str]]
+    projection: TraceView, enums: Mapping[str, frozenset[str]], context_ids: frozenset[str]
 ) -> dict[str | None, frozenset[str]]:
-    """Strings evidence may carry: ids from the detector's own view (key None: any evidence
-    key), and each key's declared enum values."""
-    ids: set[str] = {projection.root_span_id, projection.bundle_digest}
+    """Strings evidence may carry (key None: under any evidence key): ids from the detector's
+    own view, id-typed strings its own context returned (baseline bundle digests; golden doc
+    ids for eval_only detectors), and each key's declared enum values."""
+    ids: set[str] = {projection.root_span_id, projection.bundle_digest, *context_ids}
     for s in projection.spans:
         ids.update((s.span_id, s.tool_name, s.model, s.args_hash, s.bundle_digest, s.provider))
         ids.update(s.retrieved_doc_ids)

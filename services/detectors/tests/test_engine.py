@@ -305,3 +305,112 @@ def test_a_run_without_findings_has_the_empty_digest(make_config: Make) -> None:
     run = _run(make_config(reference_root={"params": {"min_spans": 99}}), _view())
     assert run.findings == ()
     assert run.findings_digest == "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+
+
+# --- evidence from the detector's own context (id-typed fields only) ---------------------------
+
+
+class _EmitsFromContext(Detector):
+    """Puts into evidence whatever `pick` takes from its context answers."""
+
+    pick: Callable[[DetectorContext, TraceView], dict[str, Any]]
+
+    def detect(self, trace: TraceView, ctx: DetectorContext) -> Sequence[FindingDraft]:
+        return [FindingDraft(trace.root_span_id, Severity.INFO, 0.5, self.pick(ctx, trace))]
+
+
+def _context_detector(
+    registry: dict[str, type[Detector]],
+    base: str,
+    pick: Callable[[DetectorContext, TraceView], dict[str, Any]],
+    mode: str = "production",
+) -> DetectorConfig:
+    spec = replace(registry[base].spec, name="ctx")
+    cls = type("Ctx", (_EmitsFromContext,), {"spec": spec, "pick": staticmethod(pick)})
+    return load_config({"mode": mode, "detectors": {"ctx": {}}}, {"ctx": cls})
+
+
+def _baseline(ctx: DetectorContext, trace: TraceView) -> ServiceBaseline:
+    found = ctx.service_baseline(trace.service, trace.start_us)
+    assert found is not None
+    return found
+
+
+BASELINES = Providers(baseline=StaticBaselineProvider([BASELINE]))
+
+
+def test_the_baseline_digest_the_context_returned_is_allowed_evidence(
+    registry: dict[str, type[Detector]],
+) -> None:
+    config = _context_detector(
+        registry,
+        "reference_baseline",
+        lambda ctx, t: {"baseline_digest": _baseline(ctx, t).bundle_digest},
+    )
+    run = _run(config, _view(), BASELINES)
+    assert run.status is RunStatus.OK, run.error_kind
+    assert run.findings[0].evidence_json() == '{"baseline_digest":"sha256:' + "b" * 64 + '"}'
+
+
+def _outcome_key(ctx: DetectorContext, t: TraceView) -> dict[str, Any]:
+    return {"outcome": next(iter(_baseline(ctx, t).outcomes))}
+
+
+def _outcome_value(ctx: DetectorContext, t: TraceView) -> dict[str, Any]:
+    return {"rate": str(_baseline(ctx, t).outcomes["tool_failure_rate"])}
+
+
+def _derived(ctx: DetectorContext, t: TraceView) -> dict[str, Any]:
+    return {"service": _baseline(ctx, t).service + "-x"}
+
+
+@pytest.mark.parametrize(
+    "pick",
+    [_outcome_key, _outcome_value, _derived],
+    ids=["outcome-key", "outcome-value", "derived"],
+)
+def test_other_strings_from_the_context_are_rejected(
+    registry: dict[str, type[Detector]],
+    pick: Callable[[DetectorContext, TraceView], dict[str, Any]],
+) -> None:
+    run = _run(_context_detector(registry, "reference_baseline", pick), _view(), BASELINES)
+    assert (run.status, run.error_kind) == (RunStatus.ERROR, "evidence_rejected")
+
+
+def test_a_baseline_digest_the_detector_did_not_get_is_rejected(
+    registry: dict[str, type[Detector]],
+) -> None:
+    # reference_root declares no baseline need: it never received the digest.
+    config = _context_detector(
+        registry, "reference_root", lambda ctx, t: {"d": BASELINE.bundle_digest}
+    )
+    run = _run(config, _view(), BASELINES)
+    assert (run.status, run.error_kind) == (RunStatus.ERROR, "evidence_rejected")
+
+
+class _Golden:
+    def golden_doc_ids(self, trace_id: str) -> tuple[str, ...] | None:
+        return ("cuad-ffffffffffff-1",)
+
+
+def test_golden_ids_are_evidence_for_an_eval_only_detector_in_eval_mode(
+    registry: dict[str, type[Detector]],
+) -> None:
+    def pick(ctx: DetectorContext, t: TraceView) -> dict[str, Any]:
+        return {"golden": tuple(ctx.golden_doc_ids() or ())}
+
+    config = _context_detector(registry, "reference_golden", pick, mode="eval")
+    run = _run(config, _view(), Providers(golden=_Golden()))
+    assert run.status is RunStatus.OK, run.error_kind
+    assert run.findings[0].evidence_json() == '{"golden":["cuad-ffffffffffff-1"]}'
+
+
+def test_a_golden_id_from_a_detector_that_is_not_eval_only_is_rejected(
+    registry: dict[str, type[Detector]],
+) -> None:
+    # Not eval_only: it gets no golden provider, so the id is not from its view or context.
+    config = _context_detector(
+        registry, "reference_root", lambda ctx, t: {"g": "cuad-ffffffffffff-1"}
+    )
+    run = _run(config, _view(), Providers(golden=_Golden()))
+    assert (run.status, run.error_kind) == (RunStatus.ERROR, "evidence_rejected")
