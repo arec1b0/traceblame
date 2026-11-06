@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import faultslib  # tools/faults, on pytest's pythonpath as at the driver's run time
+import kindlib
 import pytest
 import report
 
@@ -23,22 +24,28 @@ def work(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_a_new_run_is_written_once_with_its_seed_and_commit(work: Path) -> None:
-    run_id = faultslib.new_run(seed=11, commit=COMMIT, now=BEFORE)
+    run_id = faultslib.new_run(seed=11, commit=COMMIT, dirty=False, now=BEFORE)
     assert run_id == "faults-20261105-s11-abcdef0"
     assert json.loads((work / run_id / "run.json").read_text(encoding="utf-8")) == {
         "run_id": run_id,
         "seed": 11,
         "traceblame_commit": COMMIT,
+        "dirty": False,
         "created_at": "2026-11-05T23:59:59Z",
     }
+
+
+def test_the_dirty_flag_is_recorded_as_given_next_to_the_commit(work: Path) -> None:
+    run_id = faultslib.new_run(seed=11, commit=COMMIT, dirty=True, now=BEFORE)
+    assert faultslib.open_run(run_id)["dirty"] is True
 
 
 def test_phases_straddling_utc_midnight_with_another_seed_resolve_one_directory(
     work: Path,
 ) -> None:
     # prepare (agentic-rag) just before midnight, build (runbook-agent) and the report after.
-    run_id = faultslib.ensure_run(None, seed=11, commit=COMMIT, now=BEFORE)
-    later = faultslib.ensure_run(run_id, seed=11, commit=COMMIT, now=AFTER)
+    run_id = faultslib.ensure_run(None, seed=11, commit=COMMIT, dirty=False, now=BEFORE)
+    later = faultslib.ensure_run(run_id, seed=11, commit=COMMIT, dirty=False, now=AFTER)
     assert later == run_id
     assert faultslib.run_dir(later, "runbook-agent") == work / run_id / "runbook-agent"
     run = faultslib.open_run(run_id)
@@ -48,7 +55,7 @@ def test_phases_straddling_utc_midnight_with_another_seed_resolve_one_directory(
 
 
 def test_an_explicit_run_id_is_kept_as_given(work: Path) -> None:
-    run_id = faultslib.ensure_run("faults-mine", seed=7, commit=COMMIT, now=AFTER)
+    run_id = faultslib.ensure_run("faults-mine", seed=7, commit=COMMIT, dirty=False, now=AFTER)
     assert run_id == "faults-mine"
     assert faultslib.open_run("faults-mine")["seed"] == 7
 
@@ -58,9 +65,9 @@ def test_an_explicit_run_id_is_kept_as_given(work: Path) -> None:
     [(7, COMMIT, "seed"), (11, "f" * 40, "commit")],
 )
 def test_a_phase_with_another_seed_or_commit_is_refused(seed: int, commit: str, match: str) -> None:
-    run_id = faultslib.new_run(seed=11, commit=COMMIT, now=BEFORE)
+    run_id = faultslib.new_run(seed=11, commit=COMMIT, dirty=False, now=BEFORE)
     with pytest.raises(faultslib.RunError, match=match):
-        faultslib.ensure_run(run_id, seed=seed, commit=commit, now=AFTER)
+        faultslib.ensure_run(run_id, seed=seed, commit=commit, dirty=False, now=AFTER)
 
 
 def test_an_unknown_run_is_refused() -> None:
@@ -125,7 +132,7 @@ def test_faults_validate_computes_the_id_once_without_run_id() -> None:
 
 
 def test_every_phase_resolves_its_state_through_run_json(work: Path) -> None:
-    run_id = faultslib.new_run(seed=11, commit=COMMIT, now=BEFORE)
+    run_id = faultslib.new_run(seed=11, commit=COMMIT, dirty=False, now=BEFORE)
     d = faultslib.run_dir(run_id, "agentic-rag")
     d.mkdir(parents=True)
     (d / "state.json").write_text(json.dumps({"run_id": run_id, "seed": 11}), encoding="utf-8")
@@ -138,3 +145,12 @@ def test_every_phase_resolves_its_state_through_run_json(work: Path) -> None:
     (orphan / "state.json").write_text('{"run_id": "faults-orphan", "seed": 7}', encoding="utf-8")
     with pytest.raises(faultslib.RunError, match=r"no run\.json"):
         faultslib.load_state(orphan)
+
+
+def test_a_checkout_is_dirty_with_an_untracked_file_and_clean_without(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)  # noqa: S603, S607
+    assert kindlib.is_dirty(tmp_path) is False
+    (tmp_path / "new.txt").write_text("x", encoding="utf-8")
+    assert kindlib.is_dirty(tmp_path) is True
+    with pytest.raises(SystemExit, match="uncommitted changes"):
+        kindlib.require_clean(tmp_path)

@@ -14,7 +14,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import faultslib  # noqa: E402
-from kindlib import require_clean  # noqa: E402
+from kindlib import is_dirty, require_clean  # noqa: E402
 
 
 def main() -> int:
@@ -26,7 +26,8 @@ def main() -> int:
     if args.command == "new":
         seed = int(faultslib.config()["seed"])
         commit = require_clean(faultslib.ROOT)
-        print(faultslib.new_run(seed=seed, commit=commit, now=datetime.now(UTC)))
+        dirty = is_dirty(faultslib.ROOT)
+        print(faultslib.new_run(seed=seed, commit=commit, dirty=dirty, now=datetime.now(UTC)))
     else:
         print(faultslib.adopt_run(args.run_id)["run_id"])
     return 0

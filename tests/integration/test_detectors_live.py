@@ -633,7 +633,7 @@ def test_the_old_findings_read_returns_one_row_per_revision(
 ) -> None:
     """Code N-1's read (contract/findings_read.sql) on schema N: revision is in the sorting key,
     so FINAL keeps one row per revision of a span. The old read has no revision column and is
-    superseded by detectors_findings_current_read.sql (ADR-0009); nothing on main reads findings
+    superseded by detectors_findings_current_read.sql (ADR-0010); nothing on main reads findings
     besides this contract harness."""
     client = clickhouse.client(database)
     try:

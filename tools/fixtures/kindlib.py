@@ -32,8 +32,13 @@ def git(repo: Path, *args: str) -> str:
     return run(["git", "-C", str(repo), *args]).stdout.strip()
 
 
+def is_dirty(repo: Path) -> bool:
+    """Whether the checkout has uncommitted changes (untracked files count)."""
+    return bool(git(repo, "status", "--porcelain"))
+
+
 def require_clean(repo: Path) -> str:
-    if git(repo, "status", "--porcelain"):
+    if is_dirty(repo):
         raise SystemExit(f"capture: {repo} has uncommitted changes; provenance needs a commit")
     return git(repo, "rev-parse", "HEAD")
 

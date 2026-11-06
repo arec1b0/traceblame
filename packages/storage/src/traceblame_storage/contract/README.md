@@ -46,5 +46,5 @@ The detectors (#15) write `findings` with the new `revision` and `input_digest` 
 `findings_read.sql` predates revisions. On the new schema it returns one row per revision of a
 span (`revision` is in the sorting key, so `FINAL` keeps each, and the read does not select it).
 Its only caller is this contract's own harness; it is superseded by
-`tests/integration/detectors_findings_current_read.sql` (ADR-0009 draft), which reads through
+`tests/integration/detectors_findings_current_read.sql` (ADR-0010 draft), which reads through
 the `detector_runs` marker, and is replaced by it when that read moves here.

@@ -18,6 +18,10 @@ flock /tmp/traceblame-kind.lock -c '...'):
   check    (kind)     as for agentic-rag (faultslib.check_run), content: alert text and prompts
   content  (kind)     only the content check of a finished run (read-only): every stored row
                       of its traces in every table with a trace_id, and the run's files
+
+Every kind phase records the images kind ran and both databases' applied migrations at its
+start and its end (provenance.py, #65); a change in between or an empty read is a problem.
+The run phase also samples the eval pod after each deploy.
 """
 
 import argparse
@@ -42,8 +46,17 @@ sys.path.insert(0, str(HERE))
 import capture as common  # noqa: E402
 import capture_runbook_agent as rb  # noqa: E402
 import faultslib  # noqa: E402
+import provenance  # noqa: E402
 import scenarios  # noqa: E402
-from kindlib import check_model, kubectl, require_clean, run, spans_of, tenant_password  # noqa: E402
+from kindlib import (  # noqa: E402
+    check_model,
+    is_dirty,
+    kubectl,
+    require_clean,
+    run,
+    spans_of,
+    tenant_password,
+)
 
 from traceblame_faults import bundle, kinds, ledger, plan, record, scenario  # noqa: E402
 
@@ -154,8 +167,9 @@ def build(args: argparse.Namespace) -> int:
     app_dir: Path = args.app_dir.resolve()
     traceblame_commit = require_clean(ROOT)
     app_commit = require_clean(app_dir)
+    dirty = is_dirty(ROOT)
     run_id = faultslib.ensure_run(
-        args.run_id, seed=seed, commit=traceblame_commit, now=datetime.now(UTC)
+        args.run_id, seed=seed, commit=traceblame_commit, dirty=dirty, now=datetime.now(UTC)
     )
     d = faultslib.run_dir(run_id, APP)
     d.mkdir(parents=True, exist_ok=True)
@@ -172,6 +186,9 @@ def build(args: argparse.Namespace) -> int:
         run(["docker", "build", "--quiet", "--tag", eval_tag, str(ctx)])
     guard = image_guard(built["image"], eval_tag)
     eval_id = run(["docker", "image", "inspect", "--format", "{{.Id}}", eval_tag]).stdout.strip()
+    # The config digest is the identifier kind's containerd shares with Docker (ADR-0009): the
+    # run phase compares it with what the eval pod's node holds.
+    eval_config_id = provenance.built_config_digest(eval_tag)
     baseline_text = triage_prompt(app_dir, app_commit)
     baseline = bundle.digest(APP, {"system": baseline_text})
     tasks = _tasks(seed, rcfg)
@@ -204,10 +221,14 @@ def build(args: argparse.Namespace) -> int:
         "built_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "host_cpus": os.cpu_count(),
         "traceblame_commit": traceblame_commit,
+        "dirty": dirty,
         "app_commit": app_commit,
+        "app_dirty": is_dirty(app_dir),
+        "provenance": {},  # images and migrations per kind phase (provenance.py, #65)
         "seed": seed,
         "config": rcfg,
-        "build": built | {"eval_image": eval_tag, "eval_image_id": eval_id},
+        "build": built
+        | {"eval_image": eval_tag, "eval_image_id": eval_id, "eval_config_id": eval_config_id},
         "image_guard": guard,
         "preload_sha256": common.sha256(PRELOAD),
         "baseline_digest": baseline,
@@ -315,6 +336,17 @@ def run_phase(args: argparse.Namespace) -> int:
     d = faultslib.run_dir(args.run_id, APP)
     state = faultslib.load_state(d)
     seed = int(state["seed"])
+    prov = provenance.begin(
+        state,
+        "run",
+        kubectl=kubectl,
+        log=log,
+        eval_image=provenance.EvalImage(
+            state["build"]["eval_image"],
+            state["build"]["eval_image_id"],
+            state["build"].get("eval_config_id"),
+        ),
+    )
     ollama = common.resolve_ollama(args.ollama_url)
     check_model(ollama)
     server_version = common.get_json(f"{ollama}/api/version")["version"]
@@ -392,6 +424,7 @@ def run_phase(args: argparse.Namespace) -> int:
         if not block:
             continue
         rb.deploy_agent(build, base_env | {"TRACEBLAME_BUNDLE_DIGEST": digest})
+        prov.eval_pod(digest[:15])  # the pod that runs this block's tasks, as kind ran it
         probes = rb.safety_probes()
         safety.append(
             {"bundle_digest": digest, "failed": [p["check"] for p in probes if not p["ok"]]}
@@ -463,6 +496,8 @@ def run_phase(args: argparse.Namespace) -> int:
         "safety": safety,
         "problems": problems,
     }
+    prov.eval_pod("end")
+    prov.end()
     faultslib.save_state(d, state)
     return 0
 
@@ -470,8 +505,10 @@ def run_phase(args: argparse.Namespace) -> int:
 def record_phase(args: argparse.Namespace) -> int:
     d = faultslib.run_dir(args.run_id, APP)
     state = faultslib.load_state(d)
+    prov = provenance.begin(state, "record", kubectl=kubectl, log=log)
     with faultslib.clickhouse_client() as client:
         state["record"] = record.record(client, ledger.read(d / "ledger.jsonl"))
+    prov.end()
     faultslib.save_state(d, state)
     log(f"recorded {state['record']}")
     return 0
@@ -505,11 +542,14 @@ def check_phase(args: argparse.Namespace) -> int:
     cfg = faultslib.config()
     d = faultslib.run_dir(args.run_id, APP)
     state = faultslib.load_state(d)
+    prov = provenance.begin(state, "check", kubectl=kubectl, log=log)
     result = faultslib.check_run(
         APP, d, state, cfg, golden=lambda _: (), content=_content(d, state), log=log
     )
     result["problems"] += state["run"].get("problems", [])
     (d / "check.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    prov.end()
+    faultslib.save_state(d, state)
     log(f"check: {len(result['problems'])} problems")
     return 0
 
@@ -517,7 +557,10 @@ def check_phase(args: argparse.Namespace) -> int:
 def content_phase(args: argparse.Namespace) -> int:
     d = faultslib.run_dir(args.run_id, APP)
     state = faultslib.load_state(d)
+    prov = provenance.begin(state, "content", kubectl=kubectl, log=log)
     check = faultslib.recheck_content(d, _content(d, state), log)
+    prov.end()
+    faultslib.save_state(d, state)
     log(f"content: {check['content_check']}")
     return 0
 

@@ -1,4 +1,4 @@
-# ADR-0009: Detector findings: revisions, run markers and params-derived versions
+# ADR-0010: Detector findings: revisions, run markers and params-derived versions
 
 - **Status:** Proposed
 - **Date:** 2026-11-06

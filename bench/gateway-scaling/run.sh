@@ -121,16 +121,9 @@ pg() { "${KCTL[@]}" -n traceblame exec postgres-0 -- env PGPASSWORD="${pg_passwo
 # The applied migrations of both databases (ADR-0004, ADR-0007): another session may apply an
 # expand migration this checkout does not have (code N runs on schema N+1 expand), so the
 # report names the schema each run saw, at its start and at the end of its load.
-ch_schema() {
-  ch "SELECT arrayStringConcat(arraySort(groupArray(concat(leftPad(toString(version), 4, '0'), ' ', name,
-        ' (', phase, ', ', substring(sha256, 1, 12), ', ', formatDateTime(applied_at, '%FT%TZ', 'UTC'), ')'))), '; ')
-      FROM schema_migrations"
-}
-pg_schema() {
-  pg "SELECT string_agg(format('%s %s (%s, %s, %s)', lpad(version::text, 4, '0'), name, phase, left(sha256, 12),
-        to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')), '; ' ORDER BY version)
-      FROM schema_migrations"
-}
+# The queries are shared with the fault drivers (tools/faults/provenance.py reads the same files).
+ch_schema() { ch "$(<"${ROOT}/tools/provenance/clickhouse_schema.sql")"; }
+pg_schema() { pg "$(<"${ROOT}/tools/provenance/postgres_schema.sql")"; }
 beyond() { # applied versions (from a schema list) without a migration file in this checkout
   local dir="${ROOT}/packages/storage/src/traceblame_storage/migrations/$1" v out=""
   for v in $(tr ';' '\n' <<<"$2" | awk 'NF {print $1}'); do
