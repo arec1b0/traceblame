@@ -36,9 +36,10 @@ app overhead p95 <= 3%, pipeline lag p95 <= 60 s.
 7. Self-telemetry pipeline is separate from the analysed pipeline (no recursion).
 8. Thresholds in the design are starting hypotheses: keep them in config, not hardcoded.
 9. Ground truth never feeds attribution: detectors and the attributor must not read
-   aegis.eval.run.id, aegis.fault.injection.id, injections or eval_traces. golden_doc_ids are
-   read only by explicitly eval-only features; reports show metrics with and without them,
-   and production config excludes them.
+   aegis.eval.run.id, aegis.fault.injection.id, injections, eval_traces or eval_exclusions.
+   golden_doc_ids are read only by explicitly eval-only features; reports show metrics with
+   and without them, and production config excludes them. Ground truth is joined from
+   eval_traces.trace_id, never by injection id alone.
 10. No silent-loss settings: inserts stay acknowledged (never wait_for_async_insert=0, never
     fire-and-forget exporters); a fix that trades acknowledgement for speed needs an ADR.
 
@@ -161,8 +162,20 @@ Run from WSL2 (Ubuntu) in the repo root; never run `make` or `uv` from Windows i
   `evals/reports/faults-kind-*`; thresholds in `tools/faults/validation.yaml`. A run id is
   computed once (`RUN_ID`, or `tools/faults/run_id.py new`) into `.tools/faults/<run>/run.json`;
   every phase and the report resolve the run through it (`run_id.py adopt` for older runs)
-- `uv run traceblame-faults scenarios check|plan|check-ledger|record|digest`: the fault library's
-  CLI (`packages/faults`; scenarios in `src/traceblame_faults/scenarios/`)
+- `make faults-d1 PLAN=d1|smoke [RUN_ID=...]`: a resumable fault run of a committed plan file
+  (`tools/faults/plans/`, #70) over both apps, then the report (`evals/reports/faults-<plan>-kind-*`).
+  Without `RUN_ID` it creates the run; with `RUN_ID` it resumes it (finished entries skipped,
+  traces in flight at a kill recorded as abandoned in `eval_exclusions`, a changed provenance
+  refused: new run id). Only its kind phases take the lock; never wrap the target in it. Output
+  is appended to `.tools/faults/<run>/run.log`. The run directory is in the checkout that
+  started the run
+- `make faults-progress RUN_ID=...`: a run's progress and ETA (`tools/faults/progress.py`;
+  read-only, no kind, no lock)
+- `uv run --frozen python tools/faults/d1_queries.py generate|check --app-dir ../agentic-rag`:
+  the committed D1 query list with each query's split side, and the validation queries D1
+  excludes (`tools/faults/plans/README.md`; no kind, no model server)
+- `uv run traceblame-faults scenarios check|plan|check-ledger|record|digest|dataset`: the fault
+  library's CLI (`packages/faults`; scenarios in `src/traceblame_faults/scenarios/`)
 - `uv run --frozen traceblame-detectors run-offline|snapshot-export|versions`: the detectors over a
   frozen snapshot (JSON lines, or ClickHouse in production mode only; `mode: eval` never writes
   ClickHouse), a snapshot export through the contract reads, each detector's params-derived
