@@ -38,6 +38,21 @@ Its statements on `eval_traces`, new in this schema, are not here yet: they live
 embeds a copy of each (`packages/faults/src/traceblame_faults/sql/`, checked by
 `tests/contract/test_faults_sql_copies.py`). They move here once the table is on main.
 
+A resumable fault run (#70) adds `eval_exclusions`, the traces of a run that completed no plan
+entry (killed in flight, a torn ledger line, an entry that ended without a record). Its
+statements and the eval reads are not here yet either: `tests/integration/eval_exclusions_write.sql`
+and `eval_exclusions_read.sql`, `eval_dataset_read.sql` (the labelled traces of a run),
+`eval_run_traces_read.sql` (every stored trace of one app under a run's marker: the orphan
+sweep) and `eval_injections_by_id_read.sql`, embedded in `traceblame-faults` and checked by the
+same contract test.
+- **Join ground truth from `eval_traces.trace_id`, never on the injection id alone.** After a
+  resume the spans of an abandoned trace carry the same `aegis.fault.injection.id` as the
+  completed trace of the entry. `eval_dataset_read.sql` joins `injections` on
+  `(trace_id, injection_id)` and is the only label read.
+- An abandoned trace is never in `eval_traces` or `injections`: `record` writes one
+  `eval_traces` row per ledger line, a ledger line exists only for a trace that has ended, and
+  `record` refuses a ledger that names an abandoned trace.
+
 The detectors (#15) write `findings` with the new `revision`, `input_digest` and `run_digest`
 columns, and `detector_runs` and `detector_params`, all new in this schema: those statements
 live in `tests/integration/detectors_*.sql`, embedded in `traceblame_detectors/sql/` (checked by

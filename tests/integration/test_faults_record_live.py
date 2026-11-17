@@ -74,8 +74,9 @@ def test_record_is_idempotent_and_joins_the_marked_span(
     try:
         migrate(client, packaged())
         records = [CLEAN, APPLIED, NOT_REACHED]
-        assert record.record(client, records) == {"eval_traces": 3, "injections": 1}
-        assert record.record(client, records) == {"eval_traces": 3, "injections": 1}
+        counts = {"eval_traces": 3, "injections": 1, "eval_exclusions": 0}
+        assert record.record(client, records) == counts
+        assert record.record(client, records) == counts
 
         read = record.statement("eval_traces_read.sql")
         rows = client.query_rows(read, {"eval_run_id": RUN})
