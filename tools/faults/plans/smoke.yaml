@@ -1,0 +1,37 @@
+# The resume smoke (#70): the smallest run of both apps that covers every fault kind, for a
+# live kill and resume on kind (`make faults-d1 PLAN=smoke`). Seed 7 and validation's CUAD
+# sampling: its queries come from the validation pool, which D1 excludes, so the smoke never
+# uses a D1 query. No split.
+seed: 7
+
+agentic_rag:
+  # One query: clean and every fault kind (7 traces).
+  n: 24
+  ratio: 0.5
+  queries: 1
+  clean: 1
+  counts:
+    golden_context_removed: 1
+    tool_failure: 1
+    output_budget_exhausted: 1
+    step_memory_loss: 1
+    malformed_output: 1
+    prompt_variant: 1
+
+runbook_agent:
+  # latency only: an oom task waits 11 min for its pod to age.
+  scenarios: [latency]
+  per_scenario: 3
+  clean: 1
+  counts:
+    malformed_output: 1
+    prompt_variant: 1
+  approval_timeout_ms: 30000
+
+loop:
+  repeat_min: 3
+  hit_rate_min: 0.6
+
+settle_seconds: 300
+assemble_seconds: 300
+orphan_slack_seconds: 5
