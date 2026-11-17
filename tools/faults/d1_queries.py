@@ -52,6 +52,15 @@ def log(msg: str) -> None:
     print(f"d1-queries: {msg}", file=sys.stderr, flush=True)
 
 
+def pinned_uv() -> str:
+    """The uv pinned in tools/versions.env (.tools/bin/uv), not whichever is first on PATH: an
+    older global uv cannot build the fault library into the capture environment."""
+    path = ROOT / ".tools" / "bin" / "uv"
+    if not path.is_file():
+        raise SystemExit(f"d1-queries: no pinned uv at {path}: run make bootstrap, or set UV")
+    return str(path)
+
+
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
@@ -198,7 +207,7 @@ def main() -> int:
     parser.add_argument("--app-dir", type=Path, required=True, help="the agentic-rag checkout")
     args = parser.parse_args()
     app_dir: Path = args.app_dir.resolve()
-    uv = os.environ.get("UV", "uv")
+    uv = os.environ.get("UV") or pinned_uv()
     require_clean(app_dir)
     if args.command == "generate":
         require_clean(ROOT)  # the generator commit the lock records must hold the generator

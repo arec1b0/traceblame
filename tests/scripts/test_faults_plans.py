@@ -7,7 +7,6 @@ and fails on zero.
 """
 
 import json
-import shutil
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -295,16 +294,19 @@ def test_the_lists_regenerate_byte_identically(lock: dict[str, Any]) -> None:
     environment: tools/faults/d1_queries.py check, in process (about 20 s)."""
     app_dir = ROOT.parent / "agentic-rag"
     archive = rag.CACHE / "cuad" / "data.zip"
+    uv = ROOT / ".tools" / "bin" / "uv"  # the pinned one, never whichever uv is on PATH
     missing = [
-        str(p) for p in (archive, app_dir / ".git", rag.VENV / "bin" / "python") if not p.exists()
+        str(p)
+        for p in (archive, app_dir / ".git", rag.VENV / "bin" / "python", uv)
+        if not p.exists()
     ]
-    if missing or shutil.which("uv") is None:
-        pytest.skip(f"needs uv and {missing or 'nothing else'}: run d1_queries.py check there")
+    if missing:
+        pytest.skip(f"needs {missing}: run d1_queries.py check where they are")
     at = kindlib.git(app_dir, "rev-parse", "HEAD")
     if at != lock["agentic_rag_commit"] or kindlib.is_dirty(app_dir):
         pytest.skip(f"agentic-rag is at {at[:12]}, the list was generated at the lock's commit")
     compared, different = d1_queries.compare(
-        d1_queries.compute("d1", app_dir, "uv", committed=False)
+        d1_queries.compute("d1", app_dir, str(uv), committed=False)
     )
     print(f"{compared} queries regenerated and compared")
     assert different == []
