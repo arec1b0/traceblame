@@ -1,0 +1,200 @@
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"AFSALABANCORPINC_08_01_1996-EX-1.1-AGENCY AGREEMENT__Governing Law","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"AFSALABANCORPINC_08_01_1996-EX-1.1-AGENCY AGREEMENT__Revenue/Profit Sharing","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","step_memory_loss"],"query_ref":"AIRSPANNETWORKSINC_04_11_2000-EX-10.5-Distributor Agreement__License Grant","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","tool_failure"],"query_ref":"AIRSPANNETWORKSINC_04_11_2000-EX-10.5-Distributor Agreement__Most Favored Nation","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","step_memory_loss"],"query_ref":"AIRSPANNETWORKSINC_04_11_2000-EX-10.5-Distributor Agreement__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"AIRSPANNETWORKSINC_04_11_2000-EX-10.5-Distributor Agreement__Post-Termination Services","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"ALCOSTORESINC_12_14_2005-EX-10.26-AGENCY AGREEMENT__Parties","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","step_memory_loss"],"query_ref":"AMBASSADOREYEWEARGROUPINC_11_17_1997-EX-10.28-ENDORSEMENT AGREEMENT__Effective Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","prompt_variant","step_memory_loss"],"query_ref":"AMBASSADOREYEWEARGROUPINC_11_17_1997-EX-10.28-ENDORSEMENT AGREEMENT__License Grant","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","step_memory_loss"],"query_ref":"AgapeAtpCorp_20191202_10-KA_EX-10.1_11911128_EX-10.1_Supply Agreement__Non-Compete","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"ArconicRolledProductsCorp_20191217_10-12B_EX-2.7_11923804_EX-2.7_Trademark License Agreement__Audit Rights","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"ArconicRolledProductsCorp_20191217_10-12B_EX-2.7_11923804_EX-2.7_Trademark License Agreement__Effective Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","prompt_variant","tool_failure"],"query_ref":"BABCOCK_WILCOXENTERPRISES,INC_08_04_2015-EX-10.17-INTELLECTUAL PROPERTY AGREEMENT between THE BABCOCK _ WILCOX COMPANY and BABCOCK _ WILCOX ENTERPRISES, INC.__Effective Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"BABCOCK_WILCOXENTERPRISES,INC_08_04_2015-EX-10.17-INTELLECTUAL PROPERTY AGREEMENT between THE BABCOCK _ WILCOX COMPANY and BABCOCK _ WILCOX ENTERPRISES, INC.__Exclusivity","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","step_memory_loss","tool_failure"],"query_ref":"BIOPURECORP_06_30_1999-EX-10.13-AGENCY AGREEMENT__Effective Date","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","step_memory_loss","tool_failure"],"query_ref":"BIOPURECORP_06_30_1999-EX-10.13-AGENCY AGREEMENT__Warranty Duration","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","tool_failure"],"query_ref":"BOLIVARMININGCORP_05_23_2003-EX-2.1-VISP WEB SITE BUILDING AND HOSTING AGREEMENT__Liquidated Damages","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"BerkshireHillsBancorpInc_20120809_10-Q_EX-10.16_7708169_EX-10.16_Endorsement Agreement__Non-Compete","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","step_memory_loss"],"query_ref":"BizzingoInc_20120322_8-K_EX-10.17_7504499_EX-10.17_Endorsement Agreement__Anti-Assignment","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"BizzingoInc_20120322_8-K_EX-10.17_7504499_EX-10.17_Endorsement Agreement__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"CENTRACKINTERNATIONALINC_10_29_1999-EX-10.3-WEB SITE HOSTING AGREEMENT__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","prompt_variant","tool_failure"],"query_ref":"CENTRACKINTERNATIONALINC_10_29_1999-EX-10.3-WEB SITE HOSTING AGREEMENT__Renewal Term","split":"calib"}
+{"app":"agentic-rag","kinds":["clean"],"query_ref":"CHERRYHILLMORTGAGEINVESTMENTCORP_09_26_2013-EX-10.1-Strategic Alliance Agreement__Governing Law","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"CYBERIANOUTPOSTINC_07_09_1998-EX-10.13-PROMOTION AGREEMENT__Governing Law","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant"],"query_ref":"Columbia Laboratories, (Bermuda) Ltd. - AMEND NO. 2 TO MANUFACTURING AND SUPPLY AGREEMENT__Document Name","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","step_memory_loss"],"query_ref":"Columbia Laboratories, (Bermuda) Ltd. - AMEND NO. 2 TO MANUFACTURING AND SUPPLY AGREEMENT__Insurance","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"DovaPharmaceuticalsInc_20181108_10-Q_EX-10.2_11414857_EX-10.2_Promotion Agreement__Covenant Not To Sue","split":"test"}
+{"app":"agentic-rag","kinds":["clean","step_memory_loss"],"query_ref":"DovaPharmaceuticalsInc_20181108_10-Q_EX-10.2_11414857_EX-10.2_Promotion Agreement__Ip Ownership Assignment","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"DovaPharmaceuticalsInc_20181108_10-Q_EX-10.2_11414857_EX-10.2_Promotion Agreement__Minimum Commitment","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"DovaPharmaceuticalsInc_20181108_10-Q_EX-10.2_11414857_EX-10.2_Promotion Agreement__No-Solicit Of Employees","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"DovaPharmaceuticalsInc_20181108_10-Q_EX-10.2_11414857_EX-10.2_Promotion Agreement__Revenue/Profit Sharing","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","step_memory_loss"],"query_ref":"EMERALDHEALTHTHERAPEUTICSINC_06_10_2020-EX-4.5-CONSULTING AGREEMENT - DR. GAETANO MORELLO N.D. INC.__Anti-Assignment","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","step_memory_loss"],"query_ref":"EbixInc_20010515_10-Q_EX-10.3_4049767_EX-10.3_Co-Branding Agreement__Agreement Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"EcoScienceSolutionsInc_20180406_8-K_EX-10.1_11135398_EX-10.1_Sponsorship Agreement__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","tool_failure"],"query_ref":"FreezeTagInc_20180411_8-K_EX-10.1_11139603_EX-10.1_Sponsorship Agreement__License Grant","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"GOOSEHEADINSURANCE,INC_04_02_2018-EX-10.6-Franchise Agreement__Insurance","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant"],"query_ref":"GOOSEHEADINSURANCE,INC_04_02_2018-EX-10.6-Franchise Agreement__License Grant","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","step_memory_loss","tool_failure"],"query_ref":"GOOSEHEADINSURANCE,INC_04_02_2018-EX-10.6-Franchise Agreement__Non-Transferable License","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"GSITECHNOLOGYINC_11_16_2009-EX-10.2-INTELLECTUAL PROPERTY AGREEMENT between SONY ELECTRONICS INC. and GSI TECHNOLOGY, INC.__Document Name","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"GpaqAcquisitionHoldingsInc_20200123_S-4A_EX-10.8_11951679_EX-10.8_Service Agreement__Insurance","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"GpaqAcquisitionHoldingsInc_20200123_S-4A_EX-10.8_11951679_EX-10.8_Service Agreement__Non-Disparagement","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant"],"query_ref":"GpaqAcquisitionHoldingsInc_20200123_S-4A_EX-10.8_11951679_EX-10.8_Service Agreement__Parties","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","tool_failure"],"query_ref":"GridironBionutrientsInc_20171206_8-K_EX-10.1_10972555_EX-10.1_Endorsement Agreement__Exclusivity","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","step_memory_loss"],"query_ref":"HALITRON,INC_03_01_2005-EX-10.15-SPONSORSHIP AND DEVELOPMENT AGREEMENT__Exclusivity","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"HALITRON,INC_03_01_2005-EX-10.15-SPONSORSHIP AND DEVELOPMENT AGREEMENT__Expiration Date","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss"],"query_ref":"HEMISPHERX - Sales, Marketing, Distribution, and Supply Agreement__Covenant Not To Sue","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted"],"query_ref":"HEMISPHERX - Sales, Marketing, Distribution, and Supply Agreement__Effective Date","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","step_memory_loss","tool_failure"],"query_ref":"HEMISPHERX - Sales, Marketing, Distribution, and Supply Agreement__License Grant","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"HEMISPHERX - Sales, Marketing, Distribution, and Supply Agreement__Post-Termination Services","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","tool_failure"],"query_ref":"HERTZGLOBALHOLDINGS,INC_07_07_2016-EX-10.4-INTELLECTUAL PROPERTY AGREEMENT__Governing Law","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"HERTZGLOBALHOLDINGS,INC_07_07_2016-EX-10.4-INTELLECTUAL PROPERTY AGREEMENT__License Grant","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","step_memory_loss"],"query_ref":"HPILHOLDING_01_07_2015-EX-99.1-COOPERATION AGREEMENT__Cap On Liability","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"HPILHOLDING_01_07_2015-EX-99.1-COOPERATION AGREEMENT__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"HfEnterprisesInc_20191223_S-1_EX-10.22_11931299_EX-10.22_Development Agreement__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss"],"query_ref":"ICORECONNECTINC_10_13_2010-EX-7.1-Strategic Alliance Agreement__Renewal Term","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","step_memory_loss"],"query_ref":"IMPCOTECHNOLOGIESINC_04_15_2003-EX-10.65-JOINT VENTURE AGREEMENT__Document Name","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"IMPCOTECHNOLOGIESINC_04_15_2003-EX-10.65-JOINT VENTURE AGREEMENT__Effective Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","step_memory_loss","tool_failure"],"query_ref":"INGEVITYCORP_05_16_2016-EX-10.5-INTELLECTUAL PROPERTY AGREEMENT__Post-Termination Services","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"IntegrityMediaInc_20010329_10-K405_EX-10.17_2373875_EX-10.17_Co-Branding Agreement__License Grant","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","tool_failure"],"query_ref":"LOOKSMARTLTD_07_20_2012-EX-99.(D)(I)-SPONSORSHIP AGREEMENT__Document Name","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"LOOKSMARTLTD_07_20_2012-EX-99.(D)(I)-SPONSORSHIP AGREEMENT__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"LohaCompanyltd_20191209_F-1_EX-10.16_11917878_EX-10.16_Supply Agreement__Document Name","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","tool_failure"],"query_ref":"MERITLIFEINSURANCECO_06_19_2020-EX-10.(XIV)-MASTER SERVICES AGREEMENT__Agreement Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","step_memory_loss","tool_failure"],"query_ref":"MERITLIFEINSURANCECO_06_19_2020-EX-10.(XIV)-MASTER SERVICES AGREEMENT__Ip Ownership Assignment","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","step_memory_loss"],"query_ref":"MERITLIFEINSURANCECO_06_19_2020-EX-10.(XIV)-MASTER SERVICES AGREEMENT__Uncapped Liability","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","step_memory_loss"],"query_ref":"MphaseTechnologiesInc_20030911_10-K_EX-10.15_1560667_EX-10.15_Co-Branding Agreement__Anti-Assignment","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"MphaseTechnologiesInc_20030911_10-K_EX-10.15_1560667_EX-10.15_Co-Branding Agreement__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","step_memory_loss"],"query_ref":"MusclepharmCorp_20170208_10-KA_EX-10.38_9893581_EX-10.38_Co-Branding Agreement__Exclusivity","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","tool_failure"],"query_ref":"MusclepharmCorp_20170208_10-KA_EX-10.38_9893581_EX-10.38_Co-Branding Agreement__Parties","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant"],"query_ref":"N2KINC_10_16_1997-EX-10.16-SPONSORSHIP AGREEMENT__Effective Date","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"N2KINC_10_16_1997-EX-10.16-SPONSORSHIP AGREEMENT__Minimum Commitment","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"NOVOINTEGRATEDSCIENCES,INC_12_23_2019-EX-10.1-JOINT VENTURE AGREEMENT__Anti-Assignment","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant"],"query_ref":"PACIRA PHARMACEUTICALS, INC. - A_R STRATEGIC LICENSING, DISTRIBUTION AND MARKETING AGREEMENT __Expiration Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"PACIRA PHARMACEUTICALS, INC. - A_R STRATEGIC LICENSING, DISTRIBUTION AND MARKETING AGREEMENT __Termination For Convenience","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"PLAYAHOTELS_RESORTSNV_03_14_2017-EX-10.22-STRATEGIC ALLIANCE AGREEMENT (Hyatt Ziva Cancun)__Cap On Liability","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"PRECIGEN,INC_01_22_2020-EX-99.1-JOINT FILING AGREEMENT__Document Name","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","tool_failure"],"query_ref":"PRIMEENERGYRESOURCESCORP_04_02_2007-EX-10.28-COMPLETION AND LIQUIDITY MAINTENANCE AGREEMENT__Document Name","split":"test"}
+{"app":"agentic-rag","kinds":["clean","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"PROFOUNDMEDICALCORP_08_29_2019-EX-4.5-SUPPLY AGREEMENT__Document Name","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","step_memory_loss","tool_failure"],"query_ref":"PROFOUNDMEDICALCORP_08_29_2019-EX-4.5-SUPPLY AGREEMENT__Expiration Date","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss"],"query_ref":"PROFOUNDMEDICALCORP_08_29_2019-EX-4.5-SUPPLY AGREEMENT__License Grant","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","step_memory_loss"],"query_ref":"PROFOUNDMEDICALCORP_08_29_2019-EX-4.5-SUPPLY AGREEMENT__Non-Transferable License","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss"],"query_ref":"PROFOUNDMEDICALCORP_08_29_2019-EX-4.5-SUPPLY AGREEMENT__Post-Termination Services","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"PaperexchangeComInc_20000322_S-1A_EX-10.4_5202103_EX-10.4_Co-Branding Agreement__License Grant","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"PhotronicsInc_20171219_10-QA_EX-10.28_10982650_EX-10.28_Outsourcing Agreement__Uncapped Liability","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"Quaker Chemical Corporation - NON COMPETITION AND NON SOLICITATION AGREEMENT__Agreement Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss"],"query_ref":"RMRGROUPINC_01_22_2020-EX-99.1-JOINT FILING AGREEMENT__Agreement Date","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"RitterPharmaceuticalsInc_20200313_S-4A_EX-10.54_12055220_EX-10.54_Development Agreement__No-Solicit Of Customers","split":"test"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","prompt_variant"],"query_ref":"SEASPINEHOLDINGSCORP_10_10_2018-EX-10.1-SUPPLY AGREEMENT__Cap On Liability","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"SEASPINEHOLDINGSCORP_10_10_2018-EX-10.1-SUPPLY AGREEMENT__Governing Law","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"SEASPINEHOLDINGSCORP_10_10_2018-EX-10.1-SUPPLY AGREEMENT__Uncapped Liability","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","step_memory_loss"],"query_ref":"SPOKHOLDINGS,INC_06_19_2020-EX-10.1-COOPERATION AGREEMENT__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","prompt_variant","tool_failure"],"query_ref":"STWRESOURCESHOLDINGCORP_08_06_2014-EX-10.1-COOPERATION AGREEMENT__Third Party Beneficiary","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"SUCAMPOPHARMACEUTICALS,INC_11_04_2015-EX-10.2-STRATEGIC ALLIANCE AGREEMENT__Anti-Assignment","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"SUCAMPOPHARMACEUTICALS,INC_11_04_2015-EX-10.2-STRATEGIC ALLIANCE AGREEMENT__Audit Rights","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"SUCAMPOPHARMACEUTICALS,INC_11_04_2015-EX-10.2-STRATEGIC ALLIANCE AGREEMENT__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"ScansourceInc_20190822_10-K_EX-10.39_11793959_EX-10.39_Distributor Agreement__Parties","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","output_budget_exhausted","tool_failure"],"query_ref":"TRICITYBANKSHARESCORP_05_15_1998-EX-10-OUTSOURCING AGREEMENT__License Grant","split":"test"}
+{"app":"agentic-rag","kinds":["clean","malformed_output","step_memory_loss","tool_failure"],"query_ref":"TRICITYBANKSHARESCORP_05_15_1998-EX-10-OUTSOURCING AGREEMENT__Minimum Commitment","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","step_memory_loss","tool_failure"],"query_ref":"TRICITYBANKSHARESCORP_05_15_1998-EX-10-OUTSOURCING AGREEMENT__Non-Transferable License","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","step_memory_loss","tool_failure"],"query_ref":"TRICITYBANKSHARESCORP_05_15_1998-EX-10-OUTSOURCING AGREEMENT__Parties","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"VALENCETECHNOLOGYINC_02_14_2003-EX-10-JOINT VENTURE CONTRACT__Expiration Date","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","prompt_variant","step_memory_loss"],"query_ref":"VIVINT SOLAR, INC. - NON-COMPETITION AGREEMENT__Expiration Date","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted","prompt_variant","step_memory_loss"],"query_ref":"WEBHELPCOMINC_03_22_2000-EX-10.8-HOSTING AGREEMENT__Parties","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","tool_failure"],"query_ref":"WOMENSGOLFUNLIMITEDINC_03_29_2000-EX-10.13-ENDORSEMENT AGREEMENT__Anti-Assignment","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"WOMENSGOLFUNLIMITEDINC_03_29_2000-EX-10.13-ENDORSEMENT AGREEMENT__Insurance","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","output_budget_exhausted"],"query_ref":"WOMENSGOLFUNLIMITEDINC_03_29_2000-EX-10.13-ENDORSEMENT AGREEMENT__Minimum Commitment","split":"test"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","tool_failure"],"query_ref":"WOMENSGOLFUNLIMITEDINC_03_29_2000-EX-10.13-ENDORSEMENT AGREEMENT__Revenue/Profit Sharing","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","prompt_variant","step_memory_loss","tool_failure"],"query_ref":"WatchitMediaInc_20061201_8-K_EX-10.1_4148672_EX-10.1_Content License Agreement__Effective Date","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","malformed_output","output_budget_exhausted","tool_failure"],"query_ref":"XinhuaSportsEntertainmentLtd_20070221_F-1_EX-99.4_645553_EX-99.4_Content License Agreement__Exclusivity","split":"calib"}
+{"app":"agentic-rag","kinds":["clean","golden_context_removed","output_budget_exhausted"],"query_ref":"XinhuaSportsEntertainmentLtd_20070221_F-1_EX-99.4_645553_EX-99.4_Content License Agreement__Parties","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-0@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-102@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-104@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-105@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-10@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-137@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-13@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-14@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-15@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-16@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-17@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-19@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-1@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-27@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-28@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-29@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-2@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-31@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-33@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-36@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-39@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-3@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-42@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-43@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-44@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-45@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-46@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-50@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-53@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-58@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-5@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-60@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-61@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-63@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-65@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-68@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-6@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-70@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-73@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-7@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-86@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"latency-87@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"latency-8@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-98@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"latency-9@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-0@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-10@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-11@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-12@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-13@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-14@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-15@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-16@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-18@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-19@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-1@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-20@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-21@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-22@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-24@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-25@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-27@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-28@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-29@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-2@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-30@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-31@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-34@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-35@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-36@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-37@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-38@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-39@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-3@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-40@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-41@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-42@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-43@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-44@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-46@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-47@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-4@s19","split":"test"}
+{"app":"runbook-agent","kinds":["malformed_output"],"query_ref":"oom-50@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-51@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-52@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-5@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-6@s19","split":"calib"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-7@s19","split":"test"}
+{"app":"runbook-agent","kinds":["clean"],"query_ref":"oom-8@s19","split":"test"}
+{"app":"runbook-agent","kinds":["prompt_variant"],"query_ref":"oom-9@s19","split":"test"}
