@@ -419,6 +419,55 @@ def run_problems(provenance: dict[str, Any] | None, app: str) -> list[str]:
     return out
 
 
+# resume (#70) -----------------------------------------------------------------------------
+
+
+class FingerprintError(RuntimeError):
+    """The provenance could not be read whole: nothing to compare a resume against."""
+
+
+def fingerprint(
+    snap: dict[str, Any],
+    *,
+    traceblame: tuple[str, bool],
+    app: tuple[str, bool],
+    plan_sha256: str,
+    queries_sha256: str,
+    faults_sha256: dict[str, str],
+    model: dict[str, str],
+    preload_sha256: str | None = None,
+    eval_config_id: str | None = None,
+) -> dict[str, Any]:
+    """What a resume must find as the run's first attempt found it: both checkouts' commit and
+    dirty flag, every role's image IDs and both databases' applied migrations (from a phase's
+    start snapshot), the eval image's config digest, the plan, the preload, the fault library's
+    files, the model. runner.open_attempt compares it key by key and refuses a difference.
+    A snapshot with a failed or empty read gives no fingerprint."""
+    problems = snapshot_problems(snap, "start")
+    if problems:
+        raise FingerprintError("; ".join(problems))
+    out: dict[str, Any] = {
+        "traceblame": {"commit": traceblame[0], "dirty": traceblame[1]},
+        "app": {"commit": app[0], "dirty": app[1]},
+        "images": {
+            role: sorted({c["image_id"] for c in cs}) for role, cs in snap["images"].items()
+        },
+        "migrations": {
+            db: [f"{m['version']} {m['name']} {m['sha256']}" for m in rows]
+            for db, rows in snap["migrations"].items()
+        },
+        "plan_sha256": plan_sha256,
+        "queries_sha256": queries_sha256,
+        "faults_sha256": dict(sorted(faults_sha256.items())),
+        "model": dict(model),
+    }
+    if preload_sha256 is not None:
+        out["preload_sha256"] = preload_sha256
+    if eval_config_id is not None:
+        out["eval_config_id"] = eval_config_id
+    return out
+
+
 # recording --------------------------------------------------------------------------------
 
 
@@ -443,6 +492,11 @@ class Recorder:
         self._kubectl = kubectl
         self._log = log
         self._now = now
+
+    @property
+    def start(self) -> dict[str, Any]:
+        """The phase's start snapshot (what a resumable run's fingerprint is taken from)."""
+        return cast("dict[str, Any]", self._rec["start"])
 
     def eval_pod(self, label: str) -> None:
         """The pods running the eval image right now (runbook-agent), after a deploy."""

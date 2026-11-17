@@ -6,6 +6,7 @@ TRACE_COMPLETED stream, the settle wait, the eval tenants. Run with the workspac
 
 import asyncio
 import base64
+import hashlib
 import json
 import re
 import statistics
@@ -24,20 +25,77 @@ sys.path.insert(0, str(HERE.parent / "fixtures"))
 
 import checks  # noqa: E402
 import yaml  # noqa: E402
-from kindlib import NAMESPACE, PortForward, kubectl, spans_of, stored  # noqa: E402
+from kindlib import (  # noqa: E402
+    NAMESPACE,
+    PortForward,
+    kubectl,
+    merge_batches,
+    spans_of,
+    stored,
+)
 
-from traceblame_faults import ids, kinds, ledger, record  # noqa: E402
+from traceblame_faults import (  # noqa: E402
+    attempts,
+    dataset,
+    ids,
+    kinds,
+    ledger,
+    plan,
+    planfile,
+    querylist,
+    record,
+    runner,
+    split,
+    validate,
+)
 from traceblame_storage.client import ClickHouseClient, parse_url  # noqa: E402
 
 ROOT = HERE.parents[1]
 STREAM = "TRACE_COMPLETED"
 EVAL_TENANT = "tenant-eval"
 CONFIG = HERE / "validation.yaml"
+PLANS = HERE / "plans"
+VALIDATION = "validation"
 WORK = ROOT / ".tools" / "faults"
+_PLAN_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 
 
-def config() -> dict[str, Any]:
-    return cast("dict[str, Any]", yaml.safe_load(CONFIG.read_text(encoding="utf-8")))
+def plan_path(name: str) -> Path:
+    """The committed plan file of a plan name: tools/faults/plans/<name>.yaml, and
+    tools/faults/validation.yaml for the #14 validation run."""
+    if not _PLAN_NAME.fullmatch(name):
+        raise SystemExit(f"faults: not a plan name: {name!r}")
+    path = CONFIG if name == VALIDATION else PLANS / f"{name}.yaml"
+    if not path.is_file():
+        raise SystemExit(f"faults: no plan file {path}")
+    return path
+
+
+def config(name: str = VALIDATION) -> dict[str, Any]:
+    """A plan file in the one shape every phase reads (planfile.normalize)."""
+    return planfile.load(plan_path(name))
+
+
+def plan_ref(name: str) -> dict[str, str]:
+    return {"name": name, "sha256": planfile.sha256(plan_path(name))}
+
+
+def run_plan(run: dict[str, Any]) -> str:
+    """The plan a run was created from; a run.json without one is a validation run."""
+    return str(cast("dict[str, Any]", run.get("plan") or {}).get("name", VALIDATION))
+
+
+def run_config(run_id: str) -> dict[str, Any]:
+    """The plan file of an existing run, which must be the file the run was created from."""
+    run = open_run(run_id)
+    name = run_plan(run)
+    want = cast("dict[str, Any]", run.get("plan") or {}).get("sha256")
+    if want is not None and planfile.sha256(plan_path(name)) != want:
+        raise RunError(
+            f"faults: the plan file {plan_path(name)} changed since run {run_id} was created:"
+            " start a new run"
+        )
+    return config(name)
 
 
 def run_dir(run_id: str, app: str) -> Path:
@@ -62,33 +120,56 @@ def _write_run(run: dict[str, Any]) -> dict[str, Any]:
     return run
 
 
-def new_run(*, seed: int, commit: str, dirty: bool, now: datetime) -> str:
-    """The one place a run id is computed: faults-<UTC date>-s<seed>-<commit7>, written to
-    .tools/faults/<run>/run.json with its seed, commit, dirty flag and creation time."""
-    run_id = f"faults-{now.astimezone(UTC):%Y%m%d}-s{seed}-{commit[:7]}"
-    return ensure_run(run_id, seed=seed, commit=commit, dirty=dirty, now=now)
+def new_run(
+    *, seed: int, commit: str, dirty: bool, now: datetime, plan_name: str = VALIDATION
+) -> str:
+    """The one place a run id is computed, written to .tools/faults/<run>/run.json with its
+    seed, commit, dirty flag and creation time: faults-<UTC date>-s<seed>-<commit7> for the
+    validation run; faults-<plan>-<UTC date>-s<seed>-<commit7> for a committed plan (#70), with
+    -2, -3, ... when that run exists already, so creating a run never resumes one."""
+    stem = "faults" if plan_name == VALIDATION else f"faults-{plan_name}"
+    run_id = f"{stem}-{now.astimezone(UTC):%Y%m%d}-s{seed}-{commit[:7]}"
+    if plan_name != VALIDATION:
+        base, n = run_id, 1
+        while _run_file(run_id).is_file():
+            n += 1
+            run_id = f"{base}-{n}"
+    return ensure_run(run_id, seed=seed, commit=commit, dirty=dirty, now=now, plan_name=plan_name)
 
 
-def ensure_run(run_id: str | None, *, seed: int, commit: str, dirty: bool, now: datetime) -> str:
+def ensure_run(
+    run_id: str | None,
+    *,
+    seed: int,
+    commit: str,
+    dirty: bool,
+    now: datetime,
+    plan_name: str = VALIDATION,
+) -> str:
     """The run a prepare/build phase belongs to: a new one without an id; with an id, its
-    run.json (written now if the id is new), whose seed and commit must be this phase's.
-    `dirty` is whether the checkout had uncommitted changes, recorded next to the commit."""
+    run.json (written now if the id is new), whose seed, commit and plan file must be this
+    phase's. `dirty` is whether the checkout had uncommitted changes, recorded next to the
+    commit."""
     if run_id is None:
-        return new_run(seed=seed, commit=commit, dirty=dirty, now=now)
+        return new_run(seed=seed, commit=commit, dirty=dirty, now=now, plan_name=plan_name)
     ids.check(run_id, "run id")
     if not _run_file(run_id).is_file():
         stamp = now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        _write_run(
-            {
-                "run_id": run_id,
-                "seed": seed,
-                "traceblame_commit": commit,
-                "dirty": dirty,
-                "created_at": stamp,
-            }
-        )
+        doc: dict[str, Any] = {
+            "run_id": run_id,
+            "seed": seed,
+            "traceblame_commit": commit,
+            "dirty": dirty,
+            "created_at": stamp,
+        }
+        if plan_name != VALIDATION:
+            doc["plan"] = plan_ref(plan_name)
+        _write_run(doc)
         return run_id
     run = open_run(run_id)
+    if run_plan(run) != plan_name:
+        raise RunError(f"faults: run {run_id} is of plan {run_plan(run)}, this phase {plan_name}")
+    run_config(run_id)  # the plan file is the one the run was created from
     if int(run["seed"]) != seed:
         raise RunError(f"faults: run {run_id} has seed {run['seed']}, this phase {seed}")
     if run["traceblame_commit"] != commit:
@@ -105,6 +186,16 @@ def open_run(run_id: str) -> dict[str, Any]:
     if not path.is_file():
         raise RunError(f"faults: no run.json for {run_id} under {WORK}")
     return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
+
+
+def resume_run(run_id: str, plan_name: str | None = None) -> str:
+    """The id of an existing run that a resume may continue: it has a run.json, is of the given
+    plan if one is named, and its plan file is the one it was created from."""
+    run = open_run(run_id)
+    if plan_name is not None and run_plan(run) != plan_name:
+        raise RunError(f"faults: run {run_id} is of plan {run_plan(run)}, not {plan_name}")
+    run_config(run_id)
+    return str(run["run_id"])
 
 
 def adopt_run(run_id: str) -> dict[str, Any]:
@@ -144,7 +235,196 @@ def load_state(d: Path) -> dict[str, Any]:
 
 
 def save_state(d: Path, state: dict[str, Any]) -> None:
-    (d / "state.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    """Atomically: a kill never leaves half a state.json."""
+    runner.write_atomic(d / "state.json", json.dumps(state, indent=2) + "\n")
+
+
+# A resumable run's files (#70) --------------------------------------------------------------
+# Whatever an attempt writes while it runs is per attempt, appended as it goes, so a kill loses
+# nothing that was finished: outcomes.<attempt>.jsonl, the collector's own file
+# otlp.<attempt>.jsonl (agentic-rag) or the tee's copy otlp.<attempt>.json (runbook-agent),
+# needles.<attempt>.jsonl. The names without an attempt are the #14 runs' files.
+
+
+def _attempt_files(d: Path, stem: str, suffix: str) -> list[Path]:
+    legacy = d / f"{stem}.{suffix}"
+    return ([legacy] if legacy.is_file() else []) + sorted(d.glob(f"{stem}.a[0-9]*.{suffix}"))
+
+
+def read_outcomes(d: Path) -> list[dict[str, Any]]:
+    """Every outcome line of every attempt, in order."""
+    out: list[dict[str, Any]] = []
+    for path in _attempt_files(d, "outcomes", "jsonl"):
+        out += [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.startswith("{")
+        ]
+    return out
+
+
+def read_otlp(d: Path) -> dict[str, Any]:
+    """The run's own copy of every span it exported, merged over the attempts."""
+    spans: list[Any] = []
+    for path in _attempt_files(d, "otlp", "json"):
+        spans += json.loads(path.read_text(encoding="utf-8")).get("resourceSpans", [])
+    for path in sorted(d.glob("otlp.a[0-9]*.jsonl")):
+        spans += merge_batches(path.read_text(encoding="utf-8")).get("resourceSpans", [])
+    return {"resourceSpans": spans}
+
+
+def faults_sha256(*scripts: Path) -> dict[str, str]:
+    """The fault library's files and these driver-side scripts, by repository path: part of a
+    run's provenance, and what a resume compares (#70)."""
+    files = [
+        p
+        for p in sorted((ROOT / "packages" / "faults" / "src").rglob("*"))
+        if p.is_file() and "__pycache__" not in p.parts
+    ]
+    return {
+        p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in [*files, *scripts]
+    }
+
+
+def committed_queries(cfg: dict[str, Any], key: str) -> list[querylist.Row]:
+    """The plan's committed list under `key` ("queries" or "exclude"); [] when it names none."""
+    name = cfg.get(key)
+    if name is None:
+        return []
+    path = PLANS / str(name)
+    try:
+        rows = querylist.loads(path.read_text(encoding="utf-8"))
+    except (OSError, querylist.QueryListError) as exc:
+        raise SystemExit(f"faults: {path}: {exc}") from exc
+    if not rows:
+        raise SystemExit(f"faults: {path} lists no queries")
+    return rows
+
+
+def split_sides(
+    cfg: dict[str, Any],
+    entries: list[plan.Entry],
+    *,
+    key: Callable[[str], str] = lambda ref: ref,
+    stratum: Callable[[str, tuple[str, ...]], str] = lambda _, drawn: "+".join(drawn),
+) -> dict[str, str]:
+    """query_ref -> "calib" | "test" for a plan with a split ({} without one). key: a query's
+    grouping key (queries with one key share a side); stratum: what it is paired within."""
+    if "split" not in cfg:
+        return {}
+    drawn: dict[str, set[str]] = {}
+    for e in entries:
+        drawn.setdefault(e.query_ref, set()).add(e.kind or "clean")
+    items = [
+        split.Item(ref, key(ref), stratum(ref, tuple(sorted(k))), tuple(sorted(k)))
+        for ref, k in sorted(drawn.items())
+    ]
+    try:
+        return split.assign(
+            int(cfg["split"]["seed"]),
+            items,
+            max_kind_deviation=int(cfg["split"]["max_kind_deviation"]),
+        )
+    except split.SplitError as exc:
+        raise SystemExit(f"faults: {exc}") from exc
+
+
+def verify_queries(cfg: dict[str, Any], app: str, computed: list[querylist.Row]) -> int | None:
+    """The app's computed query list against the plan's committed one; how many queries were
+    compared, None for a plan without a committed list. A difference stops the phase."""
+    committed = committed_queries(cfg, "queries")
+    if not committed:
+        return None
+    try:
+        return querylist.verify(committed, computed, app)
+    except querylist.QueryListError as exc:
+        raise SystemExit(
+            f"faults: {exc}. Regenerate with tools/faults/d1_queries.py, or fix what changed"
+        ) from exc
+
+
+def existing_plan(d: Path, plan_text: str, queries_text: str) -> bool:
+    """Whether d holds a prepared run. If it does, this phase's plan and queries must be
+    byte-identical to the stored ones: an existing run is verified, never regenerated."""
+    if not (d / "state.json").is_file():
+        return False
+    for name, text in (("plan.jsonl", plan_text), ("queries.jsonl", queries_text)):
+        stored_text = (d / name).read_text(encoding="utf-8")
+        if stored_text != text:
+            want = hashlib.sha256(stored_text.encode()).hexdigest()[:16]
+            got = hashlib.sha256(text.encode()).hexdigest()[:16]
+            raise RunError(
+                f"faults: {d / name} has sha256 {want}..., this phase computes {got}...:"
+                " the run's plan cannot change; start a new run"
+            )
+    return True
+
+
+def open_attempt(
+    d: Path, entries: list[plan.Entry], run_id: str, fingerprint: dict[str, Any], **facts: Any
+) -> runner.Attempt:
+    """runner.open_attempt with its refusals as the phase's exit message."""
+    try:
+        return runner.open_attempt(d, entries, eval_run_id=run_id, provenance=fingerprint, **facts)
+    except (runner.RunnerError, attempts.AttemptsError, ledger.LedgerError) as exc:
+        raise SystemExit(f"faults: {exc}") from exc
+
+
+def attempt_notes(d: Path) -> list[dict[str, Any]]:
+    """Every attempt's driver notes (attempt.<id>.json), in attempt order."""
+    return [
+        cast("dict[str, Any]", json.loads(p.read_text(encoding="utf-8")))
+        for p in sorted(d.glob("attempt.a[0-9]*.json"))
+    ]
+
+
+def read_needles(d: Path) -> set[str]:
+    """The content needles the runbook driver wrote, one JSON list per task and attempt; the
+    #14 runs' single needles.json too. Never part of the content scan's own input."""
+    out: set[str] = set()
+    legacy = d / "needles.json"
+    if legacy.is_file():
+        out |= set(json.loads(legacy.read_text(encoding="utf-8")))
+    for path in sorted(d.glob("needles.a[0-9]*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            out |= set(json.loads(line))
+    return out
+
+
+def exported_spans(otlp: dict[str, Any]) -> int:
+    """Distinct spans in the run's own copy (a salvaged tee can repeat a block's)."""
+    return len({(s["traceId"], s["spanId"]) for _, s in spans_of(otlp)})
+
+
+def run_events(d: Path) -> list[dict[str, Any]]:
+    return attempts.read(d / attempts.FILE)
+
+
+def nats_seq_before(d: Path, state: dict[str, Any]) -> int:
+    """The TRACE_COMPLETED sequence before the run's first span: the first attempt's."""
+    seqs = [
+        int(e["nats_seq_before"])
+        for e in run_events(d)
+        if e["event"] == "attempt_start" and "nats_seq_before" in e
+    ]
+    if seqs:
+        return min(seqs)
+    return int(state["run"]["nats_seq_before"])
+
+
+def run_files(d: Path) -> list[Path]:
+    """The run's own files that feed the report (never the content needles themselves)."""
+    names = [d / name for name in RUN_FILES if (d / name).is_file()]
+    extra = [
+        *sorted(d.glob("outcomes.a[0-9]*.jsonl")),
+        *sorted(d.glob("otlp.a[0-9]*.json")),
+        *sorted(d.glob("otlp.a[0-9]*.jsonl")),
+        *sorted(d.glob("attempt.a[0-9]*.json")),
+        *sorted(d.glob("app.a[0-9]*.log")),
+        *sorted(d.glob("ledger.torn.*")),
+    ]
+    return names + [p for p in extra if p not in names]
 
 
 def eval_tenants() -> list[str]:
@@ -273,7 +553,7 @@ _HEX32 = re.compile(r"^[0-9a-f]{32}$")
 _TABLE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 # The run's own files that feed the report (never the content needles themselves).
 RUN_FILES = ("otlp.json", "ledger.jsonl", "outcomes.jsonl", "plan.jsonl", "queries.jsonl",
-             "state.json")  # fmt: skip
+             "state.json", "attempts.jsonl")  # fmt: skip
 Content = Callable[[dict[str, list[dict[str, Any]]], list[Path]], dict[str, Any]]
 # The dataset's own question / task ids (#14 decision) in these fields are left out of the
 # content scan, and only when a value is exactly one of the run's ids in its dataset's format:
@@ -365,17 +645,24 @@ def run_rows(trace_ids: Iterable[str]) -> dict[str, list[dict[str, Any]]]:
     }
 
 
+def abandoned_traces(d: Path) -> list[str]:
+    """The run's abandoned trace ids (attempts.jsonl); none for a #14 run."""
+    return [a.trace_id for a in attempts.abandoned(run_events(d))]
+
+
 def content_scan(
     d: Path, records: list[ledger.Record], content: Content, log: Callable[[str], None]
 ) -> dict[str, Any]:
     """The content check over every stored row of the run in every table and over the run's
     files (parsed copies under content-scan/), all without the ID_FIELDS; the counts scanned go
-    into the result next to the app's needle counts."""
+    into the result next to the app's needle counts. The run's traces are the completed ones
+    and the abandoned ones (#70): a trace that is not labelled is scanned all the same."""
     log("content check: every stored row of the run")
-    tables = run_rows({r.trace_id for r in records})
+    gone = abandoned_traces(d)
+    tables = run_rows({r.trace_id for r in records} | set(gone))
     ids = run_ids(d)
     stripped, dropped = strip_ids(tables, ids)
-    files = [d / name for name in RUN_FILES if (d / name).is_file()]
+    files = run_files(d)
     scan = d / "content-scan"
     scan.mkdir(exist_ok=True)
     copies: list[Path] = []
@@ -386,11 +673,12 @@ def content_scan(
         copy.write_text(json.dumps(docs), encoding="utf-8")
         copies.append(copy)
     out = content(cast("dict[str, list[dict[str, Any]]]", stripped), copies)
-    otlp = json.loads((d / "otlp.json").read_text(encoding="utf-8"))
+    otlp = read_otlp(d)
     out["scanned"] = {
         "rows": {t: len(rows) for t, rows in tables.items()},
         "rows_total": sum(len(rows) for rows in tables.values()),
-        "exported_spans": len(spans_of(otlp)),
+        "abandoned_traces": len(gone),
+        "exported_spans": exported_spans(otlp),
         "files": {f.name: len(f.read_text(encoding="utf-8").splitlines()) for f in files},
         "id_fields_excluded": {"fields": sorted(ID_FIELDS), "values": dropped},
     }
@@ -457,14 +745,13 @@ def check_run(
     signal against the clean trace of the same query, assembly, content. Writes check.json."""
     problems: list[str] = []
     records = ledger.read(d / "ledger.jsonl")
-    outcomes = [
-        json.loads(line)
-        for line in (d / "outcomes.jsonl").read_text(encoding="utf-8").splitlines()
-        if line.startswith("{")
-    ]
-    otlp = json.loads((d / "otlp.json").read_text(encoding="utf-8"))
-    sent = {(s["traceId"], s["spanId"]) for _, s in spans_of(otlp)}
+    outcomes = read_outcomes(d)
+    otlp = read_otlp(d)
     traces = {r.trace_id for r in records}
+    # The run's copy holds the spans of abandoned traces too; only the completed traces' spans
+    # are compared with what is stored for them.
+    exported = {(s["traceId"], s["spanId"]) for _, s in spans_of(otlp)}
+    sent = {pair for pair in exported if pair[0] in traces}
     rows = settle(traces, len(sent), float(cfg["settle_seconds"]), log)
     got = {(str(r["trace_id"]), str(r["span_id"])) for r in rows}
     if got != sent:
@@ -480,7 +767,7 @@ def check_run(
     for r in rows:
         by_trace.setdefault(str(r["trace_id"]), []).append(r)
     summaries = wait_assembled(traces, float(cfg["assemble_seconds"]), log)
-    completed = completed_since(int(state["run"]["nats_seq_before"]), traces)
+    completed = completed_since(nats_seq_before(d, state), traces)
     with clickhouse_client() as client:
         stored_eval = {
             _tid(r[0]): r
@@ -490,14 +777,17 @@ def check_run(
         }
         join_sql = record.statement("injections_spans_read.sql")
         joins = {t: client.query_rows(join_sql, {"trace_id": t}) for t in traces}
+        # Keyed by the trace as well as the injection id: after a resume another trace's spans
+        # carry the same id, and nothing here may join on the id alone (#70).
         injection_params = {
-            str(r[0]): str(r[1])
+            (str(r[0]), str(r[1])): str(r[2])
             for r in client.query_rows(
-                "SELECT injection_id, params FROM injections"
+                "SELECT toString(trace_id), injection_id, params FROM injections"
                 " WHERE has({ids:Array(String)}, toString(trace_id))",
                 {"ids": sorted(traces)},
             )
         }
+        resume = resume_check(app, d, state, cfg, records, stored_eval, client, log)
     clean_by_query = {r.query_ref: r for r in records if ledger.status(r) == "clean"}
     # Without a clean run of the same query (runbook tasks run once each), the first clean
     # trace of the same stratum is the comparison.
@@ -559,7 +849,7 @@ def check_run(
             try:
                 kinds.check_params(
                     rec.fault_kind,
-                    json.loads(injection_params.get(rec.injection_id, "{}")),
+                    json.loads(injection_params.get((rec.trace_id, rec.injection_id), "{}")),
                     applied=True,
                 )
             except (kinds.ParamsError, ValueError):
@@ -589,7 +879,13 @@ def check_run(
         if not entry["trace_summary"] or not entry["trace_completed"]:
             problems.append(f"{rec.trace_id}: not assembled (trace_summary / trace.completed)")
         per_trace.append(entry)
-    no_trace = [o for o in outcomes if o.get("status") == "no_trace"]
+    # An entry that produced no trace in one attempt and its record in a later one is complete.
+    recorded = {(r.query_ref, r.planned_fault_kind) for r in records}
+    no_trace = {
+        (str(o.get("query_ref")), str(o.get("kind")))
+        for o in outcomes
+        if o.get("status") == "no_trace"
+    } - recorded
     if no_trace:
         problems.append(f"{len(no_trace)} entries produced no trace")
 
@@ -621,15 +917,97 @@ def check_run(
             (r.params.get("baseline_digest") for r in records if r.params.get("baseline_digest")),
             None,
         ),
-        "spans": {"sent": len(sent), "stored": len(got)},
+        "spans": {
+            "sent": len(sent),
+            "stored": len(got),
+            "exported_for_abandoned_traces": len(exported) - len(sent),
+        },
         "per_kind": per_kind,
         "per_trace": per_trace,
+        "resume": resume,
         "problems": problems,
     }
+    if resume is not None:
+        problems += [f"resume: {p}" for p in resume["problems"]]
     result["content_check"] = content_scan(d, records, content, log)
     problems += content_problems(result["content_check"])
     (d / "check.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
+
+
+def _since(run: dict[str, Any]) -> str:
+    """The start of the run's creation day (UTC), as a ClickHouse DateTime: the bound of the
+    orphan sweep's scan of spans."""
+    return f"{str(run['created_at'])[:10]} 00:00:00"
+
+
+def resume_check(
+    app: str,
+    d: Path,
+    state: dict[str, Any],
+    cfg: dict[str, Any],
+    records: list[ledger.Record],
+    stored_eval: dict[str, tuple[Any, ...]],
+    client: ClickHouseClient,
+    log: Callable[[str], None],
+) -> dict[str, Any] | None:
+    """Section 6 of #70 against what is stored (traceblame_faults.validate): one record, one
+    eval_traces row and one injection per entry; no orphans; abandoned traces listed; zero
+    checked = fail. A trace the sweep attributes to an entry in flight is recorded as abandoned
+    (attempts.jsonl and eval_exclusions) and the validation runs again. None for a #14 run,
+    which has no attempt log."""
+    if not (d / attempts.FILE).is_file():
+        return None
+    run_id = str(state["run_id"])
+    entries = plan.loads((d / "plan.jsonl").read_text(encoding="utf-8"))
+    since = _since(open_run(run_id))
+    slack = float(cfg.get("orphan_slack_seconds", 5))
+    eval_rows = [
+        (t, str(r[8]), str(r[9])) for t, r in sorted(stored_eval.items()) if str(r[2]) == app
+    ]
+
+    def once() -> validate.Result:
+        stored = [
+            validate.StoredTrace(*t) for t in dataset.stored_traces(client, run_id, app, since)
+        ]
+        injections = dataset.injection_rows(
+            client,
+            [r.trace_id for r in records],
+            [e.injection_id for e in entries if e.injection_id],
+        )
+        return validate.validate(
+            eval_run_id=run_id,
+            entries=entries,
+            records=records,
+            events=run_events(d),
+            eval_rows=eval_rows,
+            injections=[(t, i) for t, i, _ in injections],
+            exclusions=[a.trace_id for a in record.exclusions(client, run_id) if a.service == app],
+            stored=stored,
+            slack_seconds=slack,
+        )
+
+    result = once()
+    swept = list(result.sweep)
+    if swept:
+        log(f"orphan sweep: {len(swept)} traces attributed to entries in flight")
+        events = attempts.Log(d / attempts.FILE)
+        for a in swept:
+            events.abandoned(a)
+        record.record_exclusions(client, swept)
+        result = once()
+    summary: dict[str, Any] = result.summary | {
+        "swept": len(swept),
+        "since": since,
+        "orphan_slack_seconds": slack,
+        "problems": result.problems,
+    }
+    log(
+        f"resume check: {summary['entries']} entries, {summary['stored_traces']} stored traces,"
+        f" {len(summary['abandoned'])} abandoned, {len(summary['orphans'])} orphans,"
+        f" {len(result.problems)} problems"
+    )
+    return summary
 
 
 def ids_hash(query_ref: str) -> str:

@@ -34,6 +34,8 @@ RUNBOOK_APP_DIR ?= $(CURDIR)/../runbook-agent
 KIND_LOCK ?= /tmp/traceblame-kind.lock
 # The fault validation run's id (tools/faults/): default faults-<date>-s<seed>-<commit7>.
 RUN_ID ?=
+# The committed plan file of make faults-d1 (tools/faults/plans/<PLAN>.yaml): d1 or smoke.
+PLAN ?= d1
 
 # Collector distribution (collector/builder-config.yaml, ocb from tools/versions.env).
 COLLECTOR_BUILD := collector/_build
@@ -44,6 +46,7 @@ export TRACEBLAME_NORMALIZE_BIN := $(CURDIR)/$(COLLECTOR_BUILD)/bin/traceblame-n
 
 .PHONY: help bootstrap lint test contract integration security attribution fixtures fixtures-agentic-rag \
 	fixtures-runbook-agent faults-agentic-rag faults-runbook-agent faults-report faults-validate \
+	faults-d1 faults-progress \
 	kind-up kind-down kind-deploy kind-runbook-up kind-runbook-down \
 	kind-clickhouse-persistence bench-scaling assembler collector collector-smoke collector-image
 
@@ -131,6 +134,24 @@ faults-runbook-agent: ## Faults into real runbook-agent runs in the sandbox (#14
 faults-report: ## The fault validation report over both apps (RUN_ID=...) into evals/reports/
 	@test -n "$(RUN_ID)" || { echo "faults-report: set RUN_ID" >&2; exit 1; }
 	$(UV_RUN) python tools/faults/report.py --run-id "$(RUN_ID)"
+
+# A resumable run of a committed plan (#70). Without RUN_ID it creates the run; with RUN_ID it
+# resumes that run: finished entries are skipped, the traces a kill left in flight are recorded
+# as abandoned, a changed provenance is refused. Only the kind phases take the lock (inside the
+# two targets), so the run phase holds it for as long as it runs. Everything is appended to the
+# run's run.log.
+faults-d1: ## A resumable fault run of a committed plan (#70; PLAN=d1|smoke; RUN_ID=<id> resumes it)
+	@run_id="$$($(UV_RUN) python tools/faults/run_id.py $(if $(RUN_ID),resume --run-id $(RUN_ID),new) --plan $(PLAN))"; \
+	mkdir -p ".tools/faults/$$run_id"; \
+	{ echo "faults-d1: run $$run_id, plan $(PLAN), $$(date -u +%Y-%m-%dT%H:%M:%SZ)"; \
+	  $(MAKE) --no-print-directory faults-agentic-rag RUN_ID="$$run_id" && \
+	  $(MAKE) --no-print-directory faults-runbook-agent RUN_ID="$$run_id" && \
+	  $(MAKE) --no-print-directory faults-report RUN_ID="$$run_id"; \
+	} 2>&1 | tee -a ".tools/faults/$$run_id/run.log"
+
+faults-progress: ## Progress of a fault run (RUN_ID=...): read-only, no kind, no lock
+	@test -n "$(RUN_ID)" || { echo "faults-progress: set RUN_ID" >&2; exit 1; }
+	@$(UV_RUN) python tools/faults/progress.py --run-id "$(RUN_ID)"
 
 # One run id for all three: RUN_ID, or a new run (tools/faults/run_id.py new writes its run.json,
 # which every phase and the report resolve the run through; nothing recomputes it).
