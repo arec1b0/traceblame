@@ -10,11 +10,19 @@ TRACEBLAME_FAULTS=1 and the tenant is an eval tenant.
 Phases (only run, record, check and content touch kind; run them under
 flock /tmp/traceblame-kind.lock -c '...'):
 
-  build    (no kind)  capture image and eval image, image guard checks, the seeded plan
-  run      (kind)     the eval image into kind, the sandbox, one task at a time as tenant-eval;
+  build    (no kind)  capture image and eval image, image guard checks, the seeded plan of a
+                      plan file (--plan; tools/faults/plans/, default the #14 validation.yaml).
+                      For an existing run it verifies the plan and the eval image instead of
+                      regenerating them
+  run      (kind)     one attempt (#70): the eval image into kind, the sandbox reset, one task
+                      at a time as tenant-eval for every plan entry without a ledger record;
                       before each task the driver arms /tmp/faults/armed.json in the agent pod,
-                      after it reads the preload's ledger lines; the injector's ledger
-  record   (kind)     the ledger into eval_traces and injections
+                      after it reads the preload's ledger lines; the injector's ledger. A killed
+                      attempt is resumed by running the phase again: it first reads the dead
+                      attempt's tee and preload lines, then resets the sandbox, which ends a
+                      task the dead driver left running
+  record   (kind)     the ledger into eval_traces and injections, the abandoned traces into
+                      eval_exclusions
   check    (kind)     as for agentic-rag (faultslib.check_run), content: alert text and prompts
   content  (kind)     only the content check of a finished run (read-only): every stored row
                       of its traces in every table with a trace_id, and the run's files
@@ -25,6 +33,7 @@ The run phase also samples the eval pod after each deploy.
 """
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -50,15 +59,25 @@ import provenance  # noqa: E402
 import scenarios  # noqa: E402
 from kindlib import (  # noqa: E402
     check_model,
+    git,
     is_dirty,
     kubectl,
     require_clean,
     run,
-    spans_of,
     tenant_password,
 )
 
-from traceblame_faults import bundle, kinds, ledger, plan, record, scenario  # noqa: E402
+from traceblame_faults import (  # noqa: E402
+    appendlog,
+    attempts,
+    bundle,
+    kinds,
+    ledger,
+    plan,
+    querylist,
+    record,
+    scenario,
+)
 
 ROOT = common.ROOT
 APP = "runbook-agent"
@@ -148,20 +167,87 @@ def _python_image() -> str:
     return rb._pins()["PYTHON_IMAGE"]  # pyright: ignore[reportPrivateUsage]
 
 
-def _tasks(seed: int, cfg: dict[str, Any]) -> list[Any]:
-    wanted = set(cfg["scenarios"])
-    return [t for t in scenarios.plan(seed, int(cfg["per_scenario"])) if t.scenario in wanted]
+def excluded_tuples(cfg: dict[str, Any]) -> frozenset[str]:
+    """The (scenario, parameters) tuples of the tasks in the plan's exclusion list."""
+    listed = querylist.of_app(faultslib.committed_queries(cfg, "exclude"), APP)
+    return frozenset(scenarios.ref_tuple(r.query_ref) for r in listed)
+
+
+def _tasks(cfg: dict[str, Any]) -> list[Any]:
+    """The plan file's tasks: the seeded plan's, or (distinct) tasks with distinct (scenario,
+    parameters) tuples, none of them a tuple of the exclusion list."""
+    seed, rcfg = int(cfg["seed"]), cfg["runbook_agent"]
+    if rcfg["distinct"]:
+        try:
+            return scenarios.distinct_plan(
+                seed,
+                int(rcfg["per_scenario"]),
+                scenarios=list(rcfg["scenarios"]),
+                exclude=excluded_tuples(cfg),
+            )
+        except ValueError as exc:
+            raise SystemExit(f"faults: {exc}") from exc
+    wanted = set(rcfg["scenarios"])
+    return [t for t in scenarios.plan(seed, int(rcfg["per_scenario"])) if t.scenario in wanted]
 
 
 def _ref(task: Any, seed: int) -> str:
     return f"{task.name}@s{seed}"
 
 
+def _plan_name(args: argparse.Namespace) -> str:
+    """--plan, or the plan of the run being resumed, or the validation plan."""
+    if args.plan is not None:
+        return str(args.plan)
+    if args.run_id is not None and (faultslib.WORK / args.run_id / faultslib.RUN_FILE).is_file():
+        return faultslib.run_plan(faultslib.open_run(args.run_id))
+    return faultslib.VALIDATION
+
+
+def build_plan(
+    cfg: dict[str, Any], run_id: str
+) -> tuple[list[plan.Entry], list[plan.Query], list[querylist.Row]]:
+    """The plan's entries (one task each), its queries with their split side, and its
+    query-list rows. The split groups tasks by their (scenario, parameters) tuple and pairs
+    them within their scenario and kind. Pure: needs no image and no cluster."""
+    seed, rcfg = int(cfg["seed"]), cfg["runbook_agent"]
+    tasks = _tasks(cfg)
+    scenario_of = {_ref(t, seed): t.scenario for t in tasks}
+    queries = [
+        plan.Query(
+            ref=_ref(t, seed), app=APP, source="runbook", stratum=t.scenario, golden_status="none"
+        )
+        for t in tasks
+    ]
+    try:
+        entries = plan.plan(
+            seed=seed,
+            eval_run_id=run_id,
+            app=APP,
+            queries=queries,
+            counts={k: int(n) for k, n in rcfg["counts"].items()},
+            clean=int(rcfg["clean"]),
+            scenarios=scenario.load_all(),
+            exclusive=True,
+        )
+    except plan.PlanError as exc:
+        raise SystemExit(f"faults: {exc}") from exc
+    sides = faultslib.split_sides(
+        cfg,
+        entries,
+        key=scenarios.ref_tuple,
+        stratum=lambda ref, drawn: f"{scenario_of[ref]}/{'+'.join(drawn)}",
+    )
+    rows = querylist.build(APP, entries, sides)
+    return entries, [q.with_(split=sides.get(q.ref, "")) for q in queries], rows
+
+
 # build ------------------------------------------------------------------------------------
 
 
 def build(args: argparse.Namespace) -> int:
-    cfg = faultslib.config()
+    plan_name = _plan_name(args)
+    cfg = faultslib.config(plan_name)
     rcfg = cfg["runbook_agent"]
     seed = int(cfg["seed"])
     app_dir: Path = args.app_dir.resolve()
@@ -169,10 +255,21 @@ def build(args: argparse.Namespace) -> int:
     app_commit = require_clean(app_dir)
     dirty = is_dirty(ROOT)
     run_id = faultslib.ensure_run(
-        args.run_id, seed=seed, commit=traceblame_commit, dirty=dirty, now=datetime.now(UTC)
+        args.run_id,
+        seed=seed,
+        commit=traceblame_commit,
+        dirty=dirty,
+        now=datetime.now(UTC),
+        plan_name=plan_name,
     )
     d = faultslib.run_dir(run_id, APP)
     d.mkdir(parents=True, exist_ok=True)
+    # The plan before the images: a plan that cannot be built or differs from the committed
+    # query list stops here.
+    entries, queries, rows = build_plan(cfg, run_id)
+    compared = faultslib.verify_queries(cfg, APP, rows)
+    text, queries_text = plan.dumps(entries), plan.dump_queries(queries)
+    existing = faultslib.existing_plan(d, text, queries_text)
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         log("capture image")
@@ -191,29 +288,21 @@ def build(args: argparse.Namespace) -> int:
     eval_config_id = provenance.built_config_digest(eval_tag)
     baseline_text = triage_prompt(app_dir, app_commit)
     baseline = bundle.digest(APP, {"system": baseline_text})
-    tasks = _tasks(seed, rcfg)
-    queries = [
-        plan.Query(
-            ref=_ref(t, seed), app=APP, source="runbook", stratum=t.scenario, golden_status="none"
-        )
-        for t in tasks
-    ]
-    entries = plan.plan(
-        seed=seed,
-        eval_run_id=run_id,
-        app=APP,
-        queries=queries,
-        counts={
-            "malformed_output": int(rcfg["malformed_output"]),
-            "prompt_variant": int(rcfg["prompt_variant"]),
-        },
-        clean=int(rcfg["clean"]),
-        scenarios=scenario.load_all(),
-        exclusive=True,
-    )
-    text = plan.dumps(entries)
+    if existing:
+        # An existing run is verified, never regenerated: the image built now must be the one
+        # the run's first attempt was built with (the config digest, ADR-0009).
+        before = faultslib.load_state(d)["build"]
+        if (before.get("eval_config_id"), before["eval_image"]) != (eval_config_id, eval_tag):
+            raise SystemExit(
+                f"faults: run {run_id} was built with eval image {before['eval_image']} (config"
+                f" {before.get('eval_config_id')}), this build gives {eval_tag} (config"
+                f" {eval_config_id}): start a new run"
+            )
+        log(f"run {run_id} exists: its plan and eval image are verified, not rewritten")
+        print(run_id)
+        return 0
     (d / "plan.jsonl").write_text(text, encoding="utf-8")
-    (d / "queries.jsonl").write_text(plan.dump_queries(queries), encoding="utf-8")
+    (d / "queries.jsonl").write_text(queries_text, encoding="utf-8")
     state: dict[str, Any] = {
         "run_id": run_id,
         "app": APP,
@@ -233,10 +322,20 @@ def build(args: argparse.Namespace) -> int:
         "preload_sha256": common.sha256(PRELOAD),
         "baseline_digest": baseline,
         "plan": {
+            "name": plan_name,
             "entries": len(entries),
             "sha256": hashlib.sha256(text.encode()).hexdigest(),
             "by_kind": dict(Counter(e.kind or "clean" for e in entries)),
         },
+        "queries": {
+            "queries": len(queries),
+            "sha256": hashlib.sha256(queries_text.encode()).hexdigest(),
+            "by_split": dict(Counter(q.split or "none" for q in queries)),
+            "distinct_tuples": len({scenarios.ref_tuple(q.ref) for q in queries}),
+            "excluded_tuples": len(excluded_tuples(cfg)),
+            "compared_with_committed_list": compared,
+        },
+        "faults_sha256": faultslib.faults_sha256(Path(__file__).resolve()),
     }
     faultslib.save_state(d, state)
     print(run_id)
@@ -330,8 +429,71 @@ def _record(
     )
 
 
+def _trace_ids(lines: list[dict[str, Any]]) -> list[str]:
+    return sorted({str(x["trace_id"]) for x in lines if x.get("trace_id")})
+
+
+def _reset_sandbox() -> None:
+    """A clean slate before an attempt's first task, as the capture's, and the end of whatever
+    a killed attempt left running: the preload disarmed, every task workload deleted,
+    Alertmanager without earlier groups. Each block then redeploys the agent (a fresh pod, so
+    a fresh /tmp/faults) and the tee."""
+    # No agent pod yet (a first attempt), or it is going away: nothing to disarm.
+    with contextlib.suppress(subprocess.CalledProcessError):
+        _disarm()
+    kubectl(
+        "-n",
+        rb.SANDBOX,
+        "delete",
+        "deployment,service,pod",
+        "-l",
+        f"{scenarios.LABEL}=workload",
+        "--wait=true",
+    )
+    kubectl("-n", rb.MONITORING, "rollout", "restart", "deployment/alertmanager")
+    kubectl("-n", rb.MONITORING, "rollout", "status", "deployment/alertmanager", "--timeout=300s")
+
+
+def apply_oom_workloads(tasks: list[Any]) -> int:
+    """The oom tasks' workloads, up front: their rule sees only pods at least ten minutes old.
+    How many tasks it applied; nothing is applied when there is none (a plan of latency tasks,
+    or a resume whose remaining entries have no oom task), since `kubectl apply` refuses an
+    empty list."""
+    oom = [t for t in tasks if t.scenario == "oom"]
+    if oom:
+        rb.apply([o for t in oom for o in scenarios.manifests(t, _python_image())])
+    return len(oom)
+
+
+def _fingerprint(
+    d: Path, state: dict[str, Any], snap: dict[str, Any], server_version: str
+) -> dict[str, Any]:
+    """What this attempt runs on, for the resume comparison (provenance.fingerprint). The plan
+    and the queries are hashed as the attempt reads them, not as build recorded them."""
+    app_dir = Path(state["app_dir"])
+    plan_sha256, queries_sha256 = faultslib.run_file_hashes(d, state)
+    try:
+        return provenance.fingerprint(
+            snap,
+            traceblame=(git(ROOT, "rev-parse", "HEAD"), is_dirty(ROOT)),
+            app=(git(app_dir, "rev-parse", "HEAD"), is_dirty(app_dir)),
+            plan_sha256=plan_sha256,
+            queries_sha256=queries_sha256,
+            faults_sha256=faultslib.faults_sha256(Path(__file__).resolve()),
+            model={
+                "name": common.CHAT_MODEL,
+                "digest": common.CHAT_MODEL_DIGEST,
+                "server_version": server_version,
+            },
+            preload_sha256=common.sha256(PRELOAD),
+            eval_config_id=str(state["build"].get("eval_config_id")),
+        )
+    except provenance.FingerprintError as exc:
+        raise SystemExit(f"faults: no provenance to run on: {exc}") from exc
+
+
 def run_phase(args: argparse.Namespace) -> int:
-    cfg = faultslib.config()
+    cfg = faultslib.run_config(args.run_id)
     rcfg = cfg["runbook_agent"]
     d = faultslib.run_dir(args.run_id, APP)
     state = faultslib.load_state(d)
@@ -353,12 +515,116 @@ def run_phase(args: argparse.Namespace) -> int:
     tenants = faultslib.require_eval_tenant()
     password = tenant_password(faultslib.EVAL_TENANT)
     entries = plan.loads((d / "plan.jsonl").read_text(encoding="utf-8"))
+    by_entry = {e.entry_id: e for e in entries}
     sc = scenario.load_all()[("prompt_variant", APP)]
     variants = {n: v.templates["system"] for n, v in sc.variants.items()}
-    by_ref = {_ref(t, seed): t for t in _tasks(seed, rcfg)}
+    by_ref = {_ref(t, seed): t for t in _tasks(cfg)}
     baseline = str(state["baseline_digest"])
+
+    def salvage(pending: Any) -> dict[str, list[str]]:
+        """The trace ids of the tasks in flight, from the agent pod's preload ledger, before
+        the sandbox is reset. A pod that is gone gives none: the orphan sweep finds them."""
+        found: dict[str, list[str]] = {}
+        for started in pending:
+            task = by_ref[by_entry[started.entry_id].query_ref]
+            try:
+                found[started.entry_id] = _trace_ids(_preload_lines(task))
+            except subprocess.CalledProcessError:
+                log(f"resume: no preload lines for {task.name} (the agent pod is gone)")
+        return found
+
+    attempt = faultslib.open_attempt(
+        d,
+        entries,
+        state["run_id"],
+        _fingerprint(d, state, prov.start, server_version),
+        salvage=salvage,
+        nats_seq_before=faultslib.stream_last_seq(),
+    )
+    rec = attempt.recovery
+    if rec.killed or rec.lost or rec.torn:
+        log(
+            f"resume: attempts killed {list(rec.killed)}, {len(rec.lost)} entries in flight run"
+            f" again, {len(rec.abandoned)} traces abandoned, torn ledger tail: {rec.torn}"
+        )
+    log(f"attempt {attempt.id}: {len(attempt.remaining)} of {len(entries)} entries to run")
+    dead = faultslib.attempt_to_salvage(faultslib.run_events(d), attempt.id)
+    if dead is not None:
+        # The last attempt did not complete (killed or failed), so its last block's copy of
+        # the exported spans was never written: read its tee session before the tee is
+        # redeployed, and keep this run's spans of it.
+        try:
+            salvaged = faultslib.own_spans(rb.read_tee(), str(state["run_id"]))
+        except subprocess.CalledProcessError:
+            log(f"resume: no tee to read for {dead} (its spans are checked from the store only)")
+        else:
+            (d / f"otlp.{dead}.salvaged.json").write_text(json.dumps(salvaged), encoding="utf-8")
+            log(f"resume: {faultslib.exported_spans(salvaged)} spans of {dead} read from its tee")
+    started = time.monotonic()
+    status = "completed"
+    safety: list[dict[str, Any]] = []
+    problems: list[str] = []
+    try:
+        if attempt.remaining:
+            _run_tasks(
+                attempt, d, state, rcfg, by_ref, variants, baseline, tenants, password, prov,
+                safety, problems,
+            )  # fmt: skip
+    except BaseException as exc:
+        status = f"failed: {type(exc).__name__}"
+        raise
+    finally:
+        attempt.note(
+            status=status,
+            seconds=round(time.monotonic() - started, 1),
+            safety=safety,
+            problems=problems,
+            provenance_start=prov.start,
+        )
+        attempt.end(status)
+    notes = faultslib.attempt_notes(d)
+    state["run"] = {
+        "nats_seq_before": faultslib.nats_seq_before(d, state),
+        "finished_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "seconds": round(time.monotonic() - started, 1),
+        "spans_sent": faultslib.exported_spans(faultslib.read_otlp(d)),
+        "eval_tenants": tenants,
+        "model": {
+            "name": common.CHAT_MODEL,
+            "digest": common.CHAT_MODEL_DIGEST,
+            "server_version": server_version,
+        },
+        "safety": [x for note in notes for x in note.get("safety", [])],
+        "problems": [x for note in notes for x in note.get("problems", [])],
+        "attempts": len(attempts.attempts(faultslib.run_events(d))),
+        "last_attempt": attempt.id,
+    }
+    prov.eval_pod("end")
+    prov.end()
+    faultslib.save_state(d, state)
+    return 0
+
+
+def _run_tasks(
+    attempt: Any,
+    d: Path,
+    state: dict[str, Any],
+    rcfg: dict[str, Any],
+    by_ref: dict[str, Any],
+    variants: dict[str, str],
+    baseline: str,
+    tenants: str,
+    password: str,
+    prov: Any,
+    safety: list[dict[str, Any]],
+    problems: list[str],
+) -> None:
+    """The attempt's remaining entries, one task at a time, block by block of bundle digest.
+    Everything a task leaves is written when the task ends: its ledger record, its outcome
+    line, its content needles; each block's tee copy when the block ends."""
+    entry_log = attempt.entry_log()
     blocks: dict[str, list[plan.Entry]] = {baseline: []}
-    for e in entries:
+    for e in attempt.remaining:
         if e.kind == "prompt_variant":
             digest = bundle.digest(APP, {"system": variants[str(e.params["variant"])]})
             blocks.setdefault(digest, []).append(e)
@@ -374,28 +640,14 @@ def run_phase(args: argparse.Namespace) -> int:
             state["build"]["eval_image"],
         ]
     )
-    kubectl(
-        "-n",
-        rb.SANDBOX,
-        "delete",
-        "deployment,service,pod",
-        "-l",
-        f"{scenarios.LABEL}=workload",
-        "--wait=true",
-    )
-    # A clean slate, as the capture's: Alertmanager without earlier groups.
-    kubectl("-n", rb.MONITORING, "rollout", "restart", "deployment/alertmanager")
-    kubectl("-n", rb.MONITORING, "rollout", "status", "deployment/alertmanager", "--timeout=300s")
-    used = [by_ref[e.query_ref] for e in entries]
+    _reset_sandbox()
+    used = [by_ref[e.query_ref] for e in attempt.remaining]
     names = scenarios.check_names(
         [o for t in used for o in scenarios.manifests(t, _python_image())]
     )
     if names:
         raise SystemExit(f"faults: workload names: {names}")
-    rb.apply(
-        [o for t in used if t.scenario == "oom" for o in scenarios.manifests(t, _python_image())]
-    )
-    seq = faultslib.stream_last_seq()
+    apply_oom_workloads(used)
     base_env = {
         "LLM_PROVIDER": "openai",
         "OPENAI_API_KEY": "ollama",
@@ -413,14 +665,9 @@ def run_phase(args: argparse.Namespace) -> int:
         "LLM_STRUCTURED_OUTPUTS": "true",
     }
     build = state["build"] | {"image": state["build"]["eval_image"]}
-    (d / "ledger.jsonl").unlink(missing_ok=True)
-    outcomes: list[dict[str, Any]] = []
-    sessions: list[dict[str, Any]] = []
-    needles: set[str] = set()
-    problems: list[str] = []
-    safety: list[dict[str, Any]] = []
-    started = time.monotonic()
-    for digest, block in blocks.items():
+    outcomes = d / f"outcomes.{attempt.id}.jsonl"
+    needles = d / f"needles.{attempt.id}.jsonl"
+    for n, (digest, block) in enumerate(blocks.items()):
         if not block:
             continue
         rb.deploy_agent(build, base_env | {"TRACEBLAME_BUNDLE_DIGEST": digest})
@@ -437,6 +684,7 @@ def run_phase(args: argparse.Namespace) -> int:
             for e in sorted(block, key=lambda x: by_ref[x.query_ref].order):
                 task = by_ref[e.query_ref]
                 log(f"task {task.name}: {e.kind or 'clean'}")
+                entry_log.start(e)
                 _arm(task, e, variants)
                 t0 = time.monotonic()
                 result = rb.run_task(
@@ -445,10 +693,13 @@ def run_phase(args: argparse.Namespace) -> int:
                 seconds = round(time.monotonic() - t0, 1)
                 _disarm()
                 lines = _preload_lines(task)
-                needles |= set(result.pop("_needles"))
+                for trace_id in _trace_ids(lines):
+                    entry_log.trace(e, trace_id)
+                appendlog.append(needles, json.dumps(sorted(result.pop("_needles"))))
                 result.pop("_alert", None)
                 rec = _record(e, task, lines, state["run_id"], digest, baseline)
                 outcome: dict[str, Any] = {
+                    "entry_id": e.entry_id,
                     "query_ref": e.query_ref,
                     "kind": e.kind,
                     "seconds": seconds,
@@ -467,47 +718,28 @@ def run_phase(args: argparse.Namespace) -> int:
                 if any(str(x.get("marker", "")).startswith("error") for x in lines):
                     problems.append(f"{task.name}: the shim refused a marker")
                 if rec is None:
+                    # No trace, or more than one: the entry stays incomplete, a resume runs it
+                    # again, and whatever traces it left are abandoned.
+                    entry_log.no_record(e, "no_trace" if not _trace_ids(lines) else "ambiguous")
                     outcome["status"] = "no_trace"
                 else:
-                    ledger.append(d / "ledger.jsonl", rec)
+                    rec = entry_log.record(e, rec)
                     outcome |= {"trace_id": rec.trace_id, "status": ledger.status(rec)}
-                outcomes.append(outcome)
+                appendlog.append(outcomes, json.dumps(outcome, sort_keys=True))
+                attempt.note(safety=safety, problems=problems)
         finally:
             agent.close()
         time.sleep(rb.FLUSH_SECONDS)
-        sessions.append(rb.read_tee())
-    otlp = {"resourceSpans": [rs for s in sessions for rs in s["resourceSpans"]]}
-    (d / "otlp.json").write_text(json.dumps(otlp), encoding="utf-8")
-    (d / "outcomes.jsonl").write_text(
-        "".join(json.dumps(o) + "\n" for o in outcomes), encoding="utf-8"
-    )
-    (d / "needles.json").write_text(json.dumps(sorted(needles)), encoding="utf-8")
-    state["run"] = {
-        "nats_seq_before": seq,
-        "finished_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "seconds": round(time.monotonic() - started, 1),
-        "spans_sent": len(spans_of(otlp)),
-        "eval_tenants": tenants,
-        "model": {
-            "name": common.CHAT_MODEL,
-            "digest": common.CHAT_MODEL_DIGEST,
-            "server_version": server_version,
-        },
-        "safety": safety,
-        "problems": problems,
-    }
-    prov.eval_pod("end")
-    prov.end()
-    faultslib.save_state(d, state)
-    return 0
+        (d / f"otlp.{attempt.id}.b{n}.json").write_text(json.dumps(rb.read_tee()), encoding="utf-8")
 
 
 def record_phase(args: argparse.Namespace) -> int:
     d = faultslib.run_dir(args.run_id, APP)
     state = faultslib.load_state(d)
     prov = provenance.begin(state, "record", kubectl=kubectl, log=log)
+    abandoned = attempts.abandoned(faultslib.run_events(d))
     with faultslib.clickhouse_client() as client:
-        state["record"] = record.record(client, ledger.read(d / "ledger.jsonl"))
+        state["record"] = record.record(client, ledger.read(d / "ledger.jsonl"), abandoned)
     prov.end()
     faultslib.save_state(d, state)
     log(f"recorded {state['record']}")
@@ -518,7 +750,7 @@ def _content(d: Path, state: dict[str, Any]) -> faultslib.Content:
     """The #13 needles (alert text windows and task-unique label values) and 40-character
     windows of every triage prompt the run could send, against every stored row of the run and
     the run's files."""
-    needles = set(json.loads((d / "needles.json").read_text(encoding="utf-8")))
+    needles = faultslib.read_needles(d)
     prompts = [triage_prompt(Path(state["app_dir"]), state["app_commit"])]
     prompts += [
         v.templates["system"]
@@ -539,7 +771,7 @@ def _content(d: Path, state: dict[str, Any]) -> faultslib.Content:
 
 
 def check_phase(args: argparse.Namespace) -> int:
-    cfg = faultslib.config()
+    cfg = faultslib.run_config(args.run_id)
     d = faultslib.run_dir(args.run_id, APP)
     state = faultslib.load_state(d)
     prov = provenance.begin(state, "check", kubectl=kubectl, log=log)
@@ -571,6 +803,7 @@ def main() -> int:
     b = sub.add_parser("build")
     b.add_argument("--app-dir", type=Path, required=True)
     b.add_argument("--run-id", help="default: a new run (tools/faults/run_id.py new)")
+    b.add_argument("--plan", help="a plan file's name (tools/faults/plans/); default validation")
     r = sub.add_parser("run")
     r.add_argument("--run-id", required=True)
     r.add_argument("--ollama-url")

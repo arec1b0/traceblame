@@ -479,3 +479,221 @@ def test_a_dirty_checkout_in_a_state_is_a_problem() -> None:
         "the traceblame checkout was dirty",
         "the app checkout was dirty",
     ]
+
+
+# A resumed run (#70): what the report reads, and what it says about the resume ----------------
+
+RESUMED_RUN = "faults-d1-20261117-s19-abc1234"
+
+
+def _resumed(tmp_path: Path) -> tuple[Path, list[plan.Entry], str]:
+    """An app's run directory after a kill and a resume, made with the real runner: every entry
+    completed once, and the trace in flight at the kill abandoned."""
+    import os
+
+    from traceblame_faults import runner, scenario
+
+    queries = [
+        plan.Query(
+            f"Contract {i}__Law",
+            "agentic-rag",
+            "cuad",
+            "answerable",
+            "mapped",
+            split="test" if i else "calib",
+        )
+        for i in range(2)
+    ]
+    entries = plan.plan(
+        seed=19,
+        eval_run_id=RESUMED_RUN,
+        app="agentic-rag",
+        queries=queries,
+        counts={"tool_failure": 2},
+        clean=2,
+        scenarios=scenario.load_all(),
+    )
+    d = tmp_path / "agentic-rag"
+    d.mkdir()
+    (d / "plan.jsonl").write_text(plan.dumps(entries), encoding="utf-8")
+    (d / "queries.jsonl").write_text(plan.dump_queries(queries), encoding="utf-8")
+
+    def rec(entry: plan.Entry, n: int) -> ledger.Record:
+        return ledger.Record(
+            trace_id=_trace_id(n),
+            eval_run_id=RESUMED_RUN,
+            service="agentic-rag",
+            source="cuad",
+            query_ref=entry.query_ref,
+            stratum="answerable",
+            golden_doc_ids=(),
+            golden_status="unmapped",
+            planned_fault_kind=entry.kind,
+            injection_id="",
+            fault_kind="",
+            target_component="",
+            host_load1=1.5,
+        )
+
+    first = runner.open_attempt(d, entries, eval_run_id=RESUMED_RUN, provenance={"c": 1})
+    log = first.entry_log()
+    log.start(entries[0])
+    log.record(entries[0], rec(entries[0], 0))
+    log.start(entries[1])
+    abandoned = _trace_id(99)
+    log.trace(entries[1], abandoned)
+    os.close(first.lock_fd)  # killed
+    second = runner.open_attempt(d, entries, eval_run_id=RESUMED_RUN, provenance={"c": 1})
+    runner.run_entries(second.entry_log(), entries, lambda e, _: rec(e, 10 + entries.index(e)))
+    second.end()
+    return d, entries, abandoned
+
+
+def _resume_summary(d: Path, entries: list[plan.Entry]) -> dict[str, Any]:
+    from traceblame_faults import attempts, validate
+
+    records = ledger.read(d / "ledger.jsonl")
+    events = attempts.read(d / attempts.FILE)
+    gone = [a.trace_id for a in attempts.abandoned(events)]
+    stored = [
+        validate.StoredTrace(t, 0.0, frozenset(), 2)
+        for t in [*gone, *(r.trace_id for r in records)]
+    ]
+    result = validate.validate(
+        eval_run_id=RESUMED_RUN,
+        entries=entries,
+        records=records,
+        events=events,
+        eval_rows=[(r.trace_id, r.planned_fault_kind, r.injection_id) for r in records],
+        injections=[],
+        exclusions=gone,
+        stored=stored,
+    )
+    return result.summary | {"problems": result.problems}
+
+
+def test_reader_the_report_input_has_no_abandoned_trace(tmp_path: Path) -> None:
+    d, entries, abandoned = _resumed(tmp_path)
+    records = ledger.read(d / "ledger.jsonl")
+    # What the report reads of a trace: the ledger view and the split view, both from the ledger.
+    view = report.ledger_view(d)
+    assert view["records"] == len(entries) == 4
+    assert abandoned not in view["host_load1"]
+    assert abandoned not in view["modes"]
+    assert sum(sum(c.values()) for c in view["counts"].values()) == 4
+    split = report.split_view(d, records)
+    assert split is not None
+    assert sum(n["calib"] + n["test"] for n in split["traces"].values()) == 4
+    # It is in the resume section, and nowhere else.
+    resume = _resume_summary(d, entries)
+    assert [a["trace_id"] for a in resume["abandoned"]] == [abandoned]
+    lines = report.resume_lines(resume)
+    assert sum(abandoned in line for line in lines) == 1
+    (row,) = [line for line in lines if abandoned in line]
+    assert row.startswith(f"| `{abandoned}` | {entries[1].entry_id} |")
+    assert "| killed | attempt_log | 2 |" in row
+
+
+def test_the_resume_section_shows_the_kill_and_no_duplicates_or_orphans(tmp_path: Path) -> None:
+    d, entries, _ = _resumed(tmp_path)
+    resume = _resume_summary(d, entries)
+    assert resume["problems"] == []
+    text = "\n".join(report.resume_lines(resume))
+    assert "- checked: 4 plan entries, 4 ledger records, 4 `eval_traces` rows, 5 traces" in text
+    assert (
+        "- attempts: 2, killed: 1; entries in flight that ran again: 1; torn ledger tails: 0"
+        in text
+    )
+    assert "never in `eval_traces` or `injections`): 1; by kind:" in text
+    assert "- injection ids with `injections` rows on more than one trace: 0" in text
+    assert "- orphans (stored, neither completed nor abandoned): 0" in text
+    assert "| killed |" in text
+    assert "| completed |" in text
+    assert report.resume_lines(None) == []
+    assert report.resume_problems({"resume": resume}) == []
+    assert report.resume_problems({}) == []
+
+
+@pytest.mark.parametrize(
+    ("change", "match"),
+    [
+        ({"entries": 0}, "nothing checked (entries = 0)"),
+        ({"stored_traces": 0}, "nothing checked (stored_traces = 0)"),
+        ({"eval_traces_rows": 0}, "nothing checked (eval_traces_rows = 0)"),
+        ({"orphans": ["f" * 32]}, "1 orphan traces"),
+        ({"duplicate_injections": 2}, "2 injection ids with injections rows on more than one"),
+        ({"problems": ["x: an orphan"]}, "resume: x: an orphan"),
+    ],
+)
+def test_a_resume_check_that_checked_nothing_or_found_something_is_a_problem(
+    tmp_path: Path, change: dict[str, Any], match: str
+) -> None:
+    d, entries, _ = _resumed(tmp_path)
+    resume = _resume_summary(d, entries) | change
+    assert any(match in p for p in report.resume_problems({"resume": resume}))
+
+
+def test_the_split_section_counts_queries_and_traces_per_side(tmp_path: Path) -> None:
+    d, _, _ = _resumed(tmp_path)
+    view = report.split_view(d, ledger.read(d / "ledger.jsonl"))
+    assert view == {
+        "queries_planned": {"calib": 1, "test": 1},
+        "queries_with_traces": {"calib": 1, "test": 1},
+        "traces": {"clean": {"calib": 1, "test": 1}, "tool_failure": {"calib": 1, "test": 1}},
+    }
+    lock = {  # the shape of tools/faults/plans/<plan>.queries.lock.json
+        "counts": {"agentic-rag": {"queries": 110}},
+        "agentic_rag": {
+            "cuad_contracts": {"total": 62, "calib": 38, "test": 41, "both_sides": 17},
+            "excluded_listed": 12,
+            "excluded_removed": 2,
+        },
+        "runbook_agent": {"tasks": 90, "distinct_tuples": 90, "excluded_tuples": 11},
+    }
+    md = "\n".join(
+        report.split_lines({"plan": "d1", "split": {"agentic-rag": view}, "split_lock": lock})
+    )
+    assert "| agentic-rag | 1 | 1 | 1 | 1 |" in md
+    assert "| agentic-rag | tool_failure | 1 | 1 |" in md
+    assert "#19 reports query-cluster bootstrap 95% CIs" in md
+    assert "110 questions come from 62 contracts" in md
+    assert "and **17 on both**" in md
+    assert "90 tasks with 90 distinct (scenario," in md
+    assert report.split_lines({"plan": "smoke", "split": {}}) == []
+    assert report.split_lock("smoke") is None
+
+
+def test_a_plan_without_a_split_has_no_split_view(tmp_path: Path) -> None:
+    d, _, _ = _resumed(tmp_path)
+    text = (d / "queries.jsonl").read_text(encoding="utf-8")
+    (d / "queries.jsonl").write_text(
+        text.replace('"split":"calib"', '"split":""').replace('"split":"test"', '"split":""'),
+        encoding="utf-8",
+    )
+    assert report.split_view(d, ledger.read(d / "ledger.jsonl")) is None
+
+
+def test_the_report_file_and_title_name_the_plan() -> None:
+    validation = {"run_id": RUN, "created_at": "2026-11-06T10:00:00Z"}
+    assert report.stem(validation) == "faults-kind-2026-11-06"
+    d1_run = {"run_id": RESUMED_RUN, "created_at": "2026-11-17T10:00:00Z", "plan": {"name": "d1"}}
+    assert report.stem(d1_run) == "faults-d1-kind-2026-11-17"
+    again = d1_run | {"run_id": RESUMED_RUN + "-2"}
+    assert report.stem(again) == "faults-d1-kind-2026-11-17-2"
+    digits = d1_run | {"run_id": "faults-d1-20261117-s19-1234567"}
+    assert report.stem(digits) == "faults-d1-kind-2026-11-17", "a commit of digits is no counter"
+    assert report.title({"date": "2026-11-06"}) == (
+        "# Fault injection through kind: validation run (2026-11-06)"
+    )
+    assert "`smoke` run" in report.title({"date": "2026-11-17", "plan": "smoke"})
+
+
+def test_the_loop_gate_is_the_validation_runs() -> None:
+    gate = report.loop_gate({"per_kind": {}}, {"loop": {"hit_rate_min": 0.6, "repeat_min": 3}})
+    assert not gate["passed"]
+    base = _minimal(problems=[])
+    gated = report.markdown(base | {"loop_gate": gate | {"gated": True}})
+    assert "**Failed**" in gated
+    reported = report.markdown(base | {"loop_gate": gate | {"gated": False}})
+    assert "Reported, not gated" in reported
+    assert "**Failed**" not in reported

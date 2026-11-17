@@ -81,7 +81,15 @@ FRAMEWORK_BANNED_IMPORTS = (
     "http",
     "requests",
 )
-LABELS = ("eval_traces", "injections", "aegis.eval.", "aegis.fault.", "eval.run.id", "injection.id")
+LABELS = (
+    "eval_traces",
+    "eval_exclusions",
+    "injections",
+    "aegis.eval.",
+    "aegis.fault.",
+    "eval.run.id",
+    "injection.id",
+)
 
 
 def _imports(tree: ast.AST) -> list[str]:
@@ -187,6 +195,7 @@ def test_framework_modules_pass_the_guard() -> None:
             "import traceblame_storage.client",
         ),
         ("SQL = 'SELECT golden_doc_ids FROM eval_traces'\n", "literal 'eval_traces'"),
+        ("SQL = 'SELECT trace_id FROM eval_exclusions'\n", "literal 'eval_exclusions'"),
         ("KEY = 'aegis.fault.injection.id'\n", "literal 'aegis.fault.'"),
     ],
 )

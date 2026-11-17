@@ -1,13 +1,21 @@
-"""The #14 validation report over both apps: evals/reports/faults-kind-<date>.{json,md}.
+"""The report of a fault run over both apps: evals/reports/faults-kind-<date>.{json,md} for the
+#14 validation run, faults-<plan>-kind-<date>.{json,md} for a run of a committed plan (#70).
 
 Reads .tools/faults/<run>/<app>/{state,check}.json written by run_agentic_rag.py and
 run_runbook_agent.py; adds the step_memory_loss gate, the per-component D1 counts and the
-throughput projection for D1 (#19), from the measured wall time per kind.
+throughput projection for D1 (#19), from the measured wall time per kind. For a resumable run
+it adds what the resume left (attempts, kills, abandoned traces, duplicates, orphans) and, for
+a plan with a split, the distinct queries and traces on each side.
+
+What it reads of a trace comes from the ledger and from check.json's per-trace rows, which are
+derived from the ledger: a trace that was abandoned (never in the ledger) is in none of the
+tables, only in the resume section.
 """
 
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -21,26 +29,22 @@ import checks  # noqa: E402
 import faultslib  # noqa: E402
 import provenance  # noqa: E402
 
-from traceblame_faults import kinds, ledger, plan  # noqa: E402
+from traceblame_faults import kinds, ledger, plan, planfile  # noqa: E402
 
 ROOT = faultslib.ROOT
 REPORTS = ROOT / "evals" / "reports"
 PRELOAD = ROOT / "packages" / "faults" / "preload" / "faults-preload.mjs"
 APPS = ("agentic-rag", "runbook-agent")
-# D1 as proposed on #19: (app, kind) -> traces; "clean" is the clean share.
-D1: dict[tuple[str, str], int] = {
-    ("agentic-rag", "golden_context_removed"): 75,
-    ("agentic-rag", "tool_failure"): 75,
-    ("agentic-rag", "output_budget_exhausted"): 75,
-    ("agentic-rag", "step_memory_loss"): 75,
-    ("agentic-rag", "malformed_output"): 50,
-    ("agentic-rag", "prompt_variant"): 50,
-    ("agentic-rag", "clean"): 110,
-    ("runbook-agent", "malformed_output"): 25,
-    ("runbook-agent", "prompt_variant"): 25,
-    ("runbook-agent", "clean"): 40,
-}
+D1_PLAN = "d1"
 DUE = "2026-11-22"
+
+
+def d1() -> dict[tuple[str, str], int]:
+    """D1 as #19 composes it: (app, kind) -> traces; "clean" is the clean share. Read from the
+    committed plan file that collects it (tools/faults/plans/d1.yaml), not from a copy here."""
+    return planfile.composition(faultslib.config(D1_PLAN))
+
+
 NOT_RECORDED = "not recorded (predates #65)"
 
 
@@ -122,7 +126,7 @@ def retrieval_rows(check: dict[str, Any], modes: dict[str, str | None]) -> list[
 
 def components() -> dict[str, int]:
     out: dict[str, int] = {}
-    for (_, kind), n in D1.items():
+    for (_, kind), n in d1().items():
         comp = kinds.KINDS[kind].component if kind in kinds.KINDS else "clean"
         out[comp] = out.get(comp, 0) + n
     return out
@@ -131,7 +135,7 @@ def components() -> dict[str, int]:
 def projection(checks: dict[str, dict[str, Any]]) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     total = 0.0
-    for (app, kind), n in D1.items():
+    for (app, kind), n in d1().items():
         per = checks.get(app, {}).get("per_kind", {}).get(kind, {})
         seconds = per.get("seconds_median")
         hours = n * float(seconds) / 3600 if seconds is not None else None
@@ -361,9 +365,169 @@ def _migrations_text(rows: list[dict[str, str]]) -> str:
     )
 
 
+def split_view(d: Path, records: list[ledger.Record]) -> dict[str, Any] | None:
+    """Distinct queries per split side, and traces per kind and side, of one app: the sides
+    from the run's queries.jsonl (the plan's committed list, verified at prepare/build), the
+    traces from the ledger. None for a plan without a split."""
+    queries = plan.load_queries((d / "queries.jsonl").read_text(encoding="utf-8"))
+    sides = {q.ref: q.split for q in queries}
+    if not any(sides.values()):
+        return None
+    traces: dict[str, dict[str, int]] = {}
+    for r in records:
+        kind = r.planned_fault_kind or "clean"
+        traces.setdefault(kind, {"calib": 0, "test": 0})[sides[r.query_ref]] += 1
+    planned = Counter(sides.values())
+    ran = Counter(sides[ref] for ref in {r.query_ref for r in records})
+    return {
+        "queries_planned": {side: planned.get(side, 0) for side in ("calib", "test")},
+        "queries_with_traces": {side: ran.get(side, 0) for side in ("calib", "test")},
+        "traces": dict(sorted(traces.items())),
+    }
+
+
+def split_lock(plan_name: str) -> dict[str, Any] | None:
+    """The lock of the plan's committed query list (what it was generated from, its counts)."""
+    path = faultslib.PLANS / f"{plan_name}.queries.lock.json"
+    if not path.is_file():
+        return None
+    return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
+
+
+def resume_problems(check: dict[str, Any]) -> list[str]:
+    """The resume check's problems, re-derived from its own counts so that a check that checked
+    nothing cannot pass: zero entries, stored traces or eval_traces rows; an orphan; an
+    injection id with rows on more than one trace."""
+    resume = check.get("resume")
+    if resume is None:
+        return []
+    out = [f"resume: {p}" for p in resume["problems"]]
+    for key in ("entries", "stored_traces", "eval_traces_rows"):
+        if not resume.get(key):
+            out.append(f"resume: nothing checked ({key} = {resume.get(key)})")
+    if resume.get("orphans"):
+        out.append(f"resume: {len(resume['orphans'])} orphan traces")
+    if resume.get("duplicate_injections"):
+        out.append(
+            f"resume: {resume['duplicate_injections']} injection ids with injections rows on"
+            " more than one trace"
+        )
+    return out
+
+
+def resume_lines(resume: dict[str, Any] | None) -> list[str]:
+    """One app's resume section: what was checked, every attempt, every abandoned trace."""
+    if resume is None:
+        return []
+    gone = resume["abandoned"]
+    by_kind = ", ".join(f"{k} {n}" for k, n in sorted(resume["abandoned_by_kind"].items()))
+    by_reason = ", ".join(f"{k} {n}" for k, n in sorted(resume["abandoned_by_reason"].items()))
+    out = [
+        "",
+        "Resume (#70):",
+        "",
+        f"- checked: {resume['entries']} plan entries, {resume['records']} ledger records,"
+        f" {resume['eval_traces_rows']} `eval_traces` rows, {resume['stored_traces']} traces"
+        f" stored under the run's marker, {resume['injection_ids_checked']} injection ids",
+        f"- attempts: {len(resume['attempts'])}, killed: {resume['killed']}; entries in flight"
+        f" that ran again: {resume['lost_entries']}; torn ledger tails: {resume['torn_tails']}",
+        f"- abandoned traces (in `eval_exclusions`, never in `eval_traces` or `injections`):"
+        f" {len(gone)}" + (f"; by kind: {by_kind}; by reason: {by_reason}" if gone else ""),
+        f"- injection ids with `injections` rows on more than one trace:"
+        f" {resume['duplicate_injections']}",
+        f"- orphans (stored, neither completed nor abandoned): {len(resume['orphans'])}"
+        + (
+            f"; found by the orphan sweep and abandoned: {resume['swept']}"
+            if resume["swept"]
+            else ""
+        ),
+        "",
+        "| Attempt | Status | Started | Ended | Last event |",
+        "|---|---|---|---|---|",
+    ]
+    out += [
+        f"| {a['id']} | {a['status']} | {a['started_at']} | {a['ended_at'] or '-'} |"
+        f" {a['last_event']} |"
+        for a in resume["attempts"]
+    ]
+    if gone:
+        out += [
+            "",
+            "| Abandoned trace | Entry | Kind | Attempt | Reason | Found in | Stored spans |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        out += [
+            f"| `{a['trace_id']}` | {a['entry_id']} | {a['kind']} | {a['attempt_id']} |"
+            f" {a['reason']} | {a['source']} | {a['stored_spans']} |"
+            for a in gone
+        ]
+    return out
+
+
+def split_lines(report: dict[str, Any]) -> list[str]:
+    """The split section: distinct queries per app and side, traces per app, kind and side."""
+    splits: dict[str, dict[str, Any]] = report.get("split") or {}
+    if not splits:
+        return []
+    out = [
+        "## Calibration / test split",
+        "",
+        "By source query, 50/50 per app, every fault kind within 2 queries of half on the test",
+        f"side (`tools/faults/plans/{report['plan']}.queries.jsonl`, committed before the run).",
+        "The grouping key is the CUAD question id for agentic-rag and the task's (scenario,",
+        "parameters) tuple for runbook-agent. #19 reports query-cluster bootstrap 95% CIs and",
+        "flags cells with n < 30 as indicative.",
+        "",
+        "| App | Queries calib | Queries test | With traces calib | With traces test |",
+        "|---|---|---|---|---|",
+    ]
+    for app, view in splits.items():
+        p, r = view["queries_planned"], view["queries_with_traces"]
+        out.append(f"| {app} | {p['calib']} | {p['test']} | {r['calib']} | {r['test']} |")
+    out += ["", "| App | Kind | Traces calib | Traces test |", "|---|---|---|---|"]
+    for app, view in splits.items():
+        out += [
+            f"| {app} | {kind} | {n['calib']} | {n['test']} |" for kind, n in view["traces"].items()
+        ]
+    lock = report.get("split_lock")
+    if lock is not None:
+        c = lock["agentic_rag"]["cuad_contracts"]
+        rb = lock["runbook_agent"]
+        out += [
+            "",
+            f"CUAD contracts are not grouped: the {lock['counts']['agentic-rag']['queries']}"
+            f" questions come from {c['total']} contracts, {c['calib']} with a question on the"
+            f" calibration side, {c['test']} on the test side, and **{c['both_sides']} on both**.",
+            "",
+            f"runbook-agent: {rb['tasks']} tasks with {rb['distinct_tuples']} distinct (scenario,"
+            f" parameters) tuples; {rb['excluded_tuples']} validation tuples excluded.",
+            f" agentic-rag: {lock['agentic_rag']['excluded_listed']} validation candidates"
+            f" listed, {lock['agentic_rag']['excluded_removed']} of them removed from this"
+            " plan's sample.",
+        ]
+    return [*out, ""]
+
+
+def title(report: dict[str, Any]) -> str:
+    plan_name = report.get("plan", faultslib.VALIDATION)
+    what = "validation run" if plan_name == faultslib.VALIDATION else f"`{plan_name}` run"
+    return f"# Fault injection through kind: {what} ({report['date']})"
+
+
+def stem(run: dict[str, Any]) -> str:
+    """The report's file name: faults-kind-<date> for the validation run, as before;
+    faults-<plan>-kind-<date> for a committed plan, with the run id's -<n> when the day and the
+    commit had more than one run."""
+    plan_name = faultslib.run_plan(run)
+    if plan_name == faultslib.VALIDATION:
+        return f"faults-kind-{run_date(run)}"
+    again = re.search(r"-s\d+-[0-9a-f]{7}-(\d+)$", str(run["run_id"]))
+    return f"faults-{plan_name}-kind-{run_date(run)}" + (f"-{again.group(1)}" if again else "")
+
+
 def markdown(report: dict[str, Any]) -> str:
     out = [
-        f"# Fault injection through kind: validation run ({report['date']})",
+        title(report),
         "",
         "`tools/faults/` (#14): the six fault kinds injected into real runs of agentic-rag",
         "(CUAD) and runbook-agent (sandbox alerts), exported through kind as `tenant-eval`.",
@@ -405,6 +569,7 @@ def markdown(report: dict[str, Any]) -> str:
             out += preload_lines(report.get("preload"))
         if app == "agentic-rag":
             out.append(f"- golden chunks of the sampled answerable queries: {s['golden_coverage']}")
+        out += resume_lines(c.get("resume"))
         out += [
             "",
             "| Kind | Component | Traces | Applied | Not reached | Marker on its span | Joined |"
@@ -459,6 +624,7 @@ def markdown(report: dict[str, Any]) -> str:
                 f"{r['moved']} | {r['counted']} |"
             )
         out.append("")
+    out += split_lines(report)
     gate = report["loop_gate"]
     out += [
         "## step_memory_loss gate",
@@ -468,9 +634,13 @@ def markdown(report: dict[str, Any]) -> str:
         f"{gate['hit_rate']:.0%}, threshold {gate['hit_rate_min']:.0%} "
         "(`tools/faults/validation.yaml`). "
         + (
-            "**Passed**: the kind is collected for D1."
-            if gate["passed"]
-            else "**Failed**: the kind is redesigned before D1, not collected as it is."
+            (
+                "**Passed**: the kind is collected for D1."
+                if gate["passed"]
+                else "**Failed**: the kind is redesigned before D1, not collected as it is."
+            )
+            if gate.get("gated", True)
+            else "Reported, not gated: the gate was the #14 validation run's."
         ),
         "",
         "## Reproducibility",
@@ -586,8 +756,9 @@ def main() -> int:
     parser.add_argument("--blocker", action="append", default=[])
     parser.add_argument("--note", action="append", default=[])
     args = parser.parse_args()
-    cfg = faultslib.config()
+    cfg = faultslib.run_config(args.run_id)
     run = faultslib.open_run(args.run_id)
+    plan_name = faultslib.run_plan(run)
     per_app: dict[str, dict[str, Any]] = {}
     states: dict[str, dict[str, Any]] = {}
     views: dict[str, dict[str, Any]] = {}
@@ -600,7 +771,15 @@ def main() -> int:
     if not per_app:
         raise SystemExit(f"report: no check.json under .tools/faults/{args.run_id}/")
     gate = loop_gate(per_app.get("agentic-rag", {"per_kind": {}}), cfg)
+    # The gate decided whether D1 collects the kind: it is the validation run's.
+    gate["gated"] = plan_name == faultslib.VALIDATION
     problems = [f"{app}: {p}" for app, c in per_app.items() for p in c["problems"]]
+    problems += [
+        f"{app}: {p}"
+        for app, c in per_app.items()
+        for p in resume_problems(c)
+        if p not in c["problems"]
+    ]
     problems += [
         f"{app}: {p}" for app, c in per_app.items() for p in ledger_problems(c, views[app])
     ]
@@ -616,20 +795,34 @@ def main() -> int:
         for app, s in states.items()
         for p in dirty_problems(s) + provenance.run_problems(s.get("provenance"), app)
     ]
-    if not gate["passed"]:
+    if gate["gated"] and not gate["passed"]:
         problems.append("step_memory_loss: loop signal below the gate; redesign before D1")
+    splits = {
+        app: view
+        for app in per_app
+        if (
+            view := split_view(
+                faultslib.run_dir(args.run_id, app),
+                ledger.read(faultslib.run_dir(args.run_id, app) / "ledger.jsonl"),
+            )
+        )
+        is not None
+    }
     requests: list[Any] = []
     rb_dir = faultslib.run_dir(args.run_id, "runbook-agent")
-    if (rb_dir / "outcomes.jsonl").is_file():
-        for line in (rb_dir / "outcomes.jsonl").read_text(encoding="utf-8").splitlines():
-            for req in json.loads(line).get("request", []):
+    if rb_dir.is_dir():
+        for outcome in faultslib.read_outcomes(rb_dir):
+            for req in outcome.get("request", []):
                 fields = cast("dict[str, Any]", req or {})
                 requests.append({k: v for k, v in fields.items() if k != "seed"})
     rag_view = views.get("agentic-rag", {"modes": {}})
     report = {
         "date": run_date(run),
         "run_id": args.run_id,
+        "plan": plan_name,
         "run": run,
+        "split": splits,
+        "split_lock": split_lock(plan_name) if splits else None,
         "config": cfg,
         "apps": per_app,
         "state": {
@@ -660,11 +853,11 @@ def main() -> int:
         else None,
         "notes": args.note,
     }
-    stem = f"faults-kind-{report['date']}"
+    name = stem(run)
     REPORTS.mkdir(parents=True, exist_ok=True)
-    (REPORTS / f"{stem}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    (REPORTS / f"{stem}.md").write_text(markdown(report), encoding="utf-8")
-    print(f"report: evals/reports/{stem}.md ({len(problems)} problems)", file=sys.stderr)
+    (REPORTS / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    (REPORTS / f"{name}.md").write_text(markdown(report), encoding="utf-8")
+    print(f"report: evals/reports/{name}.md ({len(problems)} problems)", file=sys.stderr)
     return 0
 
 

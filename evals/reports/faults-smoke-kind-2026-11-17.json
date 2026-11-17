@@ -1,0 +1,4149 @@
+{
+  "date": "2026-11-17",
+  "run_id": "faults-smoke-20261117-s7-31e6064",
+  "plan": "smoke",
+  "run": {
+    "run_id": "faults-smoke-20261117-s7-31e6064",
+    "seed": 7,
+    "traceblame_commit": "31e60647721a908a570d32f941dcaf90ca2fc0cd",
+    "dirty": false,
+    "created_at": "2026-11-17T21:00:41Z",
+    "plan": {
+      "name": "smoke",
+      "sha256": "f0cf2e34d1e066cebf880ec477f6c9afd9df8a76b37cba1ab43933d41663cc3c"
+    }
+  },
+  "split": {},
+  "split_lock": null,
+  "config": {
+    "seed": 7,
+    "agentic_rag": {
+      "n": 24,
+      "ratio": 0.5,
+      "queries": 1,
+      "clean": 1,
+      "counts": {
+        "golden_context_removed": 1,
+        "tool_failure": 1,
+        "output_budget_exhausted": 1,
+        "step_memory_loss": 1,
+        "malformed_output": 1,
+        "prompt_variant": 1
+      }
+    },
+    "runbook_agent": {
+      "scenarios": [
+        "latency"
+      ],
+      "per_scenario": 3,
+      "clean": 1,
+      "counts": {
+        "malformed_output": 1,
+        "prompt_variant": 1
+      },
+      "approval_timeout_ms": 30000,
+      "distinct": false
+    },
+    "loop": {
+      "repeat_min": 3,
+      "hit_rate_min": 0.6
+    },
+    "settle_seconds": 300,
+    "assemble_seconds": 300,
+    "orphan_slack_seconds": 5,
+    "name": "smoke"
+  },
+  "apps": {
+    "agentic-rag": {
+      "app": "agentic-rag",
+      "run_id": "faults-smoke-20261117-s7-31e6064",
+      "baseline_digest": "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965",
+      "spans": {
+        "sent": 126,
+        "stored": 126,
+        "exported_for_abandoned_traces": 1
+      },
+      "per_kind": {
+        "clean": {
+          "component": "",
+          "traces": 1,
+          "applied": 0,
+          "not_reached": 0,
+          "marker_ok": 0,
+          "joined": 0,
+          "moved": 0,
+          "assembled": 1,
+          "seconds_median": 77.5,
+          "seconds_p95": 77.45,
+          "host_load1_median": 3.62,
+          "outcomes": {
+            "answered": 1
+          }
+        },
+        "golden_context_removed": {
+          "component": "retrieval",
+          "traces": 1,
+          "applied": 1,
+          "not_reached": 0,
+          "marker_ok": 1,
+          "joined": 1,
+          "moved": 1,
+          "assembled": 1,
+          "seconds_median": 52.1,
+          "seconds_p95": 52.11,
+          "host_load1_median": 2.63,
+          "outcomes": {
+            "answered": 1
+          }
+        },
+        "malformed_output": {
+          "component": "model",
+          "traces": 1,
+          "applied": 1,
+          "not_reached": 0,
+          "marker_ok": 1,
+          "joined": 1,
+          "moved": 1,
+          "assembled": 1,
+          "seconds_median": 71.8,
+          "seconds_p95": 71.85,
+          "host_load1_median": 5.99,
+          "outcomes": {
+            "answered": 1
+          }
+        },
+        "output_budget_exhausted": {
+          "component": "orchestration",
+          "traces": 1,
+          "applied": 1,
+          "not_reached": 0,
+          "marker_ok": 1,
+          "joined": 1,
+          "moved": 1,
+          "assembled": 1,
+          "seconds_median": 60.5,
+          "seconds_p95": 60.5,
+          "host_load1_median": 3.01,
+          "outcomes": {
+            "answered": 1
+          }
+        },
+        "prompt_variant": {
+          "component": "prompt",
+          "traces": 1,
+          "applied": 1,
+          "not_reached": 0,
+          "marker_ok": 1,
+          "joined": 1,
+          "moved": 1,
+          "assembled": 1,
+          "seconds_median": 159.5,
+          "seconds_p95": 159.48,
+          "host_load1_median": 3.58,
+          "outcomes": {
+            "answered": 1
+          }
+        },
+        "step_memory_loss": {
+          "component": "orchestration",
+          "traces": 1,
+          "applied": 1,
+          "not_reached": 0,
+          "marker_ok": 1,
+          "joined": 1,
+          "moved": 1,
+          "assembled": 1,
+          "seconds_median": 133.2,
+          "seconds_p95": 133.2,
+          "host_load1_median": 2.71,
+          "outcomes": {
+            "answered": 1
+          }
+        },
+        "tool_failure": {
+          "component": "tool",
+          "traces": 1,
+          "applied": 1,
+          "not_reached": 0,
+          "marker_ok": 1,
+          "joined": 1,
+          "moved": 1,
+          "assembled": 1,
+          "seconds_median": 87.2,
+          "seconds_p95": 87.2,
+          "host_load1_median": 1.22,
+          "outcomes": {
+            "answered": 1
+          }
+        }
+      },
+      "per_trace": [
+        {
+          "trace_id": "90a1c4dc0636312412ebb20587c2c33c",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 12,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 77.45,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.1586613,
+          "loop_max": 2,
+          "host_load1": 3.62
+        },
+        {
+          "trace_id": "e5bd7c4fce48d86fb5b80f5fe59967d7",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "golden_context_removed",
+          "status": "applied",
+          "spans_stored": 12,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 52.11,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": -0.2219435,
+          "loop_max": 2,
+          "host_load1": 2.63,
+          "marker_spans": [
+            "retrieval",
+            "retrieval",
+            "retrieval"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 3,
+          "joined_spans": 3,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "golden_in_topk": [
+              false,
+              false
+            ],
+            "max_score": [
+              0.1586613,
+              -0.2219435
+            ],
+            "mode": "distractor",
+            "counted": true
+          }
+        },
+        {
+          "trace_id": "05cd5e46888d461902098e56e16c131a",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 13,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 71.85,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.15013492,
+          "loop_max": 2,
+          "host_load1": 5.99,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "698b95f1e1e0af53cb5aa7f441cea7a7",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "output_budget_exhausted",
+          "status": "applied",
+          "spans_stored": 13,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 60.5,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.15013492,
+          "loop_max": 2,
+          "host_load1": 3.01,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "finish_reasons": [
+              [
+                "stop"
+              ],
+              [
+                "length"
+              ]
+            ],
+            "parse_ok": [
+              "false"
+            ]
+          }
+        },
+        {
+          "trace_id": "a99e713e0f68e7e88df5a8e7eeca978b",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 32,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 159.48,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever"
+          ],
+          "bundle_digest": [
+            "sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7"
+          ],
+          "golden_in_topk": false,
+          "max_score": null,
+          "loop_max": 4,
+          "host_load1": 3.58,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+              ],
+              [
+                "sha256:99ff7808c1e62c8b797a7988fb76f3379d2c31716054bf8599751b10e89fc5e7"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "e35fe6620c5f9068134dc01329aa4ad9",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "step_memory_loss",
+          "status": "applied",
+          "spans_stored": 32,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 133.2,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever",
+            "retriever"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.1586613,
+          "loop_max": 7,
+          "host_load1": 2.71,
+          "marker_spans": [
+            "agent"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "loop_max": [
+              2,
+              7
+            ],
+            "repeat_min": 3
+          }
+        },
+        {
+          "trace_id": "1f57198a7d765415da3c110cbb3aa4fc",
+          "query": "9465608b62ea",
+          "stratum": "answerable",
+          "kind": "tool_failure",
+          "status": "applied",
+          "spans_stored": 12,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 87.2,
+          "outcome": "answered",
+          "steps": [
+            "retriever",
+            "retriever",
+            "retriever",
+            "final_answer"
+          ],
+          "bundle_digest": [
+            "sha256:3d5cd7f97e85e17beae69c4e6a58b33d26823c78bf296251516e842ec5c86965"
+          ],
+          "golden_in_topk": false,
+          "max_score": 0.15013492,
+          "loop_max": 2,
+          "host_load1": 1.22,
+          "marker_spans": [
+            "tool"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "marked_tool_error": 1,
+            "consumed_by_llm": 1,
+            "retried": 0,
+            "error_type": [
+              "ToolFailure"
+            ]
+          }
+        }
+      ],
+      "resume": {
+        "entries": 7,
+        "records": 7,
+        "eval_traces_rows": 7,
+        "stored_traces": 8,
+        "injection_ids_checked": 6,
+        "attempts": [
+          {
+            "id": "a001-20261117T210052Z",
+            "status": "killed",
+            "started_at": "2026-11-17T21:00:52.240Z",
+            "ended_at": "2026-11-17T21:04:31.465Z",
+            "last_event": "entry_trace agentic-rag:malformed_output:9465608b62ea"
+          },
+          {
+            "id": "a002-20261117T210431Z",
+            "status": "completed",
+            "started_at": "2026-11-17T21:04:31.486Z",
+            "ended_at": "2026-11-17T21:13:41.228Z",
+            "last_event": "entry_trace agentic-rag:tool_failure:9465608b62ea"
+          },
+          {
+            "id": "a003-20261117T212751Z",
+            "status": "completed",
+            "started_at": "2026-11-17T21:27:51.235Z",
+            "ended_at": "2026-11-17T21:27:51.260Z",
+            "last_event": "attempt_start"
+          }
+        ],
+        "killed": 1,
+        "torn_tails": 0,
+        "lost_entries": 1,
+        "abandoned": [
+          {
+            "trace_id": "91714c396783ddf9c8f5b0bf9402f517",
+            "entry_id": "agentic-rag:malformed_output:9465608b62ea",
+            "attempt_id": "a001-20261117T210052Z",
+            "kind": "malformed_output",
+            "reason": "killed",
+            "source": "attempt_log",
+            "stored_spans": 1
+          }
+        ],
+        "abandoned_by_kind": {
+          "malformed_output": 1
+        },
+        "abandoned_by_reason": {
+          "killed": 1
+        },
+        "swept": 0,
+        "duplicate_injections": 0,
+        "orphans": [],
+        "since": "2026-11-17 00:00:00",
+        "orphan_slack_seconds": 5.0,
+        "problems": []
+      },
+      "problems": [],
+      "content_check": {
+        "needles": {
+          "queries": 1,
+          "contract_chunks": 403,
+          "windows": 9013
+        },
+        "leaking": 0,
+        "scanned": {
+          "rows": {
+            "blame": 0,
+            "detector_runs": 0,
+            "eval_exclusions": 2,
+            "eval_traces": 7,
+            "findings": 0,
+            "injections": 6,
+            "spans": 127,
+            "trace_arrivals": 51,
+            "trace_summary": 7
+          },
+          "rows_total": 200,
+          "abandoned_traces": 1,
+          "exported_spans": 127,
+          "files": {
+            "ledger.jsonl": 7,
+            "plan.jsonl": 7,
+            "queries.jsonl": 1,
+            "state.json": 1496,
+            "attempts.jsonl": 28,
+            "outcomes.a001-20261117T210052Z.jsonl": 2,
+            "outcomes.a002-20261117T210431Z.jsonl": 5,
+            "otlp.a001-20261117T210052Z.jsonl": 14,
+            "otlp.a002-20261117T210431Z.jsonl": 50,
+            "attempt.a002-20261117T210431Z.json": 230,
+            "attempt.a003-20261117T212751Z.json": 230,
+            "app.a001-20261117T210052Z.log": 27,
+            "app.a002-20261117T210431Z.log": 30
+          },
+          "id_fields_excluded": {
+            "fields": [
+              "query_ref",
+              "ref"
+            ],
+            "values": 29
+          }
+        }
+      }
+    },
+    "runbook-agent": {
+      "app": "runbook-agent",
+      "run_id": "faults-smoke-20261117-s7-31e6064",
+      "baseline_digest": "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1",
+      "spans": {
+        "sent": 9,
+        "stored": 9,
+        "exported_for_abandoned_traces": 3
+      },
+      "per_kind": {
+        "clean": {
+          "component": "",
+          "traces": 1,
+          "applied": 0,
+          "not_reached": 0,
+          "marker_ok": 0,
+          "joined": 0,
+          "moved": 0,
+          "assembled": 1,
+          "seconds_median": 88.4,
+          "seconds_p95": 88.4,
+          "host_load1_median": 4.55,
+          "outcomes": {
+            "no-runbook": 1
+          }
+        },
+        "malformed_output": {
+          "component": "model",
+          "traces": 1,
+          "applied": 1,
+          "not_reached": 0,
+          "marker_ok": 1,
+          "joined": 1,
+          "moved": 1,
+          "assembled": 1,
+          "seconds_median": 109.1,
+          "seconds_p95": 109.1,
+          "host_load1_median": 5.52,
+          "outcomes": {
+            "no-runbook": 1
+          }
+        },
+        "prompt_variant": {
+          "component": "prompt",
+          "traces": 1,
+          "applied": 1,
+          "not_reached": 0,
+          "marker_ok": 1,
+          "joined": 1,
+          "moved": 1,
+          "assembled": 1,
+          "seconds_median": 97.4,
+          "seconds_p95": 97.4,
+          "host_load1_median": 1.62,
+          "outcomes": {
+            "no-runbook": 1
+          }
+        }
+      },
+      "per_trace": [
+        {
+          "trace_id": "91d5de02fe58bdc754ac92767e3183a9",
+          "query": "9d4442119917",
+          "stratum": "latency",
+          "kind": "malformed_output",
+          "status": "applied",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 109.1,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0,
+          "host_load1": 5.52,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "parse_ok": [
+              [
+                "true"
+              ],
+              [
+                "false"
+              ]
+            ]
+          }
+        },
+        {
+          "trace_id": "f8af09de2c5f195dc9b8fe3afb14823d",
+          "query": "f6bf7d9ddd50",
+          "stratum": "latency",
+          "kind": "clean",
+          "status": "clean",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 88.4,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0,
+          "host_load1": 4.55
+        },
+        {
+          "trace_id": "c71c7041d6aa9108c59a3fa8873ff728",
+          "query": "6b0b52f1a142",
+          "stratum": "latency",
+          "kind": "prompt_variant",
+          "status": "applied",
+          "spans_stored": 3,
+          "trace_summary": true,
+          "trace_completed": true,
+          "eval_traces_row": true,
+          "seconds": 97.4,
+          "outcome": "no-runbook",
+          "steps": [],
+          "bundle_digest": [
+            "sha256:99983a64628c33e47965d9b2a35493ba2a9939f74dd0ec86aab3baefc94e0d33"
+          ],
+          "golden_in_topk": null,
+          "max_score": null,
+          "loop_max": 0,
+          "host_load1": 1.62,
+          "marker_spans": [
+            "llm"
+          ],
+          "marker_kind_ok": true,
+          "marker_spans_set": 1,
+          "joined_spans": 1,
+          "params_ok": true,
+          "signal": {
+            "moved": true,
+            "bundle_digest": [
+              [
+                "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1"
+              ],
+              [
+                "sha256:99983a64628c33e47965d9b2a35493ba2a9939f74dd0ec86aab3baefc94e0d33"
+              ]
+            ]
+          }
+        }
+      ],
+      "resume": {
+        "entries": 3,
+        "records": 3,
+        "eval_traces_rows": 3,
+        "stored_traces": 4,
+        "injection_ids_checked": 2,
+        "attempts": [
+          {
+            "id": "a001-20261117T211524Z",
+            "status": "failed: SystemExit",
+            "started_at": "2026-11-17T21:15:24.989Z",
+            "ended_at": "2026-11-17T21:21:34.739Z",
+            "last_event": "attempt_start"
+          },
+          {
+            "id": "a002-20261117T212321Z",
+            "status": "killed",
+            "started_at": "2026-11-17T21:23:21.988Z",
+            "ended_at": "2026-11-17T21:29:07.488Z",
+            "last_event": "entry_start runbook-agent:clean:f6bf7d9ddd50"
+          },
+          {
+            "id": "a003-20261117T212907Z",
+            "status": "completed",
+            "started_at": "2026-11-17T21:29:07.977Z",
+            "ended_at": "2026-11-17T21:33:59.010Z",
+            "last_event": "entry_trace runbook-agent:prompt_variant:6b0b52f1a142"
+          }
+        ],
+        "killed": 1,
+        "torn_tails": 0,
+        "lost_entries": 1,
+        "abandoned": [
+          {
+            "trace_id": "8134a2bd1eef483a79fec7ccbae2d1bb",
+            "entry_id": "runbook-agent:clean:f6bf7d9ddd50",
+            "attempt_id": "a002-20261117T212321Z",
+            "kind": "clean",
+            "reason": "killed",
+            "source": "preload",
+            "stored_spans": 3
+          }
+        ],
+        "abandoned_by_kind": {
+          "clean": 1
+        },
+        "abandoned_by_reason": {
+          "killed": 1
+        },
+        "swept": 0,
+        "duplicate_injections": 0,
+        "orphans": [],
+        "since": "2026-11-17 00:00:00",
+        "orphan_slack_seconds": 5.0,
+        "problems": []
+      },
+      "problems": [],
+      "content_check": {
+        "needles": {
+          "alert": 5,
+          "prompt_windows": 153
+        },
+        "leaking": 0,
+        "scanned": {
+          "rows": {
+            "blame": 0,
+            "detector_runs": 0,
+            "eval_exclusions": 1,
+            "eval_traces": 3,
+            "findings": 0,
+            "injections": 2,
+            "spans": 12,
+            "trace_arrivals": 4,
+            "trace_summary": 4
+          },
+          "rows_total": 26,
+          "abandoned_traces": 1,
+          "exported_spans": 12,
+          "files": {
+            "ledger.jsonl": 3,
+            "plan.jsonl": 3,
+            "queries.jsonl": 3,
+            "state.json": 1135,
+            "attempts.jsonl": 15,
+            "outcomes.a002-20261117T212321Z.jsonl": 1,
+            "outcomes.a003-20261117T212907Z.jsonl": 2,
+            "otlp.a002-20261117T212321Z.salvaged.json": 1,
+            "otlp.a003-20261117T212907Z.b0.json": 1,
+            "otlp.a003-20261117T212907Z.b1.json": 1,
+            "attempt.a001-20261117T211524Z.json": 241,
+            "attempt.a002-20261117T212321Z.json": 9,
+            "attempt.a003-20261117T212907Z.json": 240
+          },
+          "id_fields_excluded": {
+            "fields": [
+              "query_ref",
+              "ref"
+            ],
+            "values": 15
+          }
+        }
+      }
+    }
+  },
+  "state": {
+    "agentic-rag": {
+      "run_id": "faults-smoke-20261117-s7-31e6064",
+      "app": "agentic-rag",
+      "prepared_at": "2026-11-17T21:00:42Z",
+      "host_cpus": 16,
+      "traceblame_commit": "31e60647721a908a570d32f941dcaf90ca2fc0cd",
+      "dirty": false,
+      "app_commit": "5370b067fdd1c44553fc34c5abb92f267d2393a1",
+      "app_dirty": false,
+      "model": {
+        "name": "qwen2.5:7b",
+        "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+        "server": "ollama",
+        "server_version": "0.40.16"
+      },
+      "packages": {
+        "openinference-instrumentation-openai": "0.1.68",
+        "openinference-instrumentation": "0.1.74",
+        "openinference-semantic-conventions": "0.1.43",
+        "openai": "3.41.0",
+        "opentelemetry-sdk": "1.45.2",
+        "opentelemetry-exporter-otlp-proto-http": "1.45.2",
+        "traceblame-py": "0.1.0",
+        "chromadb": "1.5.9",
+        "sentence-transformers": "6.2.0",
+        "torch": "2.15.0+cpu"
+      },
+      "seed": 7,
+      "config": {
+        "n": 24,
+        "ratio": 0.5,
+        "queries": 1,
+        "clean": 1,
+        "counts": {
+          "golden_context_removed": 1,
+          "tool_failure": 1,
+          "output_budget_exhausted": 1,
+          "step_memory_loss": 1,
+          "malformed_output": 1,
+          "prompt_variant": 1
+        }
+      },
+      "golden_coverage": {
+        "mapped": 12,
+        "answerable_sampled": 12
+      },
+      "excluded_queries": {
+        "listed": 0,
+        "removed": 0
+      },
+      "plan": {
+        "name": "smoke",
+        "entries": 7,
+        "sha256": "0538f2aa61bad5a2627b19c0fbd1bbd4bea2da5b3d5979ed0e98cfcb10b9f410",
+        "by_kind": {
+          "clean": 1,
+          "golden_context_removed": 1,
+          "malformed_output": 1,
+          "output_budget_exhausted": 1,
+          "prompt_variant": 1,
+          "step_memory_loss": 1,
+          "tool_failure": 1
+        }
+      },
+      "queries": {
+        "queries": 1,
+        "sha256": "9a5021cf8cb8e4a0ae775c5d46bf6c8e250282a10043cd74ae1f85e84c5c98fa",
+        "by_split": {
+          "none": 1
+        },
+        "compared_with_committed_list": null
+      },
+      "faults_sha256": {
+        "packages/faults/src/traceblame_faults/__init__.py": "9d98854ead8cdf52b17fa0d73049f4fdee1ddaedd01127c1b38a35c09828f24c",
+        "packages/faults/src/traceblame_faults/appendlog.py": "276e48d94311659ae3ae9e4e6694f715b6a8f9766c054314295d32fec6e0d745",
+        "packages/faults/src/traceblame_faults/attempts.py": "91c60f9d983cd9b729f8eeabe3111f726e0acaf926571277418637b5e1ddb918",
+        "packages/faults/src/traceblame_faults/bundle.py": "b93f268e0a81eb23faa2b76b2c066db10ea3e65cd4aa8261a8385ee23bbffc99",
+        "packages/faults/src/traceblame_faults/cli.py": "591f2490257968dfdb5c1baf7c8f53c31cb88024cec075affd775b8dec18708c",
+        "packages/faults/src/traceblame_faults/dataset.py": "131cbd951bd55200bba90bc009e9d0acea697649b7ea3147355801e882d1127d",
+        "packages/faults/src/traceblame_faults/golden.py": "2af858bc17ad535200c984bcd57c4e28750eca5d69dd7e54e733f43cea340e2f",
+        "packages/faults/src/traceblame_faults/guard.py": "b650e8b2d602705730baa812e10ddc8a733f729d7f6dd9cc5d64bfdaa7792ed0",
+        "packages/faults/src/traceblame_faults/ids.py": "f5d4fcfbb90b324474c80c2afce098c74b3caceac318a110dbcc9296e4b34841",
+        "packages/faults/src/traceblame_faults/kinds.py": "8bd057964536cf31ec4d9397876526571c5c5ee474cd647b5b4d4d8836015954",
+        "packages/faults/src/traceblame_faults/ledger.py": "9ddc798129409e220acb225c817fa285674839ffa8baffa47bc82a9f85dd0f8d",
+        "packages/faults/src/traceblame_faults/mutate.py": "b855311f8a1483c089e1ac481254629dca008ebb05d87065649d47317ed3e104",
+        "packages/faults/src/traceblame_faults/plan.py": "484dadfef00783f4041c8e07d99101f1bdae09c886a8f70b8ac69c76f934b316",
+        "packages/faults/src/traceblame_faults/planfile.py": "c8fc9fa1340d86a7c59f43e6233b25e44b0aa7ee1381f855ddabe26b3214683d",
+        "packages/faults/src/traceblame_faults/py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "packages/faults/src/traceblame_faults/querylist.py": "9e4b75a18827165a21bd80188eee1c634dd2d71fe602cee5d9f08d5ba334b866",
+        "packages/faults/src/traceblame_faults/record.py": "a5360f1874dd579a65d2a4bbf68f2183bf38e8a1effad497560a9e721fe421ab",
+        "packages/faults/src/traceblame_faults/retrieval.py": "ed55a6ae1242c88d67e4bc987af719a88aa02d22cc9229ffd3a6cacb2983375b",
+        "packages/faults/src/traceblame_faults/runner.py": "6a23d6ca2089ae53685567a9979f0d22ed502e185a4976ba8cae5fbf3bfa6998",
+        "packages/faults/src/traceblame_faults/scenario.py": "f01ad31e2e186a64ee663314afce7cb9d879643afc68306cde910b18eb2aeef5",
+        "packages/faults/src/traceblame_faults/scenarios/golden_context_removed.agentic-rag.yaml": "36338c55e5b438d828f3d8743d02832b70afcba2519efddd0f2d8e0d51154025",
+        "packages/faults/src/traceblame_faults/scenarios/malformed_output.agentic-rag.yaml": "341861225f8f1f3d125a0c534f96922834983f33041fcaf0e25795c6d79b88c9",
+        "packages/faults/src/traceblame_faults/scenarios/malformed_output.runbook-agent.yaml": "cc1b476a06e3b8997a640efea1913bf876bfcc4bb3d608f38064120ac2304fcf",
+        "packages/faults/src/traceblame_faults/scenarios/output_budget_exhausted.agentic-rag.yaml": "7dcc9bcabd3d7d08261da71dfa4d6a2a8cf21a430ceb153e8f992659a66b7956",
+        "packages/faults/src/traceblame_faults/scenarios/prompt_variant.agentic-rag.yaml": "62d02475feed0df067e8b2440597516a3a2b68d47a13fde35ca310431d98aa32",
+        "packages/faults/src/traceblame_faults/scenarios/prompt_variant.runbook-agent.yaml": "24134b3a869c38d53a642033125ba090aa91f98942e080b789a9eaf976cfe58e",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/agentic_rag/direct-answer-system.txt": "f5c88ac58cc8e17033932b2dd3ec0b302cf6619e97879bfa0b6a81e868517720",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/agentic_rag/pre-abc8838-reasoning.txt": "93d6e446ef90649df0db8d486b938456d84de445e0ebeabf67c558bc9bff8967",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/runbook_agent/no-candidate-rule-system.txt": "01925e1219193214f9772cf490105d9904e677a931c8a02d308c38fd1b232852",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/runbook_agent/no-decline-rule-system.txt": "e634dd00febe550e905111808923d4292ab57ab587b2d4f509bfcc367dfcf06b",
+        "packages/faults/src/traceblame_faults/scenarios/step_memory_loss.agentic-rag.yaml": "78f54fa1adde2181ca0be4ff541c1365f5ecf7452959dceab69b70b2a1c1f549",
+        "packages/faults/src/traceblame_faults/scenarios/tool_failure.agentic-rag.yaml": "9c2e3c069820064607d7fed43b0c5a3d699523ceebd3cd55bbf7db73695307f2",
+        "packages/faults/src/traceblame_faults/split.py": "cb021f97995c3a95817d7b07acffdd3c7f319741c57e535a35cd0c3f41973f0e",
+        "packages/faults/src/traceblame_faults/sql/eval_dataset_read.sql": "b6ce6a0b524f80ffb5889d904d2b8a44c87e310d4318fa33f9210ce538ab2adb",
+        "packages/faults/src/traceblame_faults/sql/eval_exclusions_read.sql": "f5462d7a88fd7b02796a3f7ff6f4b32840aa50c81e265e1652aa1a26b2453e0e",
+        "packages/faults/src/traceblame_faults/sql/eval_exclusions_write.sql": "2c631f717abd2d61f08e24567226052525ee282148fd5b55ce38d76ebfa6d19e",
+        "packages/faults/src/traceblame_faults/sql/eval_injections_by_id_read.sql": "651a7fbb19138df29271717de3b7852ac90bca27bdb1f93e1bcaadca82f072cd",
+        "packages/faults/src/traceblame_faults/sql/eval_run_traces_read.sql": "c0d2b5ef4cbeff57a477a15e8f24b2d4143ef5f85d64cce3c2289fd15bbf17cf",
+        "packages/faults/src/traceblame_faults/sql/eval_traces_read.sql": "368a5ae7636122848aa91fb0deb761867f4a0257b547a5abfc0c919b6777b398",
+        "packages/faults/src/traceblame_faults/sql/eval_traces_write.sql": "f2ca1f246cd520840d18b976b00baeebcbfcac0791d82174c8fed54d6408cca8",
+        "packages/faults/src/traceblame_faults/validate.py": "0c82e0de710cb631767b358241ef032673c2b94938fa7f98880912286f41f7a4",
+        "tools/faults/agentic_rag_app.py": "f2eb0b6b30963edd771fed6fa7ae1698214a0e1f9c1883e955ed705a2243ff5a"
+      },
+      "run": {
+        "nats_seq_before": 280656,
+        "finished_at": "2026-11-17T21:27:51Z",
+        "seconds": 0.0,
+        "spans_sent": 127,
+        "eval_tenants": "[tenant-eval]",
+        "attempts": 3,
+        "last_attempt": "a003-20261117T212751Z"
+      },
+      "record": {
+        "eval_traces": 7,
+        "injections": 6,
+        "eval_exclusions": 1
+      }
+    },
+    "runbook-agent": {
+      "run_id": "faults-smoke-20261117-s7-31e6064",
+      "app": "runbook-agent",
+      "built_at": "2026-11-17T21:15:22Z",
+      "host_cpus": 16,
+      "traceblame_commit": "31e60647721a908a570d32f941dcaf90ca2fc0cd",
+      "dirty": false,
+      "app_commit": "92fb6f8fcbcf30f463adea13794c37159d5409e9",
+      "app_dirty": false,
+      "seed": 7,
+      "config": {
+        "scenarios": [
+          "latency"
+        ],
+        "per_scenario": 3,
+        "clean": 1,
+        "counts": {
+          "malformed_output": 1,
+          "prompt_variant": 1
+        },
+        "approval_timeout_ms": 30000,
+        "distinct": false
+      },
+      "build": {
+        "image": "runbook-agent:92fb6f8-tb31e6064",
+        "image_id": "sha256:8cefc7e25c75f88887fa23bcdb30632a8602c561ff41b4df771ce3c98b60c607",
+        "node": "v22.23.5",
+        "kubectl": {
+          "version": "1.37.2",
+          "sha256": "c04487523e7aa7d1493f7808174c899db93d7a9cf57531420cd76b9bd415f8f4"
+        },
+        "shim_tarball_sha256": "5c7b5d1503758b5ca24a435fb6da165d19ba9ebab7e4045827d7a5a86cf6cf9b",
+        "dockerfile_patch": {
+          "original": "COPY package.json pnpm-lock.yaml ./",
+          "used": "COPY package.json pnpm-lock.yaml traceblame-ts-0.1.0.tgz ./"
+        },
+        "user": {
+          "uid": 100,
+          "gid": 101
+        },
+        "packages": {
+          "ai": "4.3.19",
+          "@ai-sdk/openai": "1.3.24",
+          "traceblame-ts": "0.1.0",
+          "@traceloop/node-server-sdk": "0.27.0",
+          "@opentelemetry/sdk-trace-base": "2.0.1",
+          "@opentelemetry/api": "1.9.0"
+        },
+        "eval_image": "runbook-agent:92fb6f8-tb31e6064-faults",
+        "eval_image_id": "sha256:ac3987b41bd71df96330b3b6742ad766d9e152ec2c6360b7c5380d9c66477741",
+        "eval_config_id": "sha256:bf046085e19d7176de738549aa8cf295a18f0b7f25cd6a13d3ac51eb62ab7e09"
+      },
+      "image_guard": {
+        "base_node_options": false,
+        "base_has_preload": false,
+        "eval_node_options": true,
+        "eval_has_preload": true,
+        "fetch_without_switch": "fetch",
+        "fetch_other_tenant": "fetch",
+        "fetch_eval_tenant": "handle"
+      },
+      "preload_sha256": "99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4",
+      "baseline_digest": "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1",
+      "plan": {
+        "name": "smoke",
+        "entries": 3,
+        "sha256": "71680c2ce41e354c3fd6cfdc4b41fb28b8b26179d0f3332961c12f2ebb43ccf8",
+        "by_kind": {
+          "malformed_output": 1,
+          "clean": 1,
+          "prompt_variant": 1
+        }
+      },
+      "queries": {
+        "queries": 3,
+        "sha256": "c5efc11c4c0ecbc34064830fd694e065bb25f5d552badf93a1338f31c136c85d",
+        "by_split": {
+          "none": 3
+        },
+        "distinct_tuples": 3,
+        "excluded_tuples": 0,
+        "compared_with_committed_list": null
+      },
+      "faults_sha256": {
+        "packages/faults/src/traceblame_faults/__init__.py": "9d98854ead8cdf52b17fa0d73049f4fdee1ddaedd01127c1b38a35c09828f24c",
+        "packages/faults/src/traceblame_faults/appendlog.py": "276e48d94311659ae3ae9e4e6694f715b6a8f9766c054314295d32fec6e0d745",
+        "packages/faults/src/traceblame_faults/attempts.py": "91c60f9d983cd9b729f8eeabe3111f726e0acaf926571277418637b5e1ddb918",
+        "packages/faults/src/traceblame_faults/bundle.py": "b93f268e0a81eb23faa2b76b2c066db10ea3e65cd4aa8261a8385ee23bbffc99",
+        "packages/faults/src/traceblame_faults/cli.py": "591f2490257968dfdb5c1baf7c8f53c31cb88024cec075affd775b8dec18708c",
+        "packages/faults/src/traceblame_faults/dataset.py": "131cbd951bd55200bba90bc009e9d0acea697649b7ea3147355801e882d1127d",
+        "packages/faults/src/traceblame_faults/golden.py": "2af858bc17ad535200c984bcd57c4e28750eca5d69dd7e54e733f43cea340e2f",
+        "packages/faults/src/traceblame_faults/guard.py": "b650e8b2d602705730baa812e10ddc8a733f729d7f6dd9cc5d64bfdaa7792ed0",
+        "packages/faults/src/traceblame_faults/ids.py": "f5d4fcfbb90b324474c80c2afce098c74b3caceac318a110dbcc9296e4b34841",
+        "packages/faults/src/traceblame_faults/kinds.py": "8bd057964536cf31ec4d9397876526571c5c5ee474cd647b5b4d4d8836015954",
+        "packages/faults/src/traceblame_faults/ledger.py": "9ddc798129409e220acb225c817fa285674839ffa8baffa47bc82a9f85dd0f8d",
+        "packages/faults/src/traceblame_faults/mutate.py": "b855311f8a1483c089e1ac481254629dca008ebb05d87065649d47317ed3e104",
+        "packages/faults/src/traceblame_faults/plan.py": "484dadfef00783f4041c8e07d99101f1bdae09c886a8f70b8ac69c76f934b316",
+        "packages/faults/src/traceblame_faults/planfile.py": "c8fc9fa1340d86a7c59f43e6233b25e44b0aa7ee1381f855ddabe26b3214683d",
+        "packages/faults/src/traceblame_faults/py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "packages/faults/src/traceblame_faults/querylist.py": "9e4b75a18827165a21bd80188eee1c634dd2d71fe602cee5d9f08d5ba334b866",
+        "packages/faults/src/traceblame_faults/record.py": "a5360f1874dd579a65d2a4bbf68f2183bf38e8a1effad497560a9e721fe421ab",
+        "packages/faults/src/traceblame_faults/retrieval.py": "ed55a6ae1242c88d67e4bc987af719a88aa02d22cc9229ffd3a6cacb2983375b",
+        "packages/faults/src/traceblame_faults/runner.py": "6a23d6ca2089ae53685567a9979f0d22ed502e185a4976ba8cae5fbf3bfa6998",
+        "packages/faults/src/traceblame_faults/scenario.py": "f01ad31e2e186a64ee663314afce7cb9d879643afc68306cde910b18eb2aeef5",
+        "packages/faults/src/traceblame_faults/scenarios/golden_context_removed.agentic-rag.yaml": "36338c55e5b438d828f3d8743d02832b70afcba2519efddd0f2d8e0d51154025",
+        "packages/faults/src/traceblame_faults/scenarios/malformed_output.agentic-rag.yaml": "341861225f8f1f3d125a0c534f96922834983f33041fcaf0e25795c6d79b88c9",
+        "packages/faults/src/traceblame_faults/scenarios/malformed_output.runbook-agent.yaml": "cc1b476a06e3b8997a640efea1913bf876bfcc4bb3d608f38064120ac2304fcf",
+        "packages/faults/src/traceblame_faults/scenarios/output_budget_exhausted.agentic-rag.yaml": "7dcc9bcabd3d7d08261da71dfa4d6a2a8cf21a430ceb153e8f992659a66b7956",
+        "packages/faults/src/traceblame_faults/scenarios/prompt_variant.agentic-rag.yaml": "62d02475feed0df067e8b2440597516a3a2b68d47a13fde35ca310431d98aa32",
+        "packages/faults/src/traceblame_faults/scenarios/prompt_variant.runbook-agent.yaml": "24134b3a869c38d53a642033125ba090aa91f98942e080b789a9eaf976cfe58e",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/agentic_rag/direct-answer-system.txt": "f5c88ac58cc8e17033932b2dd3ec0b302cf6619e97879bfa0b6a81e868517720",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/agentic_rag/pre-abc8838-reasoning.txt": "93d6e446ef90649df0db8d486b938456d84de445e0ebeabf67c558bc9bff8967",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/runbook_agent/no-candidate-rule-system.txt": "01925e1219193214f9772cf490105d9904e677a931c8a02d308c38fd1b232852",
+        "packages/faults/src/traceblame_faults/scenarios/prompts/runbook_agent/no-decline-rule-system.txt": "e634dd00febe550e905111808923d4292ab57ab587b2d4f509bfcc367dfcf06b",
+        "packages/faults/src/traceblame_faults/scenarios/step_memory_loss.agentic-rag.yaml": "78f54fa1adde2181ca0be4ff541c1365f5ecf7452959dceab69b70b2a1c1f549",
+        "packages/faults/src/traceblame_faults/scenarios/tool_failure.agentic-rag.yaml": "9c2e3c069820064607d7fed43b0c5a3d699523ceebd3cd55bbf7db73695307f2",
+        "packages/faults/src/traceblame_faults/split.py": "cb021f97995c3a95817d7b07acffdd3c7f319741c57e535a35cd0c3f41973f0e",
+        "packages/faults/src/traceblame_faults/sql/eval_dataset_read.sql": "b6ce6a0b524f80ffb5889d904d2b8a44c87e310d4318fa33f9210ce538ab2adb",
+        "packages/faults/src/traceblame_faults/sql/eval_exclusions_read.sql": "f5462d7a88fd7b02796a3f7ff6f4b32840aa50c81e265e1652aa1a26b2453e0e",
+        "packages/faults/src/traceblame_faults/sql/eval_exclusions_write.sql": "2c631f717abd2d61f08e24567226052525ee282148fd5b55ce38d76ebfa6d19e",
+        "packages/faults/src/traceblame_faults/sql/eval_injections_by_id_read.sql": "651a7fbb19138df29271717de3b7852ac90bca27bdb1f93e1bcaadca82f072cd",
+        "packages/faults/src/traceblame_faults/sql/eval_run_traces_read.sql": "c0d2b5ef4cbeff57a477a15e8f24b2d4143ef5f85d64cce3c2289fd15bbf17cf",
+        "packages/faults/src/traceblame_faults/sql/eval_traces_read.sql": "368a5ae7636122848aa91fb0deb761867f4a0257b547a5abfc0c919b6777b398",
+        "packages/faults/src/traceblame_faults/sql/eval_traces_write.sql": "f2ca1f246cd520840d18b976b00baeebcbfcac0791d82174c8fed54d6408cca8",
+        "packages/faults/src/traceblame_faults/validate.py": "0c82e0de710cb631767b358241ef032673c2b94938fa7f98880912286f41f7a4",
+        "tools/faults/run_runbook_agent.py": "d4d21ba593e1e80be8047496eb3d6e0aa15ed435cf2dd2bca4eb25dc7b1b138f"
+      },
+      "run": {
+        "nats_seq_before": 280663,
+        "finished_at": "2026-11-17T21:33:59Z",
+        "seconds": 290.6,
+        "spans_sent": 12,
+        "eval_tenants": "[tenant-eval]",
+        "model": {
+          "name": "qwen2.5:7b",
+          "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+          "server_version": "0.40.16"
+        },
+        "safety": [
+          {
+            "bundle_digest": "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1",
+            "failed": [
+              "network policy: API server egress is the live EndpointSlice",
+              "in pod: API server reachable (GET /version)",
+              "in pod: kubectl get pods -n runbook-monitoring",
+              "in pod: kubectl get pods -n runbook-sandbox"
+            ]
+          },
+          {
+            "bundle_digest": "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1",
+            "failed": []
+          },
+          {
+            "bundle_digest": "sha256:1b5b700607ed7cf70d1f3ddc96c0953677ee75cec8219e5095edea3bb0c378f1",
+            "failed": []
+          },
+          {
+            "bundle_digest": "sha256:99983a64628c33e47965d9b2a35493ba2a9939f74dd0ec86aab3baefc94e0d33",
+            "failed": []
+          }
+        ],
+        "problems": [],
+        "attempts": 3,
+        "last_attempt": "a003-20261117T212907Z"
+      },
+      "record": {
+        "eval_traces": 3,
+        "injections": 2,
+        "eval_exclusions": 1
+      }
+    }
+  },
+  "provenance": {
+    "agentic-rag": {
+      "dirty": false,
+      "app_dirty": false,
+      "phases": {
+        "run": {
+          "start": {
+            "at": "2026-11-17T21:27:49Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "end": {
+            "at": "2026-11-17T21:27:51Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "problems": []
+        },
+        "record": {
+          "start": {
+            "at": "2026-11-17T21:27:53Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "end": {
+            "at": "2026-11-17T21:27:55Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "problems": []
+        },
+        "check": {
+          "start": {
+            "at": "2026-11-17T21:27:57Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "end": {
+            "at": "2026-11-17T21:28:27Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "problems": []
+        }
+      }
+    },
+    "runbook-agent": {
+      "dirty": false,
+      "app_dirty": false,
+      "phases": {
+        "run": {
+          "start": {
+            "at": "2026-11-17T21:29:06Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "eval": {
+            "image": "runbook-agent:92fb6f8-tb31e6064-faults",
+            "built_image_id": "sha256:ac3987b41bd71df96330b3b6742ad766d9e152ec2c6360b7c5380d9c66477741",
+            "built_config_id": "sha256:bf046085e19d7176de738549aa8cf295a18f0b7f25cd6a13d3ac51eb62ab7e09"
+          },
+          "eval_pods": [
+            {
+              "label": "sha256:1b5b7006",
+              "at": "2026-11-17T21:29:43Z",
+              "pods": [
+                {
+                  "pod": "runbook-agent-f5b484cbb-jhl7c",
+                  "container": "runbook-agent",
+                  "image": "runbook-agent:92fb6f8-tb31e6064-faults",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:20d95de9993adee4179a24a9a77f25044d506afbf3e900c6f2779001c29dd33e",
+                  "node": "traceblame-worker2",
+                  "node_config_ids": [
+                    "sha256:bf046085e19d7176de738549aa8cf295a18f0b7f25cd6a13d3ac51eb62ab7e09"
+                  ]
+                }
+              ]
+            },
+            {
+              "label": "sha256:99983a64",
+              "at": "2026-11-17T21:31:54Z",
+              "pods": [
+                {
+                  "pod": "runbook-agent-659d65f77f-p84lk",
+                  "container": "runbook-agent",
+                  "image": "runbook-agent:92fb6f8-tb31e6064-faults",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:20d95de9993adee4179a24a9a77f25044d506afbf3e900c6f2779001c29dd33e",
+                  "node": "traceblame-worker2",
+                  "node_config_ids": [
+                    "sha256:bf046085e19d7176de738549aa8cf295a18f0b7f25cd6a13d3ac51eb62ab7e09"
+                  ]
+                }
+              ]
+            },
+            {
+              "label": "end",
+              "at": "2026-11-17T21:33:59Z",
+              "pods": [
+                {
+                  "pod": "runbook-agent-659d65f77f-p84lk",
+                  "container": "runbook-agent",
+                  "image": "runbook-agent:92fb6f8-tb31e6064-faults",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:20d95de9993adee4179a24a9a77f25044d506afbf3e900c6f2779001c29dd33e",
+                  "node": "traceblame-worker2",
+                  "node_config_ids": [
+                    "sha256:bf046085e19d7176de738549aa8cf295a18f0b7f25cd6a13d3ac51eb62ab7e09"
+                  ]
+                }
+              ]
+            }
+          ],
+          "end": {
+            "at": "2026-11-17T21:33:59Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "problems": []
+        },
+        "record": {
+          "start": {
+            "at": "2026-11-17T21:34:00Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "end": {
+            "at": "2026-11-17T21:34:01Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "problems": []
+        },
+        "check": {
+          "start": {
+            "at": "2026-11-17T21:34:02Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "end": {
+            "at": "2026-11-17T21:34:24Z",
+            "images": {
+              "otel-agent": [
+                {
+                  "pod": "otel-agent-hmzrl",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                },
+                {
+                  "pod": "otel-agent-zfkt7",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "otel-gateway": [
+                {
+                  "pod": "otel-gateway-58d848b77d-7hqf5",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "otel-gateway-58d848b77d-88w78",
+                  "container": "otelcol",
+                  "image": "traceblame-otelcol:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:544dff4a1da44bf7c1406fde4eee81d3b1b6e07d6ae2fae27c53a8dd701c8814",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "trace-assembler": [
+                {
+                  "pod": "trace-assembler-85d96646f8-7q9rs",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker"
+                },
+                {
+                  "pod": "trace-assembler-85d96646f8-hnsdc",
+                  "container": "assembler",
+                  "image": "traceblame-assembler:local",
+                  "image_id": "docker.io/library/import-2026-11-17@sha256:fd04e3e40cbf9ef169c2dbfc0e676061c3dec7007abda2377c974aa0d24010e5",
+                  "node": "traceblame-worker2"
+                }
+              ],
+              "clickhouse": [
+                {
+                  "pod": "chi-traceblame-demo-0-0-0",
+                  "container": "clickhouse",
+                  "image": "clickhouse/clickhouse-server:26.8.34.13@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "image_id": "docker.io/clickhouse/clickhouse-server@sha256:8b28eb09479c36c4533eec7a6268917d04ba3a6fd90e3f4205f70e761b6d7779",
+                  "node": "traceblame-worker"
+                }
+              ],
+              "nats": [
+                {
+                  "pod": "nats-0",
+                  "container": "nats",
+                  "image": "nats:2.14.9-alpine@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "image_id": "docker.io/library/nats@sha256:127c5ccbc538a93f53ebb19461dc193130df386c2d6dab8199661a28a30d85bd",
+                  "node": "traceblame-worker2"
+                }
+              ]
+            },
+            "migrations": {
+              "clickhouse": [
+                {
+                  "version": "0001",
+                  "name": "spans",
+                  "phase": "expand",
+                  "sha256": "ec39fa3ba092",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "otel_traces_ingest",
+                  "phase": "expand",
+                  "sha256": "2bf4555ab291",
+                  "applied_at": "2026-11-05T13:23:49Z"
+                },
+                {
+                  "version": "0003",
+                  "name": "spans_from_otel",
+                  "phase": "expand",
+                  "sha256": "fffa026e8a2e",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0004",
+                  "name": "findings",
+                  "phase": "expand",
+                  "sha256": "6dcc9ca329c1",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0005",
+                  "name": "blame",
+                  "phase": "expand",
+                  "sha256": "500e7a24481c",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0006",
+                  "name": "injections",
+                  "phase": "expand",
+                  "sha256": "ed6f0e72f1bb",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0007",
+                  "name": "trace_roots",
+                  "phase": "expand",
+                  "sha256": "d10f004f53e2",
+                  "applied_at": "2026-11-05T13:23:50Z"
+                },
+                {
+                  "version": "0008",
+                  "name": "trace_roots_from_otel",
+                  "phase": "expand",
+                  "sha256": "a39825f34fac",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0009",
+                  "name": "trace_arrivals",
+                  "phase": "expand",
+                  "sha256": "06f38018e34f",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0010",
+                  "name": "trace_arrivals_from_otel",
+                  "phase": "expand",
+                  "sha256": "e86b012f785a",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0011",
+                  "name": "drop_trace_roots_from_otel",
+                  "phase": "contract",
+                  "sha256": "d91fa5370215",
+                  "applied_at": "2026-11-05T13:23:51Z"
+                },
+                {
+                  "version": "0012",
+                  "name": "drop_trace_roots",
+                  "phase": "contract",
+                  "sha256": "6eef3c7d38f4",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0013",
+                  "name": "injections_injection_id",
+                  "phase": "expand",
+                  "sha256": "8e9c3e726c14",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0014",
+                  "name": "trace_summary",
+                  "phase": "expand",
+                  "sha256": "e4ace319061a",
+                  "applied_at": "2026-11-05T13:23:52Z"
+                },
+                {
+                  "version": "0015",
+                  "name": "eval_traces",
+                  "phase": "expand",
+                  "sha256": "6510d1f912cd",
+                  "applied_at": "2026-11-05T16:51:45Z"
+                },
+                {
+                  "version": "0016",
+                  "name": "findings_revision",
+                  "phase": "expand",
+                  "sha256": "d7b267093a99",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0017",
+                  "name": "detector_runs",
+                  "phase": "expand",
+                  "sha256": "afd264215c30",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0018",
+                  "name": "detector_params",
+                  "phase": "expand",
+                  "sha256": "50695d6451fe",
+                  "applied_at": "2026-11-17T20:37:51Z"
+                },
+                {
+                  "version": "0019",
+                  "name": "eval_exclusions",
+                  "phase": "expand",
+                  "sha256": "6c2131e11edd",
+                  "applied_at": "2026-11-17T20:37:52Z"
+                }
+              ],
+              "postgres": [
+                {
+                  "version": "0001",
+                  "name": "assembler_partitions",
+                  "phase": "expand",
+                  "sha256": "8ae1a3710e21",
+                  "applied_at": "2026-11-04T15:31:58Z"
+                },
+                {
+                  "version": "0002",
+                  "name": "assembler_replicas",
+                  "phase": "expand",
+                  "sha256": "0328e6b9c1a0",
+                  "applied_at": "2026-11-04T17:25:03Z"
+                }
+              ]
+            },
+            "errors": {}
+          },
+          "problems": []
+        }
+      }
+    }
+  },
+  "ledger": {
+    "agentic-rag": {
+      "sha256": "eff5cb1c48992c38763b1b2364c0da044ea5683c1f968a894a02fc0bcbfa58cb",
+      "records": 7,
+      "host_load1": {
+        "90a1c4dc0636312412ebb20587c2c33c": 3.62,
+        "e5bd7c4fce48d86fb5b80f5fe59967d7": 2.63,
+        "05cd5e46888d461902098e56e16c131a": 5.99,
+        "698b95f1e1e0af53cb5aa7f441cea7a7": 3.01,
+        "a99e713e0f68e7e88df5a8e7eeca978b": 3.58,
+        "e35fe6620c5f9068134dc01329aa4ad9": 2.71,
+        "1f57198a7d765415da3c110cbb3aa4fc": 1.22
+      },
+      "counts": {
+        "clean": {
+          "clean": 1,
+          "applied": 0,
+          "not_reached": 0
+        },
+        "golden_context_removed": {
+          "clean": 0,
+          "applied": 1,
+          "not_reached": 0
+        },
+        "malformed_output": {
+          "clean": 0,
+          "applied": 1,
+          "not_reached": 0
+        },
+        "output_budget_exhausted": {
+          "clean": 0,
+          "applied": 1,
+          "not_reached": 0
+        },
+        "prompt_variant": {
+          "clean": 0,
+          "applied": 1,
+          "not_reached": 0
+        },
+        "step_memory_loss": {
+          "clean": 0,
+          "applied": 1,
+          "not_reached": 0
+        },
+        "tool_failure": {
+          "clean": 0,
+          "applied": 1,
+          "not_reached": 0
+        }
+      }
+    },
+    "runbook-agent": {
+      "sha256": "044612c111e203ed424c1dc54b6b7641a02e9006554dae61ea2c807a654025fc",
+      "records": 3,
+      "host_load1": {
+        "91d5de02fe58bdc754ac92767e3183a9": 5.52,
+        "f8af09de2c5f195dc9b8fe3afb14823d": 4.55,
+        "c71c7041d6aa9108c59a3fa8873ff728": 1.62
+      },
+      "counts": {
+        "malformed_output": {
+          "clean": 0,
+          "applied": 1,
+          "not_reached": 0
+        },
+        "clean": {
+          "clean": 1,
+          "applied": 0,
+          "not_reached": 0
+        },
+        "prompt_variant": {
+          "clean": 0,
+          "applied": 1,
+          "not_reached": 0
+        }
+      }
+    }
+  },
+  "loop_gate": {
+    "applied": 1,
+    "loop_signal": 1,
+    "hit_rate": 1.0,
+    "hit_rate_min": 0.6,
+    "repeat_min": 3,
+    "passed": true,
+    "gated": false
+  },
+  "retrieval": [
+    {
+      "query": "9465608b62ea",
+      "status": "applied",
+      "mode": "distractor",
+      "golden_in_topk": [
+        false,
+        false
+      ],
+      "max_score": [
+        0.1586613,
+        -0.2219435
+      ],
+      "moved": true,
+      "counted": true
+    }
+  ],
+  "d1_components": {
+    "retrieval": 75,
+    "tool": 75,
+    "orchestration": 150,
+    "model": 75,
+    "prompt": 75,
+    "clean": 150
+  },
+  "projection": {
+    "rows": [
+      {
+        "app": "agentic-rag",
+        "kind": "golden_context_removed",
+        "traces": 75,
+        "seconds_median": 52.1,
+        "hours": 1.0854166666666667
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "tool_failure",
+        "traces": 75,
+        "seconds_median": 87.2,
+        "hours": 1.8166666666666667
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "output_budget_exhausted",
+        "traces": 75,
+        "seconds_median": 60.5,
+        "hours": 1.2604166666666667
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "step_memory_loss",
+        "traces": 75,
+        "seconds_median": 133.2,
+        "hours": 2.775
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "malformed_output",
+        "traces": 50,
+        "seconds_median": 71.8,
+        "hours": 0.9972222222222222
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "prompt_variant",
+        "traces": 50,
+        "seconds_median": 159.5,
+        "hours": 2.2152777777777777
+      },
+      {
+        "app": "agentic-rag",
+        "kind": "clean",
+        "traces": 110,
+        "seconds_median": 77.5,
+        "hours": 2.3680555555555554
+      },
+      {
+        "app": "runbook-agent",
+        "kind": "malformed_output",
+        "traces": 25,
+        "seconds_median": 109.1,
+        "hours": 0.7576388888888889
+      },
+      {
+        "app": "runbook-agent",
+        "kind": "prompt_variant",
+        "traces": 25,
+        "seconds_median": 97.4,
+        "hours": 0.6763888888888889
+      },
+      {
+        "app": "runbook-agent",
+        "kind": "clean",
+        "traces": 40,
+        "seconds_median": 88.4,
+        "hours": 0.9822222222222222
+      }
+    ],
+    "hours": 14.9,
+    "complete": true
+  },
+  "runbook_requests": [
+    "{\"max_tokens\": null, \"temperature\": 0}"
+  ],
+  "blockers": [],
+  "problems": [],
+  "preload": {
+    "run_sha256": "99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4",
+    "run_commit_matches": true,
+    "committed_sha256": "99165cf4425ea58a50cca9b0614f44d22217aca5e279ef7015438c3bc7c94bd4",
+    "commits_since": [],
+    "lines_added_removed": [
+      0,
+      0
+    ]
+  },
+  "notes": []
+}

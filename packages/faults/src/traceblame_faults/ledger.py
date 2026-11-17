@@ -5,6 +5,11 @@ numbers and digests; query_ref is the dataset's own question or task id (#14 dec
 A trace is clean (no fault planned), applied (the fault fired: injection_id set, an injections
 row follows) or not_reached (a fault was planned but its point never came, e.g. no k-th tool
 call: no injections row, and #19 excludes it).
+
+A line is appended only after its trace has ended, durably (appendlog), and the file is never
+rewritten: it is what `record` writes into eval_traces, so a trace that was killed mid-flight
+never gets a line or a row (#70). A record names the plan entry it completes; a Writer refuses a
+second record for an entry, and every reader refuses a torn tail.
 """
 
 import json
@@ -17,9 +22,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from traceblame_faults import ids, kinds
+from traceblame_faults import appendlog, ids, kinds
 
-_TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
+TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
 _INJECTED_AT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 _MAX_QUERY_REF = 512
 GOLDEN_STATUSES = ("mapped", "unmapped", "none")
@@ -54,6 +59,10 @@ class Record:
     # platform has none, and in ledgers written before the field). Wall-time context for the
     # D1 throughput numbers; never recorded into ClickHouse.
     host_load1: float | None = None
+    # The plan entry this record completes (ids.entry_id) and the attempt that ran it (#70);
+    # None in ledgers written before them. Never recorded into ClickHouse.
+    entry_id: str | None = None
+    attempt_id: str | None = None
 
 
 def status(rec: Record) -> Status:
@@ -67,7 +76,7 @@ def _fail(rec: Record, msg: str) -> LedgerError:
 
 
 def validate(rec: Record) -> None:
-    if not _TRACE_ID.fullmatch(rec.trace_id):
+    if not TRACE_ID.fullmatch(rec.trace_id):
         raise _fail(rec, "trace_id is not 32 lowercase hex")
     try:
         ids.check(rec.eval_run_id, "eval_run_id")
@@ -93,6 +102,12 @@ def validate(rec: Record) -> None:
         raise _fail(rec, "host_load1 must be a finite load average >= 0")
     if rec.planned_fault_kind and rec.planned_fault_kind not in kinds.KINDS:
         raise _fail(rec, f"planned_fault_kind {rec.planned_fault_kind!r}")
+    if rec.entry_id is not None and rec.entry_id != ids.entry_id(
+        rec.service, rec.planned_fault_kind, rec.query_ref
+    ):
+        raise _fail(rec, "entry_id does not derive from the service, planned kind and query")
+    if rec.attempt_id is not None and not ids.PATTERN.fullmatch(rec.attempt_id):
+        raise _fail(rec, f"attempt_id {rec.attempt_id!r}")
     if not rec.injection_id:
         if rec.fault_kind or rec.target_component or rec.params or rec.injected_at:
             raise _fail(rec, "fault_kind, target_component, params, injected_at need an injection")
@@ -123,14 +138,25 @@ def loads(line: str) -> Record:
 
 
 def append(path: Path, rec: Record) -> None:
+    """One validated record, durably (appendlog.append). The drivers go through a Writer, which
+    also keeps one record per plan entry."""
     validate(rec)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(dumps(rec) + "\n")
+    try:
+        appendlog.append(path, dumps(rec))
+    except appendlog.TornTailError as exc:
+        raise LedgerError(str(exc)) from exc
 
 
 def read(path: Path) -> list[Record]:
+    """Every record of the ledger; none for a missing file. A torn tail, a malformed line and two
+    records for one plan entry are refused."""
+    try:
+        lines = appendlog.lines(path)
+    except appendlog.TornTailError as exc:
+        raise LedgerError(str(exc)) from exc
     out: list[Record] = []
-    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    seen: set[str] = set()
+    for n, line in enumerate(lines, start=1):
         if not line.strip():
             continue
         try:
@@ -138,8 +164,43 @@ def read(path: Path) -> list[Record]:
             validate(rec)
         except (LedgerError, TypeError, ValueError) as exc:
             raise LedgerError(f"{path}: line {n}: {exc}") from exc
+        if rec.entry_id is not None:
+            if rec.entry_id in seen:
+                raise LedgerError(f"{path}: line {n}: two records for entry {rec.entry_id}")
+            seen.add(rec.entry_id)
         out.append(rec)
     return out
+
+
+class Writer:
+    """The run's ledger for one attempt: appends only, one record per plan entry."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._entries = {r.entry_id for r in read(path) if r.entry_id is not None}
+
+    @property
+    def entries(self) -> frozenset[str]:
+        """The plan entries that have their record."""
+        return frozenset(self._entries)
+
+    def append(self, rec: Record) -> None:
+        if rec.entry_id is None:
+            raise LedgerError(f"ledger record {rec.trace_id!r}: a run's record needs its entry_id")
+        if rec.entry_id in self._entries:
+            raise LedgerError(f"{self.path}: entry {rec.entry_id} already has a record")
+        append(self.path, rec)
+        self._entries.add(rec.entry_id)
+
+
+def torn(path: Path) -> appendlog.Tail | None:
+    """The ledger's torn tail, if it has one."""
+    return appendlog.tail(path)
+
+
+def repair(path: Path, copy: Path) -> appendlog.Tail | None:
+    """Resume only: the torn tail copied to `copy` and cut off."""
+    return appendlog.repair(path, copy)
 
 
 def host_load1() -> float | None:

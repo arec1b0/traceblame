@@ -83,6 +83,7 @@ def test_recheck_scans_every_table_and_the_run_files(
     assert check["content_check"]["scanned"] == {
         "rows": {"spans": 3, "eval_traces": 1},
         "rows_total": 4,
+        "abandoned_traces": 0,
         "exported_spans": 1,
         "files": {"otlp.json": 1, "ledger.jsonl": 1, "plan.jsonl": 1},
         "id_fields_excluded": {"fields": ["query_ref", "ref"], "values": 3},

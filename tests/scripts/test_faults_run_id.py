@@ -154,3 +154,91 @@ def test_a_checkout_is_dirty_with_an_untracked_file_and_clean_without(tmp_path: 
     assert kindlib.is_dirty(tmp_path) is True
     with pytest.raises(SystemExit, match="uncommitted changes"):
         kindlib.require_clean(tmp_path)
+
+
+# Runs of a committed plan file (#70) ---------------------------------------------------------
+
+
+def test_a_plan_run_is_named_after_its_plan_and_records_the_plan_file(work: Path) -> None:
+    run_id = faultslib.new_run(seed=19, commit=COMMIT, dirty=False, now=BEFORE, plan_name="d1")
+    assert run_id == "faults-d1-20261105-s19-abcdef0"
+    run = faultslib.open_run(run_id)
+    assert run["plan"] == faultslib.plan_ref("d1")
+    assert len(run["plan"]["sha256"]) == 64
+    assert faultslib.run_plan(run) == "d1"
+    assert faultslib.run_config(run_id)["seed"] == 19
+    # The validation run keeps its id and its run.json (no plan key): older tools read it.
+    validation = faultslib.new_run(seed=7, commit=COMMIT, dirty=False, now=BEFORE)
+    assert "plan" not in faultslib.open_run(validation)
+    assert faultslib.run_plan(faultslib.open_run(validation)) == faultslib.VALIDATION
+
+
+def test_creating_a_plan_run_never_resumes_an_existing_one(work: Path) -> None:
+    kwargs = {"seed": 7, "commit": COMMIT, "dirty": False, "now": BEFORE, "plan_name": "smoke"}
+    first = faultslib.new_run(**kwargs)  # type: ignore[arg-type]
+    second = faultslib.new_run(**kwargs)  # type: ignore[arg-type]
+    third = faultslib.new_run(**kwargs)  # type: ignore[arg-type]
+    assert (first, second, third) == (
+        "faults-smoke-20261105-s7-abcdef0",
+        "faults-smoke-20261105-s7-abcdef0-2",
+        "faults-smoke-20261105-s7-abcdef0-3",
+    )
+    assert sorted(p.name for p in work.iterdir()) == [first, second, third]
+
+
+def test_a_resume_needs_an_existing_run_of_that_plan(work: Path) -> None:
+    run_id = faultslib.new_run(seed=19, commit=COMMIT, dirty=False, now=BEFORE, plan_name="d1")
+    assert faultslib.resume_run(run_id, "d1") == run_id
+    assert faultslib.resume_run(run_id) == run_id
+    with pytest.raises(faultslib.RunError, match="is of plan d1, not smoke"):
+        faultslib.resume_run(run_id, "smoke")
+    with pytest.raises(faultslib.RunError, match=r"no run\.json"):
+        faultslib.resume_run("faults-d1-20261105-s19-0000000", "d1")
+    with pytest.raises(faultslib.RunError, match="is of plan d1, this phase validation"):
+        faultslib.ensure_run(run_id, seed=19, commit=COMMIT, dirty=False, now=AFTER)
+
+
+def test_a_plan_file_that_changed_since_the_run_was_created_is_refused(
+    work: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plans = tmp_path / "plans"
+    plans.mkdir()
+    text = (faultslib.PLANS / "smoke.yaml").read_text(encoding="utf-8")
+    (plans / "smoke.yaml").write_text(text, encoding="utf-8")
+    monkeypatch.setattr(faultslib, "PLANS", plans)
+    run_id = faultslib.new_run(seed=7, commit=COMMIT, dirty=False, now=BEFORE, plan_name="smoke")
+    assert faultslib.resume_run(run_id, "smoke") == run_id
+    (plans / "smoke.yaml").write_text(text + "\n# edited\n", encoding="utf-8")
+    with pytest.raises(faultslib.RunError, match=r"changed since run .* was created"):
+        faultslib.resume_run(run_id, "smoke")
+    with pytest.raises(faultslib.RunError, match="changed since"):
+        faultslib.ensure_run(
+            run_id, seed=7, commit=COMMIT, dirty=False, now=AFTER, plan_name="smoke"
+        )
+
+
+def _recipe(target: str) -> str:
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "Makefile").read_text(encoding="utf-8")
+    return text.split(f"\n{target}:", 1)[1].split("\n\n", 1)[0]
+
+
+def test_faults_d1_creates_a_run_without_run_id_and_resumes_with_it() -> None:
+    recipe = _recipe("faults-d1")
+    assert "run_id.py $(if $(RUN_ID),resume --run-id $(RUN_ID),new) --plan $(PLAN)" in recipe
+    assert recipe.count("run_id.py") == 1, "the id is computed once"
+    for target in ("faults-agentic-rag", "faults-runbook-agent", "faults-report"):
+        assert f'{target} RUN_ID="$$run_id"' in recipe, target
+    assert 'tee -a ".tools/faults/$$run_id/run.log"' in recipe
+    # Only the kind phases take the shared lock, inside the two targets: never the whole run.
+    assert "flock" not in recipe
+    for target in ("faults-agentic-rag", "faults-runbook-agent"):
+        assert 'flock "$(KIND_LOCK)"' in _recipe(target)
+    assert "date" not in recipe.replace("date -u +%Y-%m-%dT%H:%M:%SZ", "")
+    assert "rev-parse" not in recipe
+
+
+def test_faults_progress_takes_no_lock() -> None:
+    recipe = _recipe("faults-progress")
+    assert "progress.py --run-id" in recipe
+    assert "flock" not in recipe

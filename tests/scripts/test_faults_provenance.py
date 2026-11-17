@@ -573,3 +573,87 @@ def test_a_runbook_agent_run_needs_its_eval_pod_sampled_in_the_run_phase() -> No
         for p in provenance.run_problems({"run": rec, **full}, "runbook-agent")
     )
     assert provenance.run_problems({"run": rec2, **full}, "runbook-agent") == []
+
+
+# The resume fingerprint (#70) ------------------------------------------------------------------
+
+FINGERPRINT: dict[str, Any] = {
+    "traceblame": ("a" * 40, False),
+    "app": ("b" * 40, False),
+    "plan_sha256": "1" * 64,
+    "queries_sha256": "2" * 64,
+    "faults_sha256": {"packages/faults/src/x.py": "3" * 64},
+    "model": {"name": "qwen2.5:7b", "digest": "sha256:" + "4" * 64, "server_version": "0.12.6"},
+}
+
+
+def _fingerprint(cluster: Cluster, **changes: Any) -> dict[str, Any]:
+    snap = provenance.snapshot(cluster, NOW)
+    return provenance.fingerprint(snap, **(FINGERPRINT | changes))
+
+
+def test_the_fingerprint_holds_every_field_a_resume_compares() -> None:
+    fp = _fingerprint(Cluster(), preload_sha256="5" * 64, eval_config_id=CONFIG)
+    assert fp["traceblame"] == {"commit": "a" * 40, "dirty": False}
+    assert fp["app"] == {"commit": "b" * 40, "dirty": False}
+    assert fp["images"]["otel-agent"] == [_id(1)], "one id for both agent pods"
+    assert set(fp["images"]) == set(provenance.ROLES)
+    assert fp["migrations"] == {
+        "clickhouse": ["0001 spans ec39fa3ba092", "0002 trace_arrivals 06f38018e34f"],
+        "postgres": ["0001 assembler_partitions 8ae1a3710e21"],
+    }
+    assert (fp["plan_sha256"], fp["queries_sha256"]) == ("1" * 64, "2" * 64)
+    assert (fp["preload_sha256"], fp["eval_config_id"]) == ("5" * 64, CONFIG)
+    assert fp["model"]["server_version"] == "0.12.6"
+    assert "preload_sha256" not in _fingerprint(Cluster())
+
+
+def test_the_same_cluster_at_another_time_gives_the_same_fingerprint() -> None:
+    cluster = Cluster()
+    later = provenance.snapshot(cluster, datetime(2026, 11, 6, 21, 0, 0, tzinfo=UTC))
+    assert provenance.fingerprint(later, **FINGERPRINT) == _fingerprint(cluster)
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["image", "migration", "commit", "dirty", "plan", "model", "preload", "faults", "eval"],
+)
+def test_every_kind_of_change_changes_the_fingerprint(change: str) -> None:
+    cluster, kwargs = Cluster(), dict[str, Any]()
+    base = _fingerprint(Cluster(), preload_sha256="5" * 64, eval_config_id=CONFIG)
+    if change == "image":
+        cluster.pods[2]["status"]["containerStatuses"][0]["imageID"] = _id(99)
+    elif change == "migration":
+        cluster.ch += "; 0003 eval_exclusions (expand, 0123456789ab, 2026-11-17T10:00:00Z)"
+    elif change == "commit":
+        kwargs["app"] = ("c" * 40, False)
+    elif change == "dirty":
+        kwargs["traceblame"] = ("a" * 40, True)
+    elif change == "plan":
+        kwargs["plan_sha256"] = "9" * 64
+    elif change == "model":
+        kwargs["model"] = FINGERPRINT["model"] | {"server_version": "0.12.7"}
+    elif change == "faults":
+        kwargs["faults_sha256"] = {"packages/faults/src/x.py": "8" * 64}
+    preload = "6" * 64 if change == "preload" else "5" * 64
+    config = "sha256:" + "d" * 64 if change == "eval" else CONFIG
+    changed = _fingerprint(cluster, preload_sha256=preload, eval_config_id=config, **kwargs)
+    assert changed != base
+
+
+def test_a_snapshot_that_read_nothing_gives_no_fingerprint() -> None:
+    cluster = Cluster()
+    cluster.fail_exec.add("clickhouse")
+    with pytest.raises(provenance.FingerprintError, match="clickhouse: read failed"):
+        _fingerprint(cluster)
+    with pytest.raises(provenance.FingerprintError, match="no images found"):
+        _fingerprint(Cluster([]))
+
+
+def test_a_recorder_exposes_its_start_snapshot() -> None:
+    state: dict[str, Any] = {}
+    recorder = provenance.begin(
+        state, "run", kubectl=Cluster(), log=lambda _: None, now=lambda: NOW
+    )
+    assert recorder.start["images"]["nats"][0]["image_id"] == _id(5)
+    assert state == {}, "nothing is recorded before end()"

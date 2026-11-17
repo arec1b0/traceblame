@@ -1,0 +1,94 @@
+{
+  "agentic_rag": {
+    "answerable_sampled": 130,
+    "cuad_contracts": {
+      "both_sides": 17,
+      "calib": 38,
+      "test": 41,
+      "total": 62
+    },
+    "excluded_listed": 12,
+    "excluded_removed": 2,
+    "mapped": 129
+  },
+  "agentic_rag_commit": "5370b067fdd1c44553fc34c5abb92f267d2393a1",
+  "counts": {
+    "agentic-rag": {
+      "by_split": {
+        "calib": 55,
+        "test": 55
+      },
+      "kinds": {
+        "clean": {
+          "calib": 55,
+          "test": 55
+        },
+        "golden_context_removed": {
+          "calib": 37,
+          "test": 38
+        },
+        "malformed_output": {
+          "calib": 26,
+          "test": 24
+        },
+        "output_budget_exhausted": {
+          "calib": 37,
+          "test": 38
+        },
+        "prompt_variant": {
+          "calib": 26,
+          "test": 24
+        },
+        "step_memory_loss": {
+          "calib": 39,
+          "test": 36
+        },
+        "tool_failure": {
+          "calib": 39,
+          "test": 36
+        }
+      },
+      "queries": 110
+    },
+    "runbook-agent": {
+      "by_split": {
+        "calib": 45,
+        "test": 45
+      },
+      "kinds": {
+        "clean": {
+          "calib": 20,
+          "test": 20
+        },
+        "malformed_output": {
+          "calib": 13,
+          "test": 12
+        },
+        "prompt_variant": {
+          "calib": 12,
+          "test": 13
+        }
+      },
+      "queries": 90
+    }
+  },
+  "cuad": {
+    "archive_sha256": "f8161d18bea4e9c05e78fa6dda61c19c846fb8087ea969c172753bc2f45b999a",
+    "commit": "67faa0e6023b04fcaae6cc09497ab00e5d63a2a2",
+    "split_member": "test.json"
+  },
+  "faults_sha256": "d903adecbff3a673e54a16a781e343e9ad17d94a48cebd3b18f24b4f484bc110",
+  "files": {
+    "d1.queries.jsonl": "bf15033f9bd1ca5743b1c44b66a420b3c81c20c113aaa54093dd8475f8580d2d",
+    "validation.queries.jsonl": "2e88049768b3a24dd9b061c42421ca168c4b3e358e1f29191424d11814c1bd15"
+  },
+  "generator_commit": "bd338c866ac0a3fd50a02fc463ea068d76ceead3",
+  "plan": "d1",
+  "plan_sha256": "4c5e9c819795e587a34e6fa3dc1601ac79b015ee58a6fb9b2fef7de2a03481c0",
+  "runbook_agent": {
+    "distinct_tuples": 90,
+    "excluded_tuples": 11,
+    "tasks": 90
+  },
+  "validation_plan_sha256": "89ae4229c2a79ae74235e41117c3d91720385cc74913e00169c6973b080b1e9f"
+}

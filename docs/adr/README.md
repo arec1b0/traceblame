@@ -33,3 +33,4 @@ improvising.
 | [0008](0008-fault-taxonomy-and-eval-ground-truth.md) | Fault taxonomy, injection points and eval ground truth | Proposed |
 | [0009](0009-fault-run-image-identity.md) | Image identity of a fault run: what a pod's imageID can be compared with | Proposed |
 | [0010](0010-detector-findings-revisions-and-versions.md) | Detector findings: revisions, run markers and params-derived versions | Proposed |
+| [0011](0011-resumable-eval-collection-and-the-d1-split.md) | Resumable eval collection: abandoned traces, the label join and the D1 split | Proposed |

@@ -2,9 +2,12 @@
 
   queries  CUAD questions (cuad.sample), each contract chunked by the app's own chunker and its
            golden chunks mapped (traceblame_faults.golden); JSON lines of plan.Query, no text.
-  run      every plan entry through the real RAGAgent and its tools, traced by traceblame-py,
-           the entry's fault injected at its seam; one ledger record per trace, and one outcome
-           line per entry on stdout (ids, counts and timings, no text).
+  run      every remaining plan entry of one attempt (#70) through the real RAGAgent and its
+           tools, traced by traceblame-py, the entry's fault injected at its seam. Per entry:
+           entry_start and, at the root span, its trace id into the attempt log; once the trace
+           has ended and its spans are flushed, one ledger record; one outcome line (ids,
+           counts and timings, no text) into outcomes.<attempt>.jsonl. Entries that have their
+           ledger record are skipped.
 
 Seams (no app code changes; ADR draft "Fault taxonomy, injection points and eval ground truth"):
 - the agent's, the judge's and the summarizer's AsyncOpenAI clients get an httpx2 transport that
@@ -41,7 +44,19 @@ import run as app_run  # tools/fixtures/agentic_rag/run.py: chunks, session ids,
 from opentelemetry import trace
 
 import traceblame_py
-from traceblame_faults import bundle, golden, guard, ids, kinds, ledger, mutate, plan, retrieval
+from traceblame_faults import (
+    appendlog,
+    bundle,
+    golden,
+    guard,
+    ids,
+    kinds,
+    ledger,
+    mutate,
+    plan,
+    retrieval,
+    runner,
+)
 
 APP = "agentic-rag"
 CHAT_PATH = "/chat/completions"
@@ -60,10 +75,17 @@ def _trace_id(span: trace.Span) -> str:
 class Injection:
     """One plan entry while its trace runs: what fired, where, and the marked spans."""
 
-    def __init__(self, entry: plan.Entry, query: plan.Query, baseline: str) -> None:
+    def __init__(
+        self,
+        entry: plan.Entry,
+        query: plan.Query,
+        baseline: str,
+        on_trace: Callable[[str], None] = lambda _: None,
+    ) -> None:
         self.entry = entry
         self.query = query
         self.baseline = baseline
+        self.on_trace = on_trace  # the trace id, as soon as the root span gives it
         self.bundle_digest = baseline
         self.trace_id: str | None = None
         self.applied: dict[str, Any] | None = None
@@ -276,6 +298,7 @@ def _install(
     async def loop(*args: Any, **kwargs: Any) -> Any:
         span = trace.get_current_span()
         inj.trace_id = _trace_id(span)
+        inj.on_trace(inj.trace_id)
         if e.kind == "prompt_variant":
             inj.fire(span, {"bundle_digest": inj.bundle_digest})
         return await orig_loop(*args, **kwargs)
@@ -386,16 +409,23 @@ async def _run(args: argparse.Namespace) -> int:
     )
     if not aegis.setup_tracing():
         raise SystemExit("run: tracing is off (TRACEBLAME_ENABLED=1 and traceblame-py needed)")
-    ledger_path = Path(args.ledger)
+    # traceblame-py's provider is the global one (instrument()); a proxy provider has no flush.
+    flush = getattr(trace.get_tracer_provider(), "force_flush", None)
+    if flush is None:
+        raise SystemExit("run: the global tracer provider cannot flush spans")
+    run_dir = Path(args.run_dir)
+    log = runner.EntryLog(run_dir, args.attempt_id, os.environ["TRACEBLAME_EVAL_RUN_ID"])
+    outcomes = run_dir / f"outcomes.{args.attempt_id}.jsonl"
     agent: Any = None
     try:
-        for e in entries:
+        for e in log.remaining(entries):
             q, item = queries[e.query_ref], items[e.query_ref]
             store = stores.get(item.title)
             if agent is None:
                 # One agent per process: the app registers its Prometheus metrics globally.
                 agent = RAGAgent(vector_store=store, enable_tracing=False)
-            inj = Injection(e, q, baseline)
+            log.start(e)
+            inj = Injection(e, q, baseline, on_trace=lambda tid, e=e: log.trace(e, tid))
             undo = _install(agent, inj, store, stores, item, titles, variants)
             started = time.monotonic()
             outcome: dict[str, Any] = {"query_ref": e.query_ref, "kind": e.kind}
@@ -416,12 +446,16 @@ async def _run(args: argparse.Namespace) -> int:
             outcome["llm_calls"] = dict(inj.calls)
             outcome["marked_spans"] = len(inj.marked)
             if inj.trace_id is None:
+                log.no_record(e, "no_trace")
                 outcome["status"] = "no_trace"
             else:
-                rec = inj.record()
-                ledger.append(ledger_path, rec)
+                # The ledger line says the trace is complete: its spans leave the process first.
+                if not flush():
+                    raise SystemExit(f"run: spans of {e.entry_id} were not flushed in time")
+                rec = log.record(e, inj.record())
                 outcome |= {"trace_id": inj.trace_id, "status": ledger.status(rec)}
-            print(json.dumps(outcome), flush=True)
+            outcome["entry_id"] = e.entry_id
+            appendlog.append(outcomes, json.dumps(outcome, sort_keys=True))
     finally:
         aegis.shutdown_tracing()
     return 0
@@ -442,7 +476,8 @@ def main() -> int:
     r.add_argument("--archive", required=True)
     r.add_argument("--plan", required=True)
     r.add_argument("--queries", required=True)
-    r.add_argument("--ledger", required=True)
+    r.add_argument("--run-dir", required=True, help="the app's run directory (ledger, attempts)")
+    r.add_argument("--attempt-id", required=True)
     args = parser.parse_args()
     app_run.quiet_logs()
     if args.command == "queries":

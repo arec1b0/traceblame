@@ -3,7 +3,12 @@
 scenarios check   load and validate every packaged scenario
 plan              the injection plan of one app from a queries file (JSON lines)
 check-ledger      validate a ledger; counts by status
-record            a ledger into eval_traces and injections (needs the store extra)
+record            a ledger into eval_traces and injections, and a run's abandoned traces
+                  (--attempts) into eval_exclusions (needs the store extra)
+dataset trace-ids the trace ids of a run's eval_traces rows, for `traceblame-detectors
+                  snapshot-export --trace-ids-file`, and the run's exclusions with their
+                  counts next to it; never the id of an abandoned trace (needs the store extra)
+dataset labels    one JSON line per trace of the run: its label and split side
 digest            aegis.bundle.digest of prompt templates
 """
 
@@ -94,15 +99,47 @@ def _check_ledger(args: argparse.Namespace) -> int:
 
 
 def _record(args: argparse.Namespace) -> int:  # pragma: no cover - live ClickHouse (integration)
-    from traceblame_faults import record
+    from traceblame_faults import attempts, record
     from traceblame_storage.client import ClickHouseClient, parse_url
 
     records = ledger.read(Path(args.ledger))
+    abandoned = attempts.abandoned(attempts.read(Path(args.attempts))) if args.attempts else []
     client = ClickHouseClient(parse_url(args.url))
     try:
-        print(json.dumps(record.record(client, records)))
+        print(json.dumps(record.record(client, records, abandoned)))
     finally:
         client.close()
+    return 0
+
+
+def _dataset(args: argparse.Namespace) -> int:  # pragma: no cover - live ClickHouse (integration)
+    from dataclasses import asdict
+
+    from traceblame_faults import dataset, querylist
+    from traceblame_storage.client import ClickHouseClient, parse_url
+
+    splits = None
+    if args.queries:
+        rows = querylist.loads(Path(args.queries).read_text(encoding="utf-8"))
+        splits = {r.query_ref: r.split for r in rows}
+    client = ClickHouseClient(parse_url(args.url))
+    try:
+        ds = dataset.read(client, args.eval_run_id, splits=splits)
+    finally:
+        client.close()
+    out = Path(args.out)
+    if args.action == "trace-ids":
+        out.write_text("".join(t + "\n" for t in ds.trace_ids), encoding="utf-8")
+        sidecar = {"counts": ds.counts(), "excluded": [asdict(a) for a in ds.excluded]}
+        out.with_name(out.name + ".exclusions.json").write_text(
+            json.dumps(sidecar, indent=2) + "\n", encoding="utf-8"
+        )
+    else:
+        out.write_text(
+            "".join(json.dumps(r, sort_keys=True) + "\n" for r in dataset.labels(ds)),
+            encoding="utf-8",
+        )
+    print(json.dumps(ds.counts()))
     return 0
 
 
@@ -131,6 +168,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     r = sub.add_parser("record")
     r.add_argument("--ledger", required=True)
     r.add_argument("--url", required=True, help="http(s)://user:pass@host:port/database")
+    r.add_argument("--attempts", help="the run's attempts.jsonl: its abandoned traces")
+    ds = sub.add_parser("dataset")
+    ds.add_argument("action", choices=["trace-ids", "labels"])
+    ds.add_argument("--eval-run-id", required=True)
+    ds.add_argument("--url", required=True, help="http(s)://user:pass@host:port/database")
+    ds.add_argument("--queries", help="the plan's committed query list: each query's split side")
+    ds.add_argument("--out", required=True)
     d = sub.add_parser("digest")
     d.add_argument("--app", choices=kinds.APPS, required=True)
     d.add_argument("--template", type=_template, action="append", required=True)
@@ -143,6 +187,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _check_ledger(args)
     if args.command == "record":
         return _record(args)
+    if args.command == "dataset":
+        return _dataset(args)
     return _digest(args)
 
 

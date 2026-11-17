@@ -32,6 +32,12 @@ def injection_id(eval_run_id: str, kind: str, query_ref: str) -> str:
     return check(f"{eval_run_id}:{kind}:{query_hash(query_ref)}", "injection_id")
 
 
+def entry_id(app: str, kind: str, query_ref: str) -> str:
+    """`{app}:{kind|clean}:{sha256(query_ref)[:12]}`: one plan entry (#70). The same for every
+    run of a plan file, and unique within a plan (a query runs at most once per kind)."""
+    return check(f"{app}:{kind or 'clean'}:{query_hash(query_ref)}", "entry_id")
+
+
 def rank(seed: int, *parts: str) -> str:
     """Sort key of a seeded ranking, like cuad.sample's: sha256 of "seed:part:..."."""
     return hashlib.sha256(":".join([str(seed), *parts]).encode()).hexdigest()

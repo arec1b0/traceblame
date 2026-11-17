@@ -15,6 +15,7 @@ from typing import Any
 from traceblame_faults import ids, kinds, scenario
 
 GOLDEN_STATUSES = ("mapped", "unmapped", "none")
+SPLITS = ("", "calib", "test")
 
 
 class PlanError(ValueError):
@@ -31,6 +32,8 @@ class Query:
     stratum: str
     golden_status: str
     golden_doc_ids: tuple[str, ...] = ()
+    # "calib" | "test" from the plan's committed query list (#70); "" where a plan has no split.
+    split: str = ""
 
     def with_(self, **changes: Any) -> "Query":
         return replace(self, **changes)
@@ -45,6 +48,9 @@ class Entry:
     params: Mapping[str, Any] = field(default_factory=dict[str, Any])
     injection_id: str = ""
     seed: int = 0
+    # ids.entry_id(app, kind, query_ref): what a ledger record completes (#70). "" only in
+    # an Entry built by hand; plan() and loads() always set it.
+    entry_id: str = ""
 
 
 def plan(
@@ -70,7 +76,9 @@ def plan(
     pool = sorted(queries, key=lambda q: ids.rank(seed, "clean", q.ref))
     if clean > len(pool):
         raise PlanError(f"clean: {clean} wanted, {len(pool)} queries")
-    entries += [Entry(q.ref, app, "", "", {}, "", seed) for q in pool[:clean]]
+    entries += [
+        Entry(q.ref, app, "", "", {}, "", seed, ids.entry_id(app, "", q.ref)) for q in pool[:clean]
+    ]
     used = {e.query_ref for e in entries} if exclusive else set[str]()
     for kind in sorted(counts):
         n = counts[kind]
@@ -99,9 +107,23 @@ def plan(
                     params,
                     ids.injection_id(eval_run_id, kind, q.ref),
                     seed,
+                    ids.entry_id(app, kind, q.ref),
                 )
             )
     entries.sort(key=lambda e: (ids.rank(seed, e.query_ref), e.kind))
+    return check_entries(entries)
+
+
+def check_entries(entries: list[Entry]) -> list[Entry]:
+    """Every entry's entry_id derives from its app, kind and query, and no two entries share
+    one."""
+    seen: set[str] = set()
+    for e in entries:
+        if e.entry_id != ids.entry_id(e.app, e.kind, e.query_ref):
+            raise PlanError(f"entry_id {e.entry_id!r} does not derive from its app, kind and query")
+        if e.entry_id in seen:
+            raise PlanError(f"duplicate entry_id {e.entry_id}")
+        seen.add(e.entry_id)
     return entries
 
 
@@ -117,8 +139,11 @@ def loads(text: str) -> list[Entry]:
     for line in text.splitlines():
         if line.strip():
             d = json.loads(line)
+            # A plan written before #70 has no entry_id: it is derived, never guessed.
+            if not d.get("entry_id"):
+                d["entry_id"] = ids.entry_id(d["app"], d["kind"], d["query_ref"])
             out.append(Entry(**d))
-    return out
+    return check_entries(out)
 
 
 def dump_queries(queries: Sequence[Query]) -> str:
@@ -137,5 +162,7 @@ def load_queries(text: str) -> list[Query]:
             q = Query(**d)
             if q.golden_status not in GOLDEN_STATUSES:
                 raise PlanError(f"query {q.ref}: golden_status {q.golden_status!r}")
+            if q.split not in SPLITS:
+                raise PlanError(f"query {q.ref}: split {q.split!r}")
             out.append(q)
     return out

@@ -13,7 +13,10 @@ which is what the rules' `service` label reads (check_names).
 """
 
 import hashlib
+import json
 import random
+import re
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -105,6 +108,77 @@ def plan(seed: int, per_scenario: int, *, timeouts: int = 2, rejections: int = 2
     for scenario in blocks:
         indices = sorted(range(per_scenario), key=lambda i: _rank(seed, f"task:{scenario}:{i}"))
         for i in indices:
+            approval = (
+                decision.get((scenario, i), "approve") if scenario in APPROVAL_SCENARIOS else None
+            )
+            tasks.append(Task(scenario, i, _params(seed, scenario, i), approval, order=len(tasks)))
+    return tasks
+
+
+_REF = re.compile(r"^(?P<scenario>[a-z]+)-(?P<index>\d+)@s(?P<seed>\d+)$")
+_DISTINCT_SCAN = 100_000
+
+
+def tuple_key(scenario: str, params: dict[str, Any]) -> str:
+    """A task's (scenario, parameters) tuple as one string: what makes two tasks the same source
+    query, whatever their names (#70)."""
+    return f"{scenario}:{json.dumps(params, sort_keys=True, separators=(',', ':'))}"
+
+
+def ref_tuple(ref: str) -> str:
+    """The tuple of a task ref `<scenario>-<index>@s<seed>` (the faults' query_ref)."""
+    found = _REF.fullmatch(ref)
+    if found is None or found["scenario"] not in SCENARIOS:
+        raise ValueError(f"not a task ref: {ref!r}")
+    scenario = found["scenario"]
+    return tuple_key(scenario, _params(int(found["seed"]), scenario, int(found["index"])))
+
+
+def distinct_plan(
+    seed: int,
+    per_scenario: int,
+    *,
+    scenarios: Sequence[str],
+    exclude: Collection[str] = (),
+    timeouts: int = 2,
+    rejections: int = 2,
+) -> list[Task]:
+    """per_scenario tasks of each of these scenarios whose (scenario, parameters) tuples are
+    distinct and not in `exclude` (tuple_key values): per scenario the lowest indices that
+    qualify, so task names skip the indices that repeat a tuple. Ordered and decided like
+    plan(): blocks and tasks by the seed, `timeouts` and `rejections` among the chosen tasks
+    whose runbook needs approval."""
+    chosen: dict[str, list[int]] = {}
+    for scenario in scenarios:
+        if scenario not in SCENARIOS:
+            raise ValueError(f"unknown scenario {scenario!r}")
+        seen = set(exclude)
+        indices: list[int] = []
+        for i in range(_DISTINCT_SCAN):
+            key = tuple_key(scenario, _params(seed, scenario, i))
+            if key in seen:
+                continue
+            seen.add(key)
+            indices.append(i)
+            if len(indices) == per_scenario:
+                break
+        if len(indices) < per_scenario:
+            raise ValueError(
+                f"{scenario}: {len(indices)} distinct tasks, {per_scenario} wanted"
+                f" ({len(set(exclude))} tuples excluded)"
+            )
+        chosen[scenario] = indices
+    approval_tasks = sorted(
+        ((s, i) for s in APPROVAL_SCENARIOS if s in chosen for i in chosen[s]),
+        key=lambda t: _rank(seed, f"approval:{t[0]}:{t[1]}"),
+    )
+    if timeouts + rejections > len(approval_tasks):
+        raise ValueError("more timeouts and rejections than approval tasks")
+    decision = dict.fromkeys(approval_tasks[:timeouts], "timeout")
+    decision |= dict.fromkeys(approval_tasks[timeouts : timeouts + rejections], "reject")
+    tasks: list[Task] = []
+    for scenario in sorted(chosen, key=lambda s: _rank(seed, f"block:{s}")):
+        for i in sorted(chosen[scenario], key=lambda i: _rank(seed, f"task:{scenario}:{i}")):
             approval = (
                 decision.get((scenario, i), "approve") if scenario in APPROVAL_SCENARIOS else None
             )

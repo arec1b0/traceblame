@@ -47,6 +47,13 @@ make kind-down      # deletes the cluster and ALL its data, ClickHouse included
   the node containers (Docker Desktop, Windows update, `wsl --shutdown`).
   - **`make kind-down` deletes the data.** `kind delete cluster` removes the node containers
     together with their `/var` volumes.
+  - **The PersistentVolume's reclaim policy is `Delete`.** `Retain` above is the operator's
+    policy for the claim. The volume under it has `persistentVolumeReclaimPolicy: Delete`, the
+    default of the `standard` StorageClass (`reclaimPolicy: Delete`; read from the cluster with
+    `kubectl get sc,pv` on 2026-11-17). So deleting the PVC by hand deletes the volume and its
+    data, as `make kind-down` does. **Either one destroys D1** (#19, #70): `eval_traces`,
+    `injections`, `eval_exclusions` and the spans of every collected trace. Do neither between
+    the start of a D1 run and its frozen snapshot under `evals/datasets/`.
   - To start ClickHouse empty without kind-down, delete the CHI and its PVC
     (`kubectl -n observability delete chi traceblame && kubectl -n observability delete pvc -l clickhouse.altinity.com/chi=traceblame`),
     then run `make kind-deploy`.
