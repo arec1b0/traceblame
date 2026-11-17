@@ -126,3 +126,139 @@ def test_host_load1_is_none_where_the_platform_has_no_load_average(
 
     monkeypatch.setattr(os, "getloadavg", unavailable)
     assert ledger.host_load1() is None
+
+
+# Resume (#70): durable appends, one record per plan entry, torn tails ------------------------
+
+ENTRY = ids.entry_id("agentic-rag", "", CLEAN.query_ref)
+WITH_ENTRY = replace(CLEAN, entry_id=ENTRY, attempt_id="a001-20261117T100000Z")
+OTHER_TRACE = "0af7651916cd43dd8448eb211c80319c"
+
+
+def test_a_record_names_its_plan_entry_and_attempt_and_old_lines_load_without_them(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "ledger.jsonl"
+    ledger.append(path, WITH_ENTRY)
+    old = json.loads(ledger.dumps(FAULTED))
+    del old["entry_id"], old["attempt_id"]  # a #14 ledger line
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(old) + "\n")
+    assert ledger.read(path) == [WITH_ENTRY, FAULTED]
+    assert (FAULTED.entry_id, FAULTED.attempt_id) == (None, None)
+
+
+@pytest.mark.parametrize(
+    ("rec", "match"),
+    [
+        (replace(CLEAN, entry_id="agentic-rag:clean:0123456789ab"), "entry_id"),
+        (replace(FAULTED, entry_id=ENTRY), "entry_id"),
+        (replace(WITH_ENTRY, attempt_id="attempt one"), "attempt_id"),
+    ],
+)
+def test_an_entry_id_must_derive_from_the_record(rec: ledger.Record, match: str) -> None:
+    with pytest.raises(ledger.LedgerError, match=match):
+        ledger.validate(rec)
+
+
+def test_append_is_one_write_on_o_append_followed_by_fsync(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, object]] = []
+    real_open, real_write, real_fsync = os.open, os.write, os.fsync
+
+    def spy_open(path: object, flags: int, *args: object) -> int:
+        calls.append(("open", flags))
+        return real_open(path, flags, *args)  # type: ignore[arg-type]
+
+    def spy_write(fd: int, data: bytes) -> int:
+        calls.append(("write", bytes(data)))
+        return real_write(fd, data)
+
+    def spy_fsync(fd: int) -> None:
+        calls.append(("fsync", None))
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "open", spy_open)
+    monkeypatch.setattr(os, "write", spy_write)
+    monkeypatch.setattr(os, "fsync", spy_fsync)
+    path = tmp_path / "ledger.jsonl"
+    path.write_bytes(b"")  # exists: no directory fsync to tell apart
+    ledger.append(path, WITH_ENTRY)
+    names = [name for name, _ in calls]
+    assert names == ["open", "write", "fsync"]
+    assert int(calls[0][1]) & os.O_APPEND  # type: ignore[call-overload]
+    assert calls[1][1] == (ledger.dumps(WITH_ENTRY) + "\n").encode()
+
+
+def test_the_ledger_is_never_truncated_by_an_append(tmp_path: Path) -> None:
+    path = tmp_path / "ledger.jsonl"
+    ledger.append(path, WITH_ENTRY)
+    before = path.read_bytes()
+    ledger.append(path, replace(FAULTED, trace_id=OTHER_TRACE))
+    assert path.read_bytes().startswith(before)
+
+
+def test_a_writer_refuses_a_second_record_for_an_entry(tmp_path: Path) -> None:
+    path = tmp_path / "ledger.jsonl"
+    writer = ledger.Writer(path)
+    writer.append(WITH_ENTRY)
+    with pytest.raises(ledger.LedgerError, match="already has a record"):
+        writer.append(replace(WITH_ENTRY, trace_id=OTHER_TRACE))
+    # A new writer on the same file (the next attempt) knows the entry too.
+    with pytest.raises(ledger.LedgerError, match="already has a record"):
+        ledger.Writer(path).append(replace(WITH_ENTRY, trace_id=OTHER_TRACE))
+    with pytest.raises(ledger.LedgerError, match="entry_id"):
+        ledger.Writer(path).append(CLEAN)
+    assert ledger.read(path) == [WITH_ENTRY]
+
+
+def test_two_records_for_one_entry_in_a_file_are_refused_on_read(tmp_path: Path) -> None:
+    path = tmp_path / "ledger.jsonl"
+    ledger.append(path, WITH_ENTRY)
+    ledger.append(path, replace(WITH_ENTRY, trace_id=OTHER_TRACE))  # not through a Writer
+    with pytest.raises(ledger.LedgerError, match="two records"):
+        ledger.read(path)
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        b'{"trace_id": "4bf9',  # half a record
+        ledger.dumps(replace(FAULTED, trace_id=OTHER_TRACE)).encode(),  # whole JSON, no newline
+    ],
+)
+def test_a_torn_tail_is_refused_by_every_reader_and_writer(tmp_path: Path, tail: bytes) -> None:
+    path = tmp_path / "ledger.jsonl"
+    ledger.append(path, WITH_ENTRY)
+    with path.open("ab") as f:
+        f.write(tail)
+    assert ledger.torn(path) is not None
+    with pytest.raises(ledger.LedgerError, match="torn tail"):
+        ledger.read(path)
+    with pytest.raises(ledger.LedgerError, match="torn tail"):
+        ledger.append(path, FAULTED)
+    with pytest.raises(ledger.LedgerError, match="torn tail"):
+        ledger.Writer(path)
+
+
+def test_repair_copies_the_torn_tail_aside_and_cuts_it_off(tmp_path: Path) -> None:
+    path = tmp_path / "ledger.jsonl"
+    ledger.append(path, WITH_ENTRY)
+    whole = path.read_bytes()
+    tail = b'{"trace_id": "4bf9'
+    path.write_bytes(whole + tail)
+    copy = tmp_path / "ledger.torn.a002"
+    found = ledger.repair(path, copy)
+    assert found is not None
+    assert (found.offset, found.length) == (len(whole), len(tail))
+    assert copy.read_bytes() == tail
+    assert path.read_bytes() == whole
+    assert ledger.read(path) == [WITH_ENTRY]
+    assert ledger.repair(path, tmp_path / "ledger.torn.a003") is None
+    assert not (tmp_path / "ledger.torn.a003").exists()
+
+
+def test_a_missing_ledger_reads_as_no_records(tmp_path: Path) -> None:
+    assert ledger.read(tmp_path / "ledger.jsonl") == []
+    assert ledger.torn(tmp_path / "ledger.jsonl") is None
