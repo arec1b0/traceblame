@@ -28,6 +28,7 @@ import yaml  # noqa: E402
 from kindlib import (  # noqa: E402
     NAMESPACE,
     PortForward,
+    attr,
     kubectl,
     merge_batches,
     spans_of,
@@ -359,6 +360,46 @@ def existing_plan(d: Path, plan_text: str, queries_text: str) -> bool:
                 " the run's plan cannot change; start a new run"
             )
     return True
+
+
+def run_file_hashes(d: Path, state: dict[str, Any]) -> tuple[str, str]:
+    """The sha256 of plan.jsonl and queries.jsonl as they are on disk now: what an attempt
+    reads, and so what its fingerprint holds. They must be the files prepare/build wrote (the
+    hashes in state.json): an edit between the phases is refused, and an edit between attempts
+    is a changed provenance."""
+    hashes: list[str] = []
+    for name, key in (("plan.jsonl", "plan"), ("queries.jsonl", "queries")):
+        found = hashlib.sha256((d / name).read_bytes()).hexdigest()
+        recorded = cast("dict[str, Any]", state.get(key) or {}).get("sha256")
+        if recorded is not None and recorded != found:
+            raise RunError(
+                f"faults: {d / name} has sha256 {found[:16]}..., and {recorded[:16]}... when"
+                " the run was prepared: it changed since the run was prepared; start a new run"
+            )
+        hashes.append(found)
+    return hashes[0], hashes[1]
+
+
+def attempt_to_salvage(events: list[dict[str, Any]], current: str) -> str | None:
+    """The attempt whose tee session a resume must read before it redeploys the tee: the last
+    attempt before `current`, unless it completed (a completed attempt wrote its own copies).
+    Killed or failed makes no difference: either way its last block's copy was never written."""
+    before = [a for a in attempts.attempts(events) if a.id != current]
+    if not before or before[-1].status == "completed":
+        return None
+    return before[-1].id
+
+
+def own_spans(otlp: dict[str, Any], run_id: str) -> dict[str, Any]:
+    """The resource spans of this run only (by aegis.eval.run.id): a tee that the attempt
+    before never redeployed still holds the session of an earlier run."""
+    return {
+        "resourceSpans": [
+            rs
+            for rs in otlp.get("resourceSpans", [])
+            if attr(rs.get("resource", {}).get("attributes", []), "aegis.eval.run.id") == run_id
+        ]
+    }
 
 
 def open_attempt(

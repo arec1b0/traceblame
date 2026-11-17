@@ -466,17 +466,19 @@ def apply_oom_workloads(tasks: list[Any]) -> int:
 
 
 def _fingerprint(
-    state: dict[str, Any], snap: dict[str, Any], server_version: str
+    d: Path, state: dict[str, Any], snap: dict[str, Any], server_version: str
 ) -> dict[str, Any]:
-    """What this attempt runs on, for the resume comparison (provenance.fingerprint)."""
+    """What this attempt runs on, for the resume comparison (provenance.fingerprint). The plan
+    and the queries are hashed as the attempt reads them, not as build recorded them."""
     app_dir = Path(state["app_dir"])
+    plan_sha256, queries_sha256 = faultslib.run_file_hashes(d, state)
     try:
         return provenance.fingerprint(
             snap,
             traceblame=(git(ROOT, "rev-parse", "HEAD"), is_dirty(ROOT)),
             app=(git(app_dir, "rev-parse", "HEAD"), is_dirty(app_dir)),
-            plan_sha256=str(state["plan"]["sha256"]),
-            queries_sha256=str(state.get("queries", {}).get("sha256", "")),
+            plan_sha256=plan_sha256,
+            queries_sha256=queries_sha256,
             faults_sha256=faultslib.faults_sha256(Path(__file__).resolve()),
             model={
                 "name": common.CHAT_MODEL,
@@ -535,7 +537,7 @@ def run_phase(args: argparse.Namespace) -> int:
         d,
         entries,
         state["run_id"],
-        _fingerprint(state, prov.start, server_version),
+        _fingerprint(d, state, prov.start, server_version),
         salvage=salvage,
         nats_seq_before=faultslib.stream_last_seq(),
     )
@@ -546,14 +548,18 @@ def run_phase(args: argparse.Namespace) -> int:
             f" again, {len(rec.abandoned)} traces abandoned, torn ledger tail: {rec.torn}"
         )
     log(f"attempt {attempt.id}: {len(attempt.remaining)} of {len(entries)} entries to run")
-    for dead in rec.killed:
-        # The dead attempt's last tee session, before the tee is redeployed.
+    dead = faultslib.attempt_to_salvage(faultslib.run_events(d), attempt.id)
+    if dead is not None:
+        # The last attempt did not complete (killed or failed), so its last block's copy of
+        # the exported spans was never written: read its tee session before the tee is
+        # redeployed, and keep this run's spans of it.
         try:
-            salvaged = rb.read_tee()
+            salvaged = faultslib.own_spans(rb.read_tee(), str(state["run_id"]))
         except subprocess.CalledProcessError:
             log(f"resume: no tee to read for {dead} (its spans are checked from the store only)")
-            continue
-        (d / f"otlp.{dead}.salvaged.json").write_text(json.dumps(salvaged), encoding="utf-8")
+        else:
+            (d / f"otlp.{dead}.salvaged.json").write_text(json.dumps(salvaged), encoding="utf-8")
+            log(f"resume: {faultslib.exported_spans(salvaged)} spans of {dead} read from its tee")
     started = time.monotonic()
     status = "completed"
     safety: list[dict[str, Any]] = []

@@ -266,9 +266,11 @@ def prepare(args: argparse.Namespace) -> int:
 # run --------------------------------------------------------------------------------------
 
 
-def _fingerprint(state: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
-    """What this attempt runs on, for the resume comparison (provenance.fingerprint)."""
+def _fingerprint(d: Path, state: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
+    """What this attempt runs on, for the resume comparison (provenance.fingerprint). The plan
+    and the queries are hashed as the attempt reads them, not as prepare recorded them."""
     app_dir = Path(state["app_dir"])
+    plan_sha256, queries_sha256 = faultslib.run_file_hashes(d, state)
     ollama = str(state["ollama"])
     check_model(ollama)
     try:
@@ -276,8 +278,8 @@ def _fingerprint(state: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
             snap,
             traceblame=(git(ROOT, "rev-parse", "HEAD"), is_dirty(ROOT)),
             app=(git(app_dir, "rev-parse", "HEAD"), is_dirty(app_dir)),
-            plan_sha256=str(state["plan"]["sha256"]),
-            queries_sha256=str(state.get("queries", {}).get("sha256", "")),
+            plan_sha256=plan_sha256,
+            queries_sha256=queries_sha256,
             faults_sha256=faultslib.faults_sha256(APP_SCRIPT),
             model={
                 "name": common.CHAT_MODEL,
@@ -301,7 +303,7 @@ def run_phase(args: argparse.Namespace) -> int:
         d,
         entries,
         state["run_id"],
-        _fingerprint(state, prov.start),
+        _fingerprint(d, state, prov.start),
         nats_seq_before=faultslib.stream_last_seq(),
     )
     rec = attempt.recovery
