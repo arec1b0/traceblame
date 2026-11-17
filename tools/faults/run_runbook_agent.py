@@ -454,6 +454,17 @@ def _reset_sandbox() -> None:
     kubectl("-n", rb.MONITORING, "rollout", "status", "deployment/alertmanager", "--timeout=300s")
 
 
+def apply_oom_workloads(tasks: list[Any]) -> int:
+    """The oom tasks' workloads, up front: their rule sees only pods at least ten minutes old.
+    How many tasks it applied; nothing is applied when there is none (a plan of latency tasks,
+    or a resume whose remaining entries have no oom task), since `kubectl apply` refuses an
+    empty list."""
+    oom = [t for t in tasks if t.scenario == "oom"]
+    if oom:
+        rb.apply([o for t in oom for o in scenarios.manifests(t, _python_image())])
+    return len(oom)
+
+
 def _fingerprint(
     state: dict[str, Any], snap: dict[str, Any], server_version: str
 ) -> dict[str, Any]:
@@ -630,9 +641,7 @@ def _run_tasks(
     )
     if names:
         raise SystemExit(f"faults: workload names: {names}")
-    rb.apply(
-        [o for t in used if t.scenario == "oom" for o in scenarios.manifests(t, _python_image())]
-    )
+    apply_oom_workloads(used)
     base_env = {
         "LLM_PROVIDER": "openai",
         "OPENAI_API_KEY": "ollama",
